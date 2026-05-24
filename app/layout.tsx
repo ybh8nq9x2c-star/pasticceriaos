@@ -1,9 +1,12 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "PasticceriaOS",
   description: "Il sistema operativo per la tua pasticceria",
+};
+
+export const viewport: Viewport = {
   themeColor: "#1A2B4A",
 };
 
