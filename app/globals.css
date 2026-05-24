@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --navy:        #1A2B4A;
+  --navy-light:  #243660;
+  --gold:        #C9962A;
+  --gold-light:  #F5C842;
+  --cream:       #FAF7F2;
+  --cream-dark:  #F0EBE1;
+  --accent:      #D4512A;
+  --text:        #1A1A2E;
+  --text-muted:  #6B7280;
+  --teal:        #2A7D6B;
+  --red:         #C0392B;
+  --orange:      #E67E22;
+  --green:       #27AE60;
+  --border-warm: #E5DDD0;
+  --white:       #FFFFFF;
+  --shadow:      0 4px 24px rgba(26,43,74,.10);
+  --shadow-lg:   0 12px 48px rgba(26,43,74,.16);
+}
+
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: var(--cream);
+  color: var(--text);
+}
+
+/* Utility classes matching the HTML prototype */
+.font-display { font-family: 'Playfair Display', Georgia, serif; }
+.font-mono { font-family: 'DM Mono', ui-monospace, monospace; }
+
+/* Badge utilities */
+.badge {
+  @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+}
+.badge-green  { @apply bg-green-100 text-green-800; }
+.badge-red    { @apply bg-red-100 text-red-800; }
+.badge-orange { @apply bg-amber-100 text-amber-800; }
+.badge-blue   { @apply bg-sky-100 text-sky-800; }
+.badge-gray   { @apply bg-gray-100 text-gray-600; }
+.badge-navy   { @apply bg-[#1A2B4A] text-white; }
+.badge-teal   { @apply bg-teal-100 text-teal-800; }
