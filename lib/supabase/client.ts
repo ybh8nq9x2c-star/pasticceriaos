@@ -5,8 +5,13 @@ import { createBrowserClient } from "@supabase/ssr";
  * Reads from NEXT_PUBLIC_* env vars (safe to expose).
  */
 export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      'Missing Supabase env vars: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY ' +
+        'must be set at build time (Railway → Variables) and the app rebuilt.'
+    );
+  }
+  return createBrowserClient(supabaseUrl, supabaseAnonKey);
 }
