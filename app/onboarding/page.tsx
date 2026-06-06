@@ -1,9 +1,14 @@
 'use client';
 
 // =============================================================================
-// app/(main)/onboarding/page.tsx
+// app/onboarding/page.tsx
 // Onboarding: crea organizzazione (nome pasticceria + città).
 // Usa createOrganizationAction dal modulo identity.
+//
+// NB: vive FUORI dal route group (main) di proposito. Il layout (main) richiede
+// un'organizzazione via requireSession(); l'onboarding è la pagina dove l'org
+// viene creata, quindi non deve passare per quel layout (altrimenti loop
+// /login ↔ /onboarding per gli utenti senza organizzazione).
 // =============================================================================
 
 import { useFormState } from 'react-dom';
