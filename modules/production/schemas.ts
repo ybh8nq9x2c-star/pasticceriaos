@@ -15,7 +15,7 @@ const planItemSchema = z.object({
     .number()
     .int('Il numero di batch deve essere intero')
     .positive('Il numero di batch deve essere maggiore di 0'),
-  notes:     z.string().trim().max(500).optional().or(z.literal('')),
+  notes:     z.string().trim().max(500).nullish().or(z.literal('')),
   sortOrder: z.coerce.number().int().min(0).optional().default(0),
 });
 
