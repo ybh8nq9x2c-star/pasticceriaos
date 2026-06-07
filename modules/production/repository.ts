@@ -80,7 +80,7 @@ export async function insertPlan(
       .from('production_plan_items')
       .insert(
         input.items.map((item, idx) => ({
-          plan_id:    plan.id,
+          production_plan_id:    plan.id,
           recipe_id:  item.recipeId,
           batch_count: item.batchCount,
           notes:      item.notes || null,
@@ -122,7 +122,7 @@ export async function deletePlanItems(planId: string): Promise<void> {
   const { error } = await supabase
     .from('production_plan_items')
     .delete()
-    .eq('plan_id', planId);
+    .eq('production_plan_id', planId);
   if (error) throw mapSupabaseError(error);
 }
 
@@ -135,7 +135,7 @@ export async function insertPlanItems(
     .from('production_plan_items')
     .insert(
       items.map((item, idx) => ({
-        plan_id:    planId,
+        production_plan_id:    planId,
         recipe_id:  item.recipeId,
         batch_count: item.batchCount,
         notes:      item.notes || null,
