@@ -15,7 +15,7 @@ import { recordMovementAction } from '@/modules/inventory/actions';
 interface IngredientOption { id: string; name: string; unit: string }
 
 const MOVEMENT_TYPES = [
-  { value: 'purchase_received', label: 'Acquisto ricevuto' },
+  { value: 'purchase_receipt', label: 'Acquisto ricevuto' },
   { value: 'waste',             label: 'Scarico / Scarto' },
   { value: 'manual_adjustment', label: 'Rettifica manuale' },
   { value: 'initial_stock',     label: 'Stock iniziale' },
@@ -27,7 +27,7 @@ const labelClass = 'block text-sm font-medium text-[#1A2B4A] mb-1.5';
 export default function MovementPage() {
   const router = useRouter();
   const [ingredients, setIngredients] = useState<IngredientOption[]>([]);
-  const [movType, setMovType] = useState('purchase_received');
+  const [movType, setMovType] = useState('purchase_receipt');
 
   const [state, formAction, pending] = useFormState(recordMovementAction, IDLE_STATE);
 
@@ -95,10 +95,9 @@ export default function MovementPage() {
                 Quantità <span className="text-[#C0392B]">*</span>
               </label>
               <input
-                name="quantity"
+                name="quantityDelta"
                 type="number"
                 step="0.001"
-                min="0.001"
                 required
                 placeholder="0.00"
                 className={`${fieldClass} font-mono`}
