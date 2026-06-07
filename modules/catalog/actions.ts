@@ -7,6 +7,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { getErrorMessage } from '@/lib/errors';
 import type { ActionState } from '@/lib/utils';
 import * as service from './service';
@@ -31,7 +32,7 @@ export async function createSupplierAction(
   }
 
   revalidatePath('/suppliers');
-  return { status: 'success', message: 'Fornitore creato con successo.' };
+  redirect('/suppliers');
 }
 
 export async function updateSupplierAction(
@@ -88,7 +89,7 @@ export async function createIngredientAction(
   }
 
   revalidatePath('/ingredients');
-  return { status: 'success', message: 'Ingrediente creato con successo.' };
+  redirect('/ingredients');
 }
 
 export async function updateIngredientAction(
@@ -155,7 +156,7 @@ export async function createRecipeAction(
   }
 
   revalidatePath('/recipes');
-  return { status: 'success', message: 'Ricetta creata con successo.' };
+  redirect('/recipes');
 }
 
 export async function updateRecipeAction(

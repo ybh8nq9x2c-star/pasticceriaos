@@ -34,7 +34,7 @@ export const createIngredientSchema = z.object({
   name: z.string().trim().min(1, 'Il nome è obbligatorio').max(200),
   sku: z.string().trim().max(50).optional().or(z.literal('')),
   unit: z.enum(UNITS, { errorMap: () => ({ message: 'Unità di misura non valida' }) }),
-  supplierId: z.string().uuid().optional().or(z.literal('')),
+  supplierId: z.string().uuid().nullish().or(z.literal('')),
   unitPrice: z
     .string()
     .optional()

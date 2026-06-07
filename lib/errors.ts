@@ -3,6 +3,8 @@
 // Classi di errore applicativo e utility per gestione errori uniforme.
 // =============================================================================
 
+import { ZodError } from 'zod';
+
 // ---------------------------------------------------------------------------
 // Classi di errore
 // ---------------------------------------------------------------------------
@@ -81,6 +83,10 @@ export class BusinessRuleError extends AppError {
  * Usata nelle Server Actions per restituire messaggi all'utente.
  */
 export function getErrorMessage(error: unknown): string {
+  // ZodError: mostra il primo messaggio leggibile invece del dump JSON grezzo.
+  if (error instanceof ZodError) {
+    return error.issues[0]?.message ?? 'Dati inseriti non validi';
+  }
   if (error instanceof AppError) return error.message;
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
