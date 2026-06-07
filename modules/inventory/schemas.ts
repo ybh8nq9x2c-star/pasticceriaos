@@ -32,8 +32,8 @@ export const createMovementSchema = z
       .pipe(z.number().refine((n) => n !== 0, { message: 'La quantità non può essere 0' })),
     unit: z.enum(UNITS),
     notes: z.string().trim().max(500).optional().or(z.literal('')),
-    referenceType: z.string().trim().max(50).optional().or(z.literal('')),
-    referenceId:   z.string().uuid().optional().or(z.literal('')),
+    referenceType: z.string().trim().max(50).nullish().or(z.literal('')),
+    referenceId:   z.string().uuid().nullish().or(z.literal('')),
   })
   .refine(
     (data) =>
