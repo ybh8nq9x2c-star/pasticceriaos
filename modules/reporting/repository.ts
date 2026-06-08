@@ -28,13 +28,13 @@ export async function listIngredientRequirements(
     .order('plan_date')
     .order('ingredient_name');
 
-  if (planId) query = query.eq('plan_id', planId);
+  if (planId) query = query.eq('production_plan_id', planId);
 
   const { data, error } = await query;
   if (error) throw mapSupabaseError(error);
 
   return (data ?? []).map((r) => ({
-    planId:                r.plan_id,
+    planId:                r.production_plan_id,
     planDate:              r.plan_date,
     ingredientProductId:   r.ingredient_product_id,
     ingredientName:        r.ingredient_name,
