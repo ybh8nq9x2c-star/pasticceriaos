@@ -357,7 +357,7 @@ export interface Database {
       production_plan_items: {
         Row: {
           id: string;
-          plan_id: string;
+          production_plan_id: string;
           recipe_id: string;
           batch_count: number;
           notes: string | null;
@@ -365,7 +365,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          plan_id: string;
+          production_plan_id: string;
           recipe_id: string;
           batch_count: number;
           notes?: string | null;
@@ -378,8 +378,8 @@ export interface Database {
         };
         Relationships: [
           {
-            foreignKeyName: 'production_plan_items_plan_id_fkey';
-            columns: ['plan_id'];
+            foreignKeyName: 'production_plan_items_production_plan_id_fkey';
+            columns: ['production_plan_id'];
             isOneToOne: false;
             referencedRelation: 'production_plans';
             referencedColumns: ['id'];
@@ -517,7 +517,7 @@ export interface Database {
     Views: {
       v_ingredient_requirements: {
         Row: {
-          plan_id: string;
+          production_plan_id: string;
           organization_id: string;
           plan_date: string;
           ingredient_product_id: string;
