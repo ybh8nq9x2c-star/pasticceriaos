@@ -33,6 +33,25 @@ export async function createOrderAction(
   return { status: 'success', message: 'Ordine creato.' };
 }
 
+/** A1: genera bozze d'ordine reali, una per fornitore, dalle shortage del piano. */
+export async function createDraftsFromShortageAction(planId: string): Promise<ActionState> {
+  try {
+    const result = await service.createDraftOrdersFromShortage(planId);
+    revalidatePath('/orders');
+    revalidatePath(`/production/${planId}`);
+    const skippedNote =
+      result.skippedIngredients.length > 0
+        ? ` ${result.skippedIngredients.length} ingredienti senza fornitore esclusi: ${result.skippedIngredients.join(', ')}.`
+        : '';
+    return {
+      status: 'success',
+      message: `${result.createdOrderIds.length} bozze ordine create.${skippedNote}`,
+    };
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+}
+
 export async function updateOrderAction(
   id: string,
   _prev: ActionState,

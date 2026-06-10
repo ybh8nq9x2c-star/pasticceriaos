@@ -11,9 +11,10 @@ import {
   createMovementSchema,
   updateThresholdSchema,
   initialStockSchema,
+  createBatchSchema,
 } from './schemas';
-import type { InventoryLevel, InventoryMovement, LowStockAlert } from './types';
-import type { CreateMovementInput, UpdateThresholdInput, InitialStockInput } from './schemas';
+import type { InventoryLevel, InventoryMovement, LowStockAlert, IngredientBatch, ExpiringBatch } from './types';
+import type { CreateMovementInput, UpdateThresholdInput, InitialStockInput, CreateBatchInput } from './schemas';
 
 // ---------------------------------------------------------------------------
 // Levels
@@ -119,4 +120,52 @@ export async function recordInitialStock(raw: unknown): Promise<InventoryMovemen
 export async function getLowStockAlerts(): Promise<LowStockAlert[]> {
   const orgId = await requireOrgId();
   return repo.listLowStockAlerts(orgId);
+}
+
+// ---------------------------------------------------------------------------
+// Lotti e scadenze
+// ---------------------------------------------------------------------------
+
+/**
+ * Registra un lotto ricevuto (lotto fornitore + scadenza). NON crea movimenti:
+ * lo stock è già stato caricato dalla ricezione ordine; il lotto è il livello
+ * di tracciabilità HACCP sopra il ledger.
+ */
+export async function recordBatch(raw: unknown): Promise<string> {
+  const orgId = await requireOrgId();
+  const input: CreateBatchInput = createBatchSchema.parse(raw);
+
+  // supplier_id derivato dall'ordine, se presente.
+  let supplierId: string | null = null;
+  if (input.purchaseOrderId) {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from('purchase_orders')
+      .select('supplier_id')
+      .eq('id', input.purchaseOrderId)
+      .maybeSingle();
+    supplierId = data?.supplier_id ?? null;
+  }
+
+  return repo.insertBatch(orgId, {
+    ingredientProductId: input.ingredientProductId,
+    purchaseOrderId:     input.purchaseOrderId || null,
+    supplierId,
+    lotNumber:           input.lotNumber || null,
+    expiryDate:          input.expiryDate,
+    quantity:            input.quantity,
+    unit:                input.unit,
+    notes:               input.notes || null,
+  });
+}
+
+export async function getBatchesForOrder(purchaseOrderId: string): Promise<IngredientBatch[]> {
+  const orgId = await requireOrgId();
+  return repo.listBatchesForOrder(orgId, purchaseOrderId);
+}
+
+/** Lotti in scadenza entro N giorni (default 7) con ricette suggerite. */
+export async function getExpiringBatches(withinDays = 7): Promise<ExpiringBatch[]> {
+  const orgId = await requireOrgId();
+  return repo.listExpiringBatches(orgId, withinDays);
 }

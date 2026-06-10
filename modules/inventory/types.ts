@@ -50,3 +50,32 @@ export interface LowStockAlert {
   unit: UnitOfMeasure;
   alertLevel: AlertLevel;
 }
+
+// ── Lotti e scadenze (HACCP-lite, migration 028) ─────────────────────────────
+
+export interface IngredientBatch {
+  id: string;
+  ingredientProductId: string;
+  ingredientName: string;
+  purchaseOrderId: string | null;
+  lotNumber: string | null;
+  expiryDate: string;
+  quantityReceived: number;
+  quantityRemaining: number;
+  unit: UnitOfMeasure;
+  receivedAt: string;
+  notes: string | null;
+}
+
+export interface ExpiringBatch {
+  batchId: string;
+  ingredientProductId: string;
+  ingredientName: string;
+  lotNumber: string | null;
+  expiryDate: string;
+  quantityRemaining: number;
+  unit: UnitOfMeasure;
+  daysToExpiry: number;
+  supplierName: string | null;
+  suggestedRecipes: string[];
+}

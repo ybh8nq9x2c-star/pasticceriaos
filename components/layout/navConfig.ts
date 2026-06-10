@@ -8,37 +8,42 @@ export type NavItem = { href: string; label: string; emoji: string };
 export type NavSection = { title: string; items: NavItem[] };
 
 // ── Customer workspace (route group `(main)`) ────────────────────────────────
+// Navigazione orientata ai FLUSSI: il marketplace non è più una sezione
+// separata — è assorbito nell'hub Fornitori.
 export const CUSTOMER_NAV: NavSection[] = [
   {
     title: 'Operativo',
     items: [
-      { href: '/dashboard',   label: 'Dashboard',   emoji: '🏠' },
-      { href: '/ingredients', label: 'Ingredienti', emoji: '🧂' },
-      { href: '/suppliers',   label: 'Fornitori',   emoji: '🤝' },
-      { href: '/recipes',     label: 'Ricette',     emoji: '📖' },
-      { href: '/production',  label: 'Produzione',  emoji: '🧮' },
+      { href: '/dashboard',  label: 'Oggi',           emoji: '☀️' },
+      { href: '/production', label: 'Produzione',     emoji: '🧮' },
+      { href: '/customers',  label: 'Ordini clienti', emoji: '🎂' },
+      { href: '/recipes',    label: 'Ricette',        emoji: '📖' },
     ],
   },
   {
-    title: 'Gestione',
+    title: 'Approvvigionamento',
     items: [
-      { href: '/inventory',             label: 'Magazzino',   emoji: '📦' },
-      { href: '/orders',                label: 'Ordini',      emoji: '🛒' },
-      { href: '/marketplace/suppliers', label: 'Marketplace', emoji: '🔗' },
-      { href: '/analytics',             label: 'Analisi',     emoji: '📊' },
+      { href: '/suppliers',   label: 'Fornitori',   emoji: '🤝' },
+      { href: '/orders',      label: 'Ordini',      emoji: '🛒' },
+      { href: '/documents',   label: 'Documenti',   emoji: '🧾' },
+      { href: '/inventory',   label: 'Magazzino',   emoji: '📦' },
+      { href: '/ingredients', label: 'Ingredienti', emoji: '🧂' },
     ],
   },
   {
     title: 'Sistema',
-    items: [{ href: '/settings', label: 'Impostazioni', emoji: '⚙️' }],
+    items: [
+      { href: '/analytics', label: 'Analisi',      emoji: '📊' },
+      { href: '/settings',  label: 'Impostazioni', emoji: '⚙️' },
+    ],
   },
 ];
 
 // 4 primary destinations for the mobile bottom bar; the 4th slot is the drawer.
 export const CUSTOMER_BOTTOM: NavItem[] = [
-  { href: '/dashboard',             label: 'Home',        emoji: '🏠' },
-  { href: '/inventory',             label: 'Magazzino',   emoji: '📦' },
-  { href: '/marketplace/suppliers', label: 'Marketplace', emoji: '🔗' },
+  { href: '/dashboard',  label: 'Oggi',       emoji: '☀️' },
+  { href: '/production', label: 'Produzione', emoji: '🧮' },
+  { href: '/inventory',  label: 'Magazzino',  emoji: '📦' },
 ];
 
 // ── Supplier workspace (`/supplier`) ─────────────────────────────────────────

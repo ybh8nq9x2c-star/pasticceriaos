@@ -7,8 +7,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getOrder, getOrderHistory } from '@/modules/ordering/service';
+import { getBatchesForOrder } from '@/modules/inventory/service';
 import { changeOrderStatusAction, cancelOrderAction } from '@/modules/ordering/actions';
-import { IDLE_STATE, UNIT_LABELS } from '@/lib/utils';
+import { RegisterBatchForm } from './RegisterBatchForm';
+import { IDLE_STATE, UNIT_LABELS, UNIT_SHORT } from '@/lib/utils';
 import type { OrderStatus } from '@/modules/ordering/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 
@@ -59,6 +61,16 @@ export default async function OrderDetailPage({ params }: { params: { id: string
     ]);
   } catch {
     notFound();
+  }
+
+  // Lotti registrati su questo ordine (solo per ordini ricevuti).
+  const batches = order.status === 'received' ? await getBatchesForOrder(order.id) : [];
+  const batchedQtyByIngredient = new Map<string, number>();
+  for (const b of batches) {
+    batchedQtyByIngredient.set(
+      b.ingredientProductId,
+      (batchedQtyByIngredient.get(b.ingredientProductId) ?? 0) + b.quantityReceived,
+    );
   }
 
   const nextAction = NEXT_ACTIONS[order.status];
@@ -187,6 +199,63 @@ export default async function OrderDetailPage({ params }: { params: { id: string
             </table>
           </div>
 
+          {/* Lotti e scadenze (HACCP) — solo su ordini ricevuti */}
+          {order.status === 'received' && (
+            <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="font-playfair text-base font-bold text-[#1A2B4A]">Lotti e scadenze</h2>
+                <Link href="/inventory/batches" className="text-xs font-semibold text-[#C9962A] hover:underline">
+                  Tutte le scadenze →
+                </Link>
+              </div>
+              <p className="text-xs text-[#6B7280] mb-4">
+                Registra lotto e scadenza per gli ingredienti deperibili: abilita
+                alert scadenza, consumo FEFO e tracciabilità di produzione.
+              </p>
+
+              {batches.length > 0 && (
+                <div className="mb-4 divide-y divide-[#F0EBE1] border border-[#F0EBE1] rounded-xl overflow-hidden">
+                  {batches.map((b) => (
+                    <div key={b.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                      <span className="flex-1 text-[#1A2B4A]">{b.ingredientName}</span>
+                      <span className="font-mono text-xs text-[#6B7280]">{b.lotNumber ?? 'senza lotto'}</span>
+                      <span className="font-mono text-xs text-[#6B7280]">
+                        {b.quantityRemaining}/{b.quantityReceived} {UNIT_SHORT[b.unit]}
+                      </span>
+                      <span className="font-mono text-xs font-semibold text-[#1A2B4A]">
+                        scad. {new Date(b.expiryDate + 'T00:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: '2-digit' })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {order.lineItems.map((li) => {
+                  const registered = batchedQtyByIngredient.get(li.ingredientProductId) ?? 0;
+                  const remaining = Math.max(0, li.quantity - registered);
+                  if (remaining <= 0) return null;
+                  return (
+                    <div key={li.id} className="flex flex-wrap items-center gap-3 py-1">
+                      <span className="text-sm text-[#1A1A2E] w-44 truncate">{li.ingredientName}</span>
+                      <RegisterBatchForm
+                        orderId={order.id}
+                        ingredientProductId={li.ingredientProductId}
+                        defaultQuantity={remaining}
+                        unit={li.unitSnapshot}
+                      />
+                    </div>
+                  );
+                })}
+                {order.lineItems.every(
+                  (li) => (batchedQtyByIngredient.get(li.ingredientProductId) ?? 0) >= li.quantity,
+                ) && (
+                  <p className="text-sm text-[#1E7E45] font-medium">✓ Tutte le righe hanno lotti registrati.</p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Storico stati */}
           {history.length > 0 && (
             <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">
@@ -228,6 +297,16 @@ export default async function OrderDetailPage({ params }: { params: { id: string
               <h2 className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide mb-2">Note</h2>
               <p className="text-sm text-[#1A1A2E] whitespace-pre-wrap">{order.notes}</p>
             </div>
+          )}
+
+          {/* Documenti collegati */}
+          {(order.status === 'received' || order.status === 'confirmed') && (
+            <Link
+              href={`/documents/new?order=${order.id}`}
+              className="block w-full py-3 text-center border border-[#1A2B4A]/30 text-[#1A2B4A] rounded-xl text-sm font-semibold hover:bg-[#1A2B4A]/[0.04] transition-colors"
+            >
+              🧾 Registra DDT / fattura
+            </Link>
           )}
 
           {/* Azione avanzamento stato */}

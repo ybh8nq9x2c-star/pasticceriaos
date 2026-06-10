@@ -71,6 +71,24 @@ export const initialStockSchema = z.object({
   notes: z.string().trim().max(500).optional().or(z.literal('')),
 });
 
+// ---------------------------------------------------------------------------
+// Registrazione lotto ingrediente (alla ricezione ordine)
+// ---------------------------------------------------------------------------
+
+export const createBatchSchema = z.object({
+  ingredientProductId: z.string().uuid('ID ingrediente non valido'),
+  purchaseOrderId: z.string().uuid().nullish().or(z.literal('')),
+  lotNumber: z.string().trim().max(100).optional().or(z.literal('')),
+  expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data scadenza non valida'),
+  quantity: z
+    .string()
+    .transform((v) => parseFloat(v.replace(',', '.')))
+    .pipe(z.number().positive('La quantità deve essere maggiore di 0')),
+  unit: z.enum(UNITS),
+  notes: z.string().trim().max(500).optional().or(z.literal('')),
+});
+
 export type CreateMovementInput  = z.infer<typeof createMovementSchema>;
 export type UpdateThresholdInput = z.infer<typeof updateThresholdSchema>;
 export type InitialStockInput    = z.infer<typeof initialStockSchema>;
+export type CreateBatchInput     = z.infer<typeof createBatchSchema>;

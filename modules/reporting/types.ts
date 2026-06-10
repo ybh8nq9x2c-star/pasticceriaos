@@ -53,6 +53,7 @@ export interface OpenOrder {
   status: string;
   orderDate: string;
   expectedDate: string | null;
+  sentAt: string | null;
   lineItemsCount: number;
   totalAmount: number | null;
 }

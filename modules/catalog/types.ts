@@ -8,6 +8,8 @@ import type { UnitOfMeasure } from '@/lib/database.types';
 export interface Supplier {
   id: string;
   organizationId: string;
+  /** Org marketplace collegata (Livello 2+). NULL = fornitore solo-email (Livello 1). */
+  supplierOrgId: string | null;
   name: string;
   email: string;
   phone: string | null;

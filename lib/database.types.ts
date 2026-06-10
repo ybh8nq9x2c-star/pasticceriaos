@@ -40,6 +40,29 @@ export type MarketplaceOrderStatus =
   | 'delivered'
   | 'cancelled';
 
+// ── documenti commerciali (migration 027) ─────────────────────────────────────
+
+export type DocumentType = 'order_confirmation' | 'delivery_note' | 'invoice' | 'credit_note';
+
+export type DocumentStatus = 'received' | 'matched' | 'anomaly' | 'archived';
+
+export type AnomalyType =
+  | 'quantity_mismatch'
+  | 'price_mismatch'
+  | 'extra_item'
+  | 'missing_item'
+  | 'total_mismatch';
+
+// ── ordini clienti (migration 029) ────────────────────────────────────────────
+
+export type CustomerOrderStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'in_production'
+  | 'ready'
+  | 'delivered'
+  | 'cancelled';
+
 // ── Database type ─────────────────────────────────────────────────────────────
 // NOTA: ogni tabella/vista richiede `Relationships` dal supabase-js v2.49+.
 
@@ -544,6 +567,308 @@ export interface Database {
           }
         ];
       };
+      // ── supplier price list (migration 026) ──────────────────────────────────
+      supplier_price_list: {
+        Row: {
+          id: string;
+          organization_id: string;
+          supplier_id: string;
+          ingredient_product_id: string;
+          unit_price: number;
+          unit: UnitOfMeasure;
+          valid_from: string;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          supplier_id: string;
+          ingredient_product_id: string;
+          unit_price: number;
+          unit: UnitOfMeasure;
+          valid_from?: string;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          unit_price?: number;
+          unit?: UnitOfMeasure;
+          valid_from?: string;
+          is_active?: boolean;
+        };
+        Relationships: [];
+      };
+
+      // ── documenti commerciali (migration 027) ────────────────────────────────
+      commercial_documents: {
+        Row: {
+          id: string;
+          organization_id: string;
+          supplier_id: string | null;
+          purchase_order_id: string | null;
+          marketplace_order_id: string | null;
+          document_type: DocumentType;
+          document_status: DocumentStatus;
+          document_number: string | null;
+          document_date: string;
+          due_date: string | null;
+          subtotal_amount: number | null;
+          tax_amount: number | null;
+          total_amount: number | null;
+          notes: string | null;
+          file_url: string | null;
+          uploaded_by_org_id: string | null;
+          matched_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          supplier_id?: string | null;
+          purchase_order_id?: string | null;
+          marketplace_order_id?: string | null;
+          document_type: DocumentType;
+          document_status?: DocumentStatus;
+          document_number?: string | null;
+          document_date: string;
+          due_date?: string | null;
+          subtotal_amount?: number | null;
+          tax_amount?: number | null;
+          total_amount?: number | null;
+          notes?: string | null;
+          file_url?: string | null;
+          uploaded_by_org_id?: string | null;
+          matched_at?: string | null;
+        };
+        Update: {
+          supplier_id?: string | null;
+          purchase_order_id?: string | null;
+          document_status?: DocumentStatus;
+          document_number?: string | null;
+          document_date?: string;
+          due_date?: string | null;
+          subtotal_amount?: number | null;
+          tax_amount?: number | null;
+          total_amount?: number | null;
+          notes?: string | null;
+          file_url?: string | null;
+          matched_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      document_line_items: {
+        Row: {
+          id: string;
+          document_id: string;
+          order_line_item_id: string | null;
+          ingredient_product_id: string | null;
+          description: string;
+          quantity: number;
+          unit: UnitOfMeasure;
+          unit_price: number | null;
+          line_total: number | null;
+          quantity_variance: number | null;
+          price_variance: number | null;
+          matched_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          order_line_item_id?: string | null;
+          ingredient_product_id?: string | null;
+          description: string;
+          quantity: number;
+          unit: UnitOfMeasure;
+          unit_price?: number | null;
+          line_total?: number | null;
+          quantity_variance?: number | null;
+          price_variance?: number | null;
+          matched_at?: string | null;
+        };
+        Update: {
+          order_line_item_id?: string | null;
+          ingredient_product_id?: string | null;
+          quantity_variance?: number | null;
+          price_variance?: number | null;
+          matched_at?: string | null;
+        };
+        Relationships: [];
+      };
+
+      document_anomalies: {
+        Row: {
+          id: string;
+          document_id: string;
+          anomaly_type: AnomalyType;
+          description: string;
+          expected_value: string | null;
+          actual_value: string | null;
+          resolved: boolean;
+          resolved_at: string | null;
+          resolved_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          anomaly_type: AnomalyType;
+          description: string;
+          expected_value?: string | null;
+          actual_value?: string | null;
+          resolved?: boolean;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+        };
+        Update: {
+          resolved?: boolean;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+        };
+        Relationships: [];
+      };
+
+      // ── lotti ingredienti (migration 028) ────────────────────────────────────
+      ingredient_batches: {
+        Row: {
+          id: string;
+          organization_id: string;
+          ingredient_product_id: string;
+          purchase_order_id: string | null;
+          supplier_id: string | null;
+          lot_number: string | null;
+          expiry_date: string;
+          quantity_received: number;
+          quantity_remaining: number;
+          unit: UnitOfMeasure;
+          received_at: string;
+          notes: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          ingredient_product_id: string;
+          purchase_order_id?: string | null;
+          supplier_id?: string | null;
+          lot_number?: string | null;
+          expiry_date: string;
+          quantity_received: number;
+          quantity_remaining: number;
+          unit: UnitOfMeasure;
+          received_at?: string;
+          notes?: string | null;
+          is_active?: boolean;
+        };
+        Update: {
+          lot_number?: string | null;
+          expiry_date?: string;
+          quantity_remaining?: number;
+          notes?: string | null;
+          is_active?: boolean;
+        };
+        Relationships: [];
+      };
+
+      production_batch_ingredients: {
+        Row: {
+          id: string;
+          organization_id: string;
+          production_plan_id: string;
+          ingredient_batch_id: string;
+          ingredient_product_id: string;
+          quantity_used: number;
+          unit: UnitOfMeasure;
+          used_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+
+      // ── ordini clienti (migration 029) ───────────────────────────────────────
+      customer_orders: {
+        Row: {
+          id: string;
+          organization_id: string;
+          customer_name: string;
+          customer_phone: string | null;
+          customer_email: string | null;
+          pickup_date: string;
+          pickup_time: string | null;
+          notes: string | null;
+          status: CustomerOrderStatus;
+          total_amount: number | null;
+          deposit_paid: number | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          customer_name: string;
+          customer_phone?: string | null;
+          customer_email?: string | null;
+          pickup_date: string;
+          pickup_time?: string | null;
+          notes?: string | null;
+          status?: CustomerOrderStatus;
+          total_amount?: number | null;
+          deposit_paid?: number | null;
+          created_by?: string | null;
+        };
+        Update: {
+          customer_name?: string;
+          customer_phone?: string | null;
+          customer_email?: string | null;
+          pickup_date?: string;
+          pickup_time?: string | null;
+          notes?: string | null;
+          status?: CustomerOrderStatus;
+          total_amount?: number | null;
+          deposit_paid?: number | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      customer_order_items: {
+        Row: {
+          id: string;
+          customer_order_id: string;
+          recipe_id: string | null;
+          description: string;
+          quantity: number;
+          unit_price: number | null;
+          notes: string | null;
+          sort_order: number;
+        };
+        Insert: {
+          id?: string;
+          customer_order_id: string;
+          recipe_id?: string | null;
+          description: string;
+          quantity: number;
+          unit_price?: number | null;
+          notes?: string | null;
+          sort_order?: number;
+        };
+        Update: {
+          recipe_id?: string | null;
+          description?: string;
+          quantity?: number;
+          unit_price?: number | null;
+          notes?: string | null;
+          sort_order?: number;
+        };
+        Relationships: [];
+      };
     };
 
     Views: {
@@ -721,6 +1046,50 @@ export interface Database {
           total_value: number | null;
           delivered_count: number;
           last_order_at: string | null;
+        };
+        Relationships: [];
+      };
+      v_documents_attention: {
+        Row: {
+          id: string;
+          organization_id: string;
+          document_type: DocumentType;
+          document_status: DocumentStatus;
+          document_number: string | null;
+          document_date: string;
+          total_amount: number | null;
+          supplier_name: string | null;
+          open_anomalies: number;
+        };
+        Relationships: [];
+      };
+      v_expiring_batches: {
+        Row: {
+          batch_id: string;
+          organization_id: string;
+          ingredient_product_id: string;
+          ingredient_name: string;
+          lot_number: string | null;
+          expiry_date: string;
+          quantity_remaining: number;
+          unit: UnitOfMeasure;
+          days_to_expiry: number;
+          supplier_name: string | null;
+          suggested_recipes: string[] | null;
+        };
+        Relationships: [];
+      };
+      v_customer_orders_upcoming: {
+        Row: {
+          order_id: string;
+          organization_id: string;
+          customer_name: string;
+          pickup_date: string;
+          pickup_time: string | null;
+          status: CustomerOrderStatus;
+          total_amount: number | null;
+          items_count: number;
+          pieces_count: number;
         };
         Relationships: [];
       };

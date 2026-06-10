@@ -1,0 +1,54 @@
+'use client';
+
+// =============================================================================
+// app/(main)/production/[id]/DraftOrdersButton.tsx
+// A1: genera bozze d'ordine reali (una per fornitore) dalle shortage del piano.
+// =============================================================================
+
+import Link from 'next/link';
+import { useFormState } from 'react-dom';
+import { IDLE_STATE, type ActionState } from '@/lib/utils';
+import { createDraftsFromShortageAction } from '@/modules/ordering/actions';
+
+export function DraftOrdersButton({ planId }: { planId: string }) {
+  const bound = (async (_prev: ActionState, _fd: FormData) =>
+    createDraftsFromShortageAction(planId)) as (
+    prev: ActionState,
+    formData: FormData,
+  ) => Promise<ActionState>;
+  const [state, formAction, pending] = useFormState(bound, IDLE_STATE);
+
+  if (state.status === 'success') {
+    return (
+      <div className="text-right">
+        <p className="text-xs font-semibold text-[#1E7E45]">✓ {state.message}</p>
+        <Link href="/orders" className="text-xs font-semibold text-[#C9962A] hover:underline">
+          Rivedi le bozze →
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="text-right shrink-0">
+      {state.status === 'error' && (
+        <p className="text-xs text-[#C0392B] mb-1">{state.error}</p>
+      )}
+      <form action={formAction}>
+        <button
+          type="submit"
+          disabled={pending}
+          className="px-3 py-2 bg-[#1A2B4A] text-white rounded-xl text-xs font-semibold hover:bg-[#243660] disabled:opacity-60"
+        >
+          {pending ? 'Generazione…' : '🛒 Genera bozze per fornitore'}
+        </button>
+      </form>
+      <Link
+        href={`/orders/new?plan=${planId}`}
+        className="inline-block mt-1.5 text-[11px] font-semibold text-[#6B7280] hover:text-[#C9962A]"
+      >
+        oppure componi a mano →
+      </Link>
+    </div>
+  );
+}

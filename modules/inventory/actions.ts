@@ -51,6 +51,31 @@ export async function recordInitialStockAction(
   return { status: 'success', message: 'Stock iniziale registrato.' };
 }
 
+export async function recordBatchAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    await service.recordBatch({
+      ingredientProductId: formData.get('ingredientProductId'),
+      purchaseOrderId:     formData.get('purchaseOrderId'),
+      lotNumber:           formData.get('lotNumber'),
+      expiryDate:          formData.get('expiryDate'),
+      quantity:            formData.get('quantity'),
+      unit:                formData.get('unit'),
+      notes:               formData.get('notes'),
+    });
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+
+  const orderId = formData.get('purchaseOrderId') as string | null;
+  if (orderId) revalidatePath(`/orders/${orderId}`);
+  revalidatePath('/inventory/batches');
+  revalidatePath('/dashboard');
+  return { status: 'success', message: 'Lotto registrato.' };
+}
+
 export async function updateThresholdAction(
   _prev: ActionState,
   formData: FormData,

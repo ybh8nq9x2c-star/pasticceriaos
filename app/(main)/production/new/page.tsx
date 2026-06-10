@@ -14,6 +14,12 @@ import { createPlanAction } from '@/modules/production/actions';
 
 interface RecipeOption { id: string; name: string; emoji: string | null; basePortions: number }
 interface PlanRow { key: number; recipeId: string; batchCount: string; notes: string }
+interface CustomerOrderForDate {
+  id: string;
+  customerName: string;
+  pickupTime: string | null;
+  items: { recipeId: string | null; recipeName: string | null; description: string; quantity: number }[];
+}
 
 let keyCounter = 0;
 
@@ -27,6 +33,8 @@ export default function NewProductionPage() {
   const [rows, setRows] = useState<PlanRow[]>([
     { key: ++keyCounter, recipeId: '', batchCount: '1', notes: '' },
   ]);
+  const [planDate, setPlanDate] = useState(today());
+  const [customerOrders, setCustomerOrders] = useState<CustomerOrderForDate[]>([]);
 
   const [state, formAction, pending] = useFormState(createPlanAction, IDLE_STATE);
 
@@ -36,6 +44,48 @@ export default function NewProductionPage() {
       .then(setRecipes)
       .catch(() => []);
   }, []);
+
+  // Ordini clienti REALI per la data scelta: il piano li deve coprire.
+  useEffect(() => {
+    fetch(`/api/customers/orders?date=${planDate}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setCustomerOrders(Array.isArray(data) ? data : []))
+      .catch(() => setCustomerOrders([]));
+  }, [planDate]);
+
+  /** Aggiunge al piano le ricette degli ordini clienti (batch per coprire i pezzi). */
+  function addFromCustomerOrders() {
+    const needed = new Map<string, number>(); // recipeId -> pezzi totali
+    for (const order of customerOrders) {
+      for (const item of order.items) {
+        if (item.recipeId) {
+          needed.set(item.recipeId, (needed.get(item.recipeId) ?? 0) + item.quantity);
+        }
+      }
+    }
+    if (needed.size === 0) return;
+
+    setRows((prev) => {
+      const next = [...prev.filter((r) => r.recipeId !== '' || prev.length === 1)];
+      for (const [recipeId, pieces] of needed) {
+        const recipe = recipes.find((r) => r.id === recipeId);
+        const batches = recipe ? Math.max(1, Math.ceil(pieces / recipe.basePortions)) : 1;
+        const existing = next.find((r) => r.recipeId === recipeId);
+        if (existing) {
+          existing.batchCount = String(Math.max(parseInt(existing.batchCount) || 0, batches));
+          existing.notes = existing.notes || 'include ordini clienti';
+        } else {
+          next.push({
+            key: ++keyCounter,
+            recipeId,
+            batchCount: String(batches),
+            notes: 'include ordini clienti',
+          });
+        }
+      }
+      return next.filter((r) => r.recipeId !== '' || next.length === 1);
+    });
+  }
 
   useEffect(() => {
     if (state.status === 'success') router.push('/production');
@@ -93,7 +143,8 @@ export default function NewProductionPage() {
                 name="planDate"
                 type="date"
                 required
-                defaultValue={today()}
+                value={planDate}
+                onChange={(e) => setPlanDate(e.target.value)}
                 className="w-full rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30 focus:border-[#C9962A]"
               />
             </div>
@@ -111,6 +162,43 @@ export default function NewProductionPage() {
             />
           </div>
         </div>
+
+        {/* Ordini clienti per la data scelta */}
+        {customerOrders.length > 0 && (
+          <div className="rounded-2xl border border-[#C9962A]/30 bg-[#C9962A]/[0.06] p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[#8A6418]">
+                  🎂 {customerOrders.length} {customerOrders.length === 1 ? 'ordine cliente' : 'ordini clienti'} con ritiro in questa data
+                </p>
+                <ul className="mt-2 space-y-1 text-xs text-[#6B7280]">
+                  {customerOrders.map((o) => (
+                    <li key={o.id}>
+                      <span className="font-medium text-[#1A2B4A]">{o.customerName}</span>
+                      {o.pickupTime && ` (${o.pickupTime.slice(0, 5)})`}
+                      {' — '}
+                      {o.items.map((i) => `${i.quantity}× ${i.recipeName ?? i.description}`).join(', ')}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {customerOrders.some((o) => o.items.some((i) => i.recipeId)) && (
+                <button
+                  type="button"
+                  onClick={addFromCustomerOrders}
+                  className="shrink-0 px-3 py-2 bg-[#1A2B4A] text-white rounded-xl text-xs font-semibold hover:bg-[#243660]"
+                >
+                  + Aggiungi al piano
+                </button>
+              )}
+            </div>
+            {customerOrders.some((o) => o.items.some((i) => !i.recipeId)) && (
+              <p className="mt-2 text-[11px] text-[#8A6418]">
+                Gli articoli fuori ricettario non hanno distinta base: vanno pianificati a mano.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Ricette nel piano */}
         <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">

@@ -281,6 +281,7 @@ function toSupplier(row: any): Supplier {
   return {
     id:             row.id,
     organizationId: row.organization_id,
+    supplierOrgId:  row.supplier_org_id ?? null,
     name:           row.name,
     email:          row.email,
     phone:          row.phone,

@@ -1,7 +1,10 @@
 // =============================================================================
 // app/(main)/dashboard/page.tsx
-// Dashboard principale — Server Component.
-// Aggrega: KPI, ordini aperti, alert scorte, piano di oggi.
+// OGGI — dashboard orientata all'azione. Risponde a "cosa faccio adesso?":
+//   1. Situazione di oggi (piano, copertura stock, ordini clienti)
+//   2. Richiede attenzione (ordini fermi, documenti, anomalie, scadenze, margini)
+//   3. Azioni suggerite (contestuali, spiegabili, mai automatiche)
+//   4. KPI operativi (tutti da query reali; '—' quando non ci sono dati)
 // =============================================================================
 
 import type { Metadata } from 'next';
@@ -9,39 +12,21 @@ import Link from 'next/link';
 import {
   getDashboardSummary,
   getOpenOrders,
+  getIngredientRequirements,
+  getRecipeCosts,
   getIngredientPurchaseStats,
 } from '@/modules/reporting/service';
-import { getLowStockAlerts } from '@/modules/inventory/service';
+import { getLowStockAlerts, getExpiringBatches } from '@/modules/inventory/service';
+import { listDocuments } from '@/modules/documents/service';
+import { listCustomerOrders } from '@/modules/customers/service';
 import { requireSession } from '@/modules/identity/service';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, todayISODate } from '@/lib/utils';
 
-export const metadata: Metadata = { title: 'Dashboard' };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+export const metadata: Metadata = { title: 'Oggi' };
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
-  draft:     'Bozza',
-  sent:      'Inviato',
-  confirmed: 'Confermato',
-  received:  'Ricevuto',
-  cancelled: 'Annullato',
+  draft: 'Bozza', sent: 'Inviato', confirmed: 'Confermato',
 };
-
-const ORDER_STATUS_COLOR: Record<string, string> = {
-  draft:     'bg-[#6B7280]/10 text-[#6B7280]',
-  sent:      'bg-[#C9962A]/15 text-[#8A6418]',
-  confirmed: 'bg-[#1A2B4A]/10 text-[#1A2B4A]',
-  received:  'bg-[#27AE60]/10 text-[#1E7E45]',
-  cancelled: 'bg-[#C0392B]/10 text-[#C0392B]',
-};
-
-const ALERT_CFG = {
-  out_of_stock: { dot: 'bg-[#C0392B]', badge: 'bg-[#C0392B]/10 text-[#C0392B]', label: 'Esaurito' },
-  critical:     { dot: 'bg-[#E67E22]', badge: 'bg-amber-100 text-amber-700',     label: 'Critico'  },
-  low:          { dot: 'bg-[#C9962A]', badge: 'bg-[#C9962A]/15 text-[#8A6418]',  label: 'Basso'    },
-} as const;
 
 function todayLabel() {
   return new Date().toLocaleDateString('it-IT', {
@@ -49,322 +34,430 @@ function todayLabel() {
   });
 }
 
-function shortDate(iso: string) {
-  return new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', {
-    day: '2-digit', month: 'short',
-  });
-}
-
-// ---------------------------------------------------------------------------
-// KPI Card sub-component
-// ---------------------------------------------------------------------------
-
-function KpiCard({
-  label,
-  value,
-  sub,
-  href,
-  accentClass,
-}: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  href?: string;
-  accentClass?: string;
+function KpiCard({ label, value, sub, href, accentClass }: {
+  label: string; value: string | number; sub?: string; href?: string; accentClass?: string;
 }) {
   const inner = (
-    <div className="relative rounded-2xl border border-[#E5DDD0] bg-white px-6 py-5 overflow-hidden transition-all hover:shadow-[0_4px_24px_rgba(26,43,74,0.10)] hover:-translate-y-px cursor-pointer">
-      {accentClass && (
-        <span className={`absolute top-0 left-0 h-full w-1 rounded-l-2xl ${accentClass}`} />
-      )}
+    <div className="relative rounded-2xl border border-[#E5DDD0] bg-white px-5 py-4 overflow-hidden transition-all hover:shadow-[0_4px_24px_rgba(26,43,74,0.10)] hover:-translate-y-px">
+      {accentClass && <span className={`absolute top-0 left-0 h-full w-1 rounded-l-2xl ${accentClass}`} />}
       <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide">{label}</p>
-      <p className="font-playfair text-[34px] font-bold text-[#1A2B4A] mt-1 leading-none">{value}</p>
+      <p className="font-playfair text-[28px] font-bold text-[#1A2B4A] mt-1 leading-none">{value}</p>
       {sub && <p className="text-xs text-[#6B7280] mt-1.5">{sub}</p>}
     </div>
   );
   return href ? <Link href={href} className="block">{inner}</Link> : inner;
 }
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
+interface AttentionItem {
+  emoji: string;
+  text: string;
+  detail: string;
+  href: string;
+  severity: 'red' | 'amber';
+}
 
-export default async function DashboardPage() {
+interface SuggestedAction {
+  emoji: string;
+  text: string;
+  cta: string;
+  href: string;
+}
+
+export default async function TodayPage() {
   const session = await requireSession();
+  const today = todayISODate();
 
-  // Nessun fallback fittizio: se le query falliscono interviene l'error
-  // boundary del route group, non numeri a zero spacciati per reali.
-  const [summary, openOrders, stockAlerts, topSpend] = await Promise.all([
-    getDashboardSummary(),
-    getOpenOrders(),
-    getLowStockAlerts(),
-    getIngredientPurchaseStats(3),
-  ]);
+  const [summary, openOrders, stockAlerts, recipeCosts, expiring, documents, customerOrders, topSpend] =
+    await Promise.all([
+      getDashboardSummary(),
+      getOpenOrders(),
+      getLowStockAlerts(),
+      getRecipeCosts(),
+      getExpiringBatches(3),
+      listDocuments(),
+      listCustomerOrders(),
+      getIngredientPurchaseStats(3),
+    ]);
 
-  const totalAlerts   = summary.lowStockCount + summary.outOfStockCount;
-  const recentOrders  = openOrders.slice(0, 5);
-  const criticalAlerts = stockAlerts.slice(0, 6);
+  // Fabbisogno del piano di oggi (se esiste): copertura stock reale.
+  const todayRequirements = summary.todayPlan
+    ? await getIngredientRequirements(summary.todayPlan.id)
+    : [];
+  const todayShortages = todayRequirements.filter((r) => r.estimatedShortage > 0);
+
+  // ── SEZIONE 2: richiede attenzione ─────────────────────────────────────────
+  const now = Date.now();
+  const staleOrders = openOrders.filter(
+    (o) => o.status === 'sent' && o.sentAt && now - new Date(o.sentAt).getTime() > 24 * 3600_000,
+  );
+  const docsToVerify = documents.filter((d) => d.documentStatus === 'received');
+  const docsWithAnomalies = documents.filter((d) => d.documentStatus === 'anomaly');
+  const lowMarginRecipes = recipeCosts.filter(
+    (r) => r.isActive && r.marginPct !== null && r.marginPct < 30,
+  );
+  const negativeMarginRecipes = lowMarginRecipes.filter((r) => (r.marginPct ?? 0) < 0);
+
+  const attention: AttentionItem[] = [];
+  if (negativeMarginRecipes.length > 0) {
+    attention.push({
+      emoji: '🛑', severity: 'red',
+      text: `Stai producendo in perdita: ${negativeMarginRecipes.map((r) => r.name).join(', ')}`,
+      detail: 'food cost sopra il prezzo di vendita',
+      href: '/analytics',
+    });
+  }
+  if (docsWithAnomalies.length > 0) {
+    attention.push({
+      emoji: '⚠️', severity: 'red',
+      text: `${docsWithAnomalies.length} ${docsWithAnomalies.length === 1 ? 'documento con anomalie' : 'documenti con anomalie'} di prezzo/quantità`,
+      detail: docsWithAnomalies.map((d) => d.supplierName).filter(Boolean).slice(0, 3).join(', '),
+      href: '/documents?stato=anomaly',
+    });
+  }
+  if (expiring.length > 0) {
+    attention.push({
+      emoji: '⏳', severity: 'red',
+      text: `${expiring.length} ${expiring.length === 1 ? 'lotto scade' : 'lotti scadono'} entro 3 giorni`,
+      detail: expiring.slice(0, 3).map((b) => b.ingredientName).join(', '),
+      href: '/inventory/batches',
+    });
+  }
+  if (staleOrders.length > 0) {
+    attention.push({
+      emoji: '📨', severity: 'amber',
+      text: `${staleOrders.length} ${staleOrders.length === 1 ? 'ordine inviato' : 'ordini inviati'} senza conferma da oltre 24h`,
+      detail: staleOrders.map((o) => o.supplierName).slice(0, 3).join(', '),
+      href: '/orders',
+    });
+  }
+  if (docsToVerify.length > 0) {
+    attention.push({
+      emoji: '🧾', severity: 'amber',
+      text: `${docsToVerify.length} ${docsToVerify.length === 1 ? 'documento da verificare' : 'documenti da verificare'}`,
+      detail: 'esegui il matching con gli ordini',
+      href: '/documents?stato=received',
+    });
+  }
+  if (lowMarginRecipes.length > negativeMarginRecipes.length) {
+    const risky = lowMarginRecipes.filter((r) => (r.marginPct ?? 0) >= 0);
+    attention.push({
+      emoji: '📉', severity: 'amber',
+      text: `${risky.length} ${risky.length === 1 ? 'ricetta' : 'ricette'} con margine sotto il 30%`,
+      detail: risky.slice(0, 3).map((r) => `${r.name} (${r.marginPct}%)`).join(', '),
+      href: '/analytics',
+    });
+  }
+
+  // ── SEZIONE 3: azioni suggerite ─────────────────────────────────────────────
+  const suggested: SuggestedAction[] = [];
+  if (summary.todayPlan && todayShortages.length > 0) {
+    suggested.push({
+      emoji: '🛒',
+      text: `Mancano ${todayShortages.length} ingredienti per il piano di oggi (${todayShortages.slice(0, 3).map((s) => s.ingredientName).join(', ')})`,
+      cta: 'Genera bozze ordine',
+      href: `/production/${summary.todayPlan.id}`,
+    });
+  }
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowIso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+  const ordersTomorrow = customerOrders.filter((o) => o.pickupDate === tomorrowIso);
+  if (ordersTomorrow.length > 0 && !summary.todayPlan) {
+    suggested.push({
+      emoji: '🎂',
+      text: `Hai ${ordersTomorrow.reduce((s, o) => s + o.piecesCount, 0)} pezzi da consegnare domani (${ordersTomorrow.length} ordini clienti)`,
+      cta: 'Pianifica la produzione',
+      href: '/production/new',
+    });
+  } else if (ordersTomorrow.length > 0) {
+    suggested.push({
+      emoji: '🎂',
+      text: `${ordersTomorrow.length} ordini clienti con ritiro domani: verifica che il piano li copra`,
+      cta: 'Vedi ordini',
+      href: '/customers',
+    });
+  }
+  for (const b of expiring.slice(0, 2)) {
+    if (b.suggestedRecipes.length > 0) {
+      suggested.push({
+        emoji: '♻️',
+        text: `${b.quantityRemaining} ${b.unit} di ${b.ingredientName} ${b.daysToExpiry <= 0 ? 'scadono oggi' : `scadono tra ${b.daysToExpiry}g`} — usali in: ${b.suggestedRecipes.slice(0, 2).join(', ')}`,
+        cta: 'Vedi lotti',
+        href: '/inventory/batches',
+      });
+    }
+  }
+  if (!summary.todayPlan) {
+    suggested.push({
+      emoji: '🧮',
+      text: 'Nessun piano di produzione per oggi',
+      cta: 'Crea il piano',
+      href: '/production/new',
+    });
+  }
+
+  const totalAlerts = summary.lowStockCount + summary.outOfStockCount;
+  const ordersToday = customerOrders.filter((o) => o.pickupDate === today);
+  const pricedRecipes = recipeCosts.filter((r) => r.isActive && r.costPerPortion !== null);
+  const avgFoodCostPct = (() => {
+    const withMargin = pricedRecipes.filter((r) => r.sellPricePerPortion !== null && r.sellPricePerPortion > 0);
+    if (withMargin.length === 0) return null;
+    const avg = withMargin.reduce((s, r) => s + ((r.costPerPortion ?? 0) / (r.sellPricePerPortion ?? 1)) * 100, 0) / withMargin.length;
+    return Math.round(avg);
+  })();
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
-
       {/* Header */}
       <div>
         <h1 className="font-playfair text-3xl font-bold text-[#1A2B4A] leading-tight">
-          Buongiorno —{' '}
-          <span className="text-[#C9962A]">{session.organizationName}</span>
+          Buongiorno — <span className="text-[#C9962A]">{session.organizationName}</span>
         </h1>
         <p className="text-sm text-[#6B7280] mt-1 capitalize">{todayLabel()}</p>
       </div>
 
-      {/* KPI grid */}
-      <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
-        <KpiCard
-          label="Sotto soglia"
-          value={totalAlerts}
-          sub={
-            summary.outOfStockCount > 0 ? `${summary.outOfStockCount} esauriti` :
-            summary.lowStockCount   > 0 ? `${summary.lowStockCount} in alert`   :
-            'Tutto OK'
-          }
-          href="/inventory"
-          accentClass={
-            summary.outOfStockCount > 0 ? 'bg-[#C0392B]' :
-            summary.lowStockCount   > 0 ? 'bg-[#E67E22]' :
-            'bg-[#27AE60]'
-          }
-        />
-        <KpiCard
-          label="Ordini aperti"
-          value={summary.openOrdersCount}
-          sub={
-            summary.openOrdersTotalValue !== null
-              ? `Valore: ${formatCurrency(summary.openOrdersTotalValue)}`
-              : summary.openOrdersCount > 0 ? 'Valore non calcolabile' : 'Nessun ordine'
-          }
-          href="/orders"
-          accentClass={summary.openOrdersCount > 0 ? 'bg-[#C9962A]' : undefined}
-        />
-        <KpiCard
-          label="Piani attivi"
-          value={summary.activePlansCount}
-          sub={summary.activePlansCount > 0 ? 'Produzione in corso' : 'Nessun piano attivo'}
-          href="/production"
-          accentClass={summary.activePlansCount > 0 ? 'bg-[#1A2B4A]' : undefined}
-        />
-        <KpiCard
-          label="Produzione di oggi"
-          value={
-            summary.todayPlan
-              ? summary.todayPlan.status === 'completed'
-                ? 'Completata'
-                : `${summary.todayPlan.totalPortions} porz.`
-              : '—'
-          }
-          sub={
-            summary.todayPlan
-              ? summary.todayPlan.status === 'completed'
-                ? `${summary.todayPlan.itemsCount} ricette prodotte`
-                : `${summary.todayPlan.itemsCount} ricette · stato: ${summary.todayPlan.status === 'in_progress' ? 'in corso' : 'bozza'}`
-              : 'Nessun piano oggi'
-          }
+      {/* ── 1 · SITUAZIONE DI OGGI ─────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        {/* Piano di oggi */}
+        <Link
           href={summary.todayPlan ? `/production/${summary.todayPlan.id}` : '/production/new'}
-          accentClass={
-            summary.todayPlan?.status === 'completed' ? 'bg-[#27AE60]' :
-            summary.todayPlan          ? 'bg-[#2A7D6B]' :
-            undefined
-          }
-        />
+          className="block bg-white rounded-2xl border border-[#E5DDD0] p-5 hover:shadow-[0_4px_24px_rgba(26,43,74,0.10)] transition-all"
+        >
+          <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide">Piano produzione di oggi</p>
+          {summary.todayPlan ? (
+            <>
+              <p className="font-playfair text-2xl font-bold text-[#1A2B4A] mt-1.5">
+                {summary.todayPlan.status === 'completed' ? '✅ Completato' : `${summary.todayPlan.totalPortions} porzioni`}
+              </p>
+              <p className="text-xs text-[#6B7280] mt-1">
+                {summary.todayPlan.itemsCount} ricette · stato {summary.todayPlan.status === 'in_progress' ? 'in corso' : summary.todayPlan.status === 'completed' ? 'completato' : 'bozza'}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-playfair text-2xl font-bold text-[#6B7280] mt-1.5">—</p>
+              <p className="text-xs text-[#C9962A] font-semibold mt-1">Crea il piano →</p>
+            </>
+          )}
+        </Link>
+
+        {/* Copertura stock per il piano */}
+        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-5">
+          <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide">Stock per il piano</p>
+          {!summary.todayPlan ? (
+            <p className="font-playfair text-2xl font-bold text-[#6B7280] mt-1.5">—</p>
+          ) : summary.todayPlan.status === 'completed' ? (
+            <p className="font-playfair text-2xl font-bold text-[#27AE60] mt-1.5">Consumato ✓</p>
+          ) : todayShortages.length === 0 ? (
+            <>
+              <p className="font-playfair text-2xl font-bold text-[#27AE60] mt-1.5">Coperto ✓</p>
+              <p className="text-xs text-[#6B7280] mt-1">{todayRequirements.length} ingredienti verificati</p>
+            </>
+          ) : (
+            <>
+              <p className="font-playfair text-2xl font-bold text-[#C0392B] mt-1.5">
+                Mancano {todayShortages.length}
+              </p>
+              <p className="text-xs text-[#6B7280] mt-1 truncate">
+                {todayShortages.map((s) => s.ingredientName).join(', ')}
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* Ordini clienti oggi */}
+        <Link
+          href="/customers"
+          className="block bg-white rounded-2xl border border-[#E5DDD0] p-5 hover:shadow-[0_4px_24px_rgba(26,43,74,0.10)] transition-all"
+        >
+          <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide">Ritiri clienti oggi</p>
+          {ordersToday.length === 0 ? (
+            <>
+              <p className="font-playfair text-2xl font-bold text-[#6B7280] mt-1.5">Nessuno</p>
+              <p className="text-xs text-[#6B7280] mt-1">nessun ritiro previsto per oggi</p>
+            </>
+          ) : (
+            <>
+              <p className="font-playfair text-2xl font-bold text-[#1A2B4A] mt-1.5">
+                {ordersToday.reduce((s, o) => s + o.piecesCount, 0)} pezzi
+              </p>
+              <p className="text-xs text-[#6B7280] mt-1 truncate">
+                {ordersToday.map((o) => `${o.customerName}${o.pickupTime ? ` (${o.pickupTime.slice(0, 5)})` : ''}`).join(', ')}
+              </p>
+            </>
+          )}
+        </Link>
       </div>
 
-      {/* KPI riga 2: spesa reale del mese (ordini ricevuti) + top ingredienti */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <KpiCard
-          label="Spesa del mese"
-          value={summary.monthSpend > 0 ? `€${formatCurrency(summary.monthSpend)}` : '—'}
-          sub={
-            summary.monthOrdersReceived > 0
-              ? `${summary.monthOrdersReceived} ordini ricevuti questo mese`
-              : 'Nessun ordine ricevuto questo mese'
-          }
-          href="/analytics"
-          accentClass={summary.monthSpend > 0 ? 'bg-[#C9962A]' : undefined}
-        />
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-[#E5DDD0] px-6 py-5">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide">
-              Top ingredienti per spesa
-            </p>
-            <Link href="/analytics" className="text-xs font-semibold text-[#C9962A] hover:underline">
-              Analisi →
-            </Link>
-          </div>
-          {topSpend.length === 0 ? (
-            <p className="text-sm text-[#6B7280] mt-3">
-              Ancora nessun ordine ricevuto: la spesa per ingrediente apparirà qui.
-            </p>
-          ) : (
-            <div className="mt-3 space-y-2">
-              {topSpend.map((item, idx) => {
-                const max = topSpend[0]?.totalSpend || 1;
-                return (
-                  <div key={item.ingredientProductId} className="flex items-center gap-3">
-                    <span className="text-xs font-mono text-[#6B7280] w-4">{idx + 1}</span>
-                    <span className="text-sm text-[#1A2B4A] w-40 truncate">{item.ingredientName}</span>
-                    <div className="flex-1 h-2 bg-[#F0EBE1] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#C9962A] rounded-full"
-                        style={{ width: `${Math.max(4, Math.round((item.totalSpend / max) * 100))}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-mono font-semibold text-[#1A2B4A] w-20 text-right">
-                      €{formatCurrency(item.totalSpend)}
-                    </span>
-                  </div>
-                );
-              })}
+      {/* ── 2 · RICHIEDE ATTENZIONE ────────────────────────────────────────── */}
+      <div>
+        <h2 className="font-semibold text-sm text-[#6B7280] uppercase tracking-wide mb-3">Richiede attenzione</h2>
+        {attention.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-[#E5DDD0] px-6 py-5 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-[#27AE60]/15 flex items-center justify-center">
+              <span className="text-[#27AE60] font-bold">✓</span>
             </div>
-          )}
+            <p className="text-sm text-[#6B7280]">Tutto sotto controllo: nessuna anomalia, scadenza o ordine fermo.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-[#E5DDD0] divide-y divide-[#F0EBE1] overflow-hidden">
+            {attention.map((item, i) => (
+              <Link key={i} href={item.href} className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#FAF7F2] transition-colors group">
+                <span className="text-xl leading-none shrink-0">{item.emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium ${item.severity === 'red' ? 'text-[#C0392B]' : 'text-[#1A2B4A]'}`}>
+                    {item.text}
+                  </p>
+                  {item.detail && <p className="text-xs text-[#6B7280] mt-0.5 truncate">{item.detail}</p>}
+                </div>
+                <span className="text-xs font-semibold text-[#C9962A] group-hover:underline shrink-0">Apri →</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── 3 · AZIONI SUGGERITE ───────────────────────────────────────────── */}
+      {suggested.length > 0 && (
+        <div>
+          <h2 className="font-semibold text-sm text-[#6B7280] uppercase tracking-wide mb-3">Azioni suggerite</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {suggested.slice(0, 4).map((a, i) => (
+              <div key={i} className="bg-[#1A2B4A] rounded-2xl p-5 text-white flex items-start gap-3">
+                <span className="text-xl leading-none shrink-0">{a.emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm leading-snug">{a.text}</p>
+                  <Link href={a.href} className="inline-block mt-2 text-xs font-bold text-[#E8C36A] hover:underline">
+                    {a.cta} →
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 4 · KPI OPERATIVI (tutti da query reali) ───────────────────────── */}
+      <div>
+        <h2 className="font-semibold text-sm text-[#6B7280] uppercase tracking-wide mb-3">KPI operativi</h2>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <KpiCard
+            label="Spesa mese corrente"
+            value={summary.monthSpend > 0 ? `€${formatCurrency(summary.monthSpend)}` : '—'}
+            sub={summary.monthOrdersReceived > 0 ? `${summary.monthOrdersReceived} ordini ricevuti` : 'in attesa di dati'}
+            href="/analytics"
+            accentClass={summary.monthSpend > 0 ? 'bg-[#C9962A]' : undefined}
+          />
+          <KpiCard
+            label="Food cost medio"
+            value={avgFoodCostPct !== null ? `${avgFoodCostPct}%` : '—'}
+            sub={avgFoodCostPct !== null ? `${pricedRecipes.length} ricette prezzate` : 'imposta prezzi di vendita'}
+            href="/analytics"
+            accentClass={avgFoodCostPct !== null ? (avgFoodCostPct <= 40 ? 'bg-[#27AE60]' : 'bg-[#E67E22]') : undefined}
+          />
+          <KpiCard
+            label="Ordini in corso"
+            value={summary.openOrdersCount}
+            sub={
+              summary.openOrdersTotalValue !== null && summary.openOrdersCount > 0
+                ? `valore €${formatCurrency(summary.openOrdersTotalValue)}`
+                : summary.openOrdersCount > 0 ? 'valore parziale' : 'nessun ordine aperto'
+            }
+            href="/orders"
+            accentClass={summary.openOrdersCount > 0 ? 'bg-[#1A2B4A]' : undefined}
+          />
+          <KpiCard
+            label="Sotto soglia"
+            value={totalAlerts}
+            sub={
+              summary.outOfStockCount > 0 ? `${summary.outOfStockCount} esauriti` :
+              totalAlerts > 0 ? 'scorte in alert' : 'scorte OK'
+            }
+            href="/inventory"
+            accentClass={
+              summary.outOfStockCount > 0 ? 'bg-[#C0392B]' :
+              totalAlerts > 0 ? 'bg-[#E67E22]' : 'bg-[#27AE60]'
+            }
+          />
         </div>
       </div>
 
-      {/* 2-col panel: ordini recenti + alert scorte */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-
-        {/* Ordini aperti (3/5) */}
-        <div className="lg:col-span-3 bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0EBE1]">
-            <h2 className="font-semibold text-[15px] text-[#1A2B4A]">Ordini aperti</h2>
-            <Link href="/orders" className="text-xs font-semibold text-[#C9962A] hover:underline">
-              Vedi tutti →
-            </Link>
+      {/* Ordini aperti + top spesa (sintesi operative) */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#F0EBE1]">
+            <h2 className="font-semibold text-[15px] text-[#1A2B4A]">Ordini fornitore aperti</h2>
+            <Link href="/orders" className="text-xs font-semibold text-[#C9962A] hover:underline">Tutti →</Link>
           </div>
-
-          {recentOrders.length === 0 ? (
-            <div className="px-6 py-10 text-center">
-              <p className="text-sm text-[#6B7280]">Nessun ordine aperto.</p>
-              <Link
-                href="/orders/new"
-                className="inline-block mt-3 text-xs font-semibold text-[#C9962A] hover:underline"
-              >
-                Crea il primo ordine →
-              </Link>
-            </div>
+          {openOrders.length === 0 ? (
+            <p className="px-5 py-8 text-sm text-[#6B7280] text-center">
+              Nessun ordine aperto. Le bozze si generano dal piano produzione.
+            </p>
           ) : (
             <div className="divide-y divide-[#F0EBE1]">
-              {recentOrders.map((order) => (
-                <Link
-                  key={order.orderId}
-                  href={`/orders/${order.orderId}`}
-                  className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#FAF7F2] transition-colors group"
-                >
+              {openOrders.slice(0, 5).map((o) => (
+                <Link key={o.orderId} href={`/orders/${o.orderId}`} className="flex items-center gap-3 px-5 py-3 hover:bg-[#FAF7F2] transition-colors">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#1A2B4A] group-hover:text-[#C9962A] truncate">
-                      {order.supplierName}
-                    </p>
-                    <p className="text-xs text-[#6B7280] font-mono mt-0.5">
-                      {shortDate(order.orderDate)}
-                      {order.expectedDate && ` · consegna ${shortDate(order.expectedDate)}`}
-                      {' · '}{order.lineItemsCount} righe
-                    </p>
+                    <p className="text-sm font-semibold text-[#1A2B4A] truncate">{o.supplierName}</p>
+                    <p className="text-xs text-[#6B7280] font-mono mt-0.5">{o.orderDate} · {o.lineItemsCount} righe</p>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    {order.totalAmount !== null && (
-                      <span className="text-xs font-mono font-medium text-[#1A2B4A]">
-                        {formatCurrency(order.totalAmount)}
-                      </span>
-                    )}
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${ORDER_STATUS_COLOR[order.status] ?? 'bg-[#6B7280]/10 text-[#6B7280]'}`}>
-                      {ORDER_STATUS_LABELS[order.status] ?? order.status}
-                    </span>
-                  </div>
+                  {o.totalAmount !== null && (
+                    <span className="text-xs font-mono font-semibold text-[#1A2B4A]">€{formatCurrency(o.totalAmount)}</span>
+                  )}
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#C9962A]/15 text-[#8A6418]">
+                    {ORDER_STATUS_LABELS[o.status] ?? o.status}
+                  </span>
                 </Link>
               ))}
             </div>
           )}
-
-          <div className="px-6 py-3 border-t border-[#F0EBE1] flex justify-between items-center">
-            <span className="text-xs text-[#6B7280]">
-              {summary.openOrdersCount > 5 ? `+${summary.openOrdersCount - 5} altri` : ''}
-            </span>
-            <Link
-              href="/orders/new"
-              className="text-xs font-semibold text-[#1A2B4A] hover:text-[#C9962A]"
-            >
-              + Nuovo ordine
-            </Link>
-          </div>
         </div>
 
-        {/* Alert scorte (2/5) */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+        <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-[#F0EBE1]">
             <h2 className="font-semibold text-[15px] text-[#1A2B4A]">Scorte critiche</h2>
-            <Link href="/inventory" className="text-xs font-semibold text-[#C9962A] hover:underline">
-              Magazzino →
-            </Link>
+            <Link href="/inventory" className="text-xs font-semibold text-[#C9962A] hover:underline">Magazzino →</Link>
           </div>
-
-          {criticalAlerts.length === 0 ? (
-            <div className="px-5 py-10 text-center space-y-1">
-              <div className="w-8 h-8 rounded-full bg-[#27AE60]/15 flex items-center justify-center mx-auto">
-                <span className="text-[#27AE60] text-sm font-bold">✓</span>
-              </div>
-              <p className="text-sm text-[#6B7280] mt-2">Tutte le scorte sono OK.</p>
-            </div>
+          {stockAlerts.length === 0 ? (
+            <p className="px-5 py-8 text-sm text-[#6B7280] text-center">Tutte le scorte sono sopra soglia. ✓</p>
           ) : (
-            <>
-              <div className="divide-y divide-[#F0EBE1]">
-                {criticalAlerts.map((alert) => {
-                  const cfg = ALERT_CFG[alert.alertLevel] ?? ALERT_CFG.low;
-                  return (
-                    <div key={alert.ingredientProductId} className="flex items-center gap-3 px-5 py-3">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
-                      <span className="flex-1 text-sm text-[#1A2B4A] truncate">
-                        {alert.ingredientName}
-                      </span>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${cfg.badge}`}>
-                        {cfg.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="px-5 py-3 border-t border-[#F0EBE1]">
-                <Link
-                  href="/orders/new"
-                  className="block w-full py-2 text-center rounded-xl text-xs font-semibold bg-[#1A2B4A] text-white hover:bg-[#243660] transition-colors"
-                >
-                  Crea ordine di rifornimento
-                </Link>
-              </div>
-            </>
+            <div className="divide-y divide-[#F0EBE1]">
+              {stockAlerts.slice(0, 5).map((a) => (
+                <div key={a.ingredientProductId} className="flex items-center gap-3 px-5 py-3">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${a.alertLevel === 'out_of_stock' ? 'bg-[#C0392B]' : a.alertLevel === 'critical' ? 'bg-[#E67E22]' : 'bg-[#C9962A]'}`} />
+                  <span className="flex-1 text-sm text-[#1A2B4A] truncate">{a.ingredientName}</span>
+                  <span className="text-xs font-mono text-[#6B7280]">{a.currentQuantity}/{a.minThreshold} {a.unit}</span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
 
-      {/* Azioni rapide */}
-      <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">
-        <h2 className="font-semibold text-[15px] text-[#1A2B4A] mb-4">Azioni rapide</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { href: '/recipes/new',     label: 'Nuova ricetta',     icon: '📖' },
-            { href: '/production/new',  label: 'Nuovo piano',       icon: '🧮' },
-            { href: '/orders/new',      label: 'Nuovo ordine',      icon: '🛒' },
-            { href: '/ingredients/new', label: 'Nuovo ingrediente', icon: '🧂' },
-          ].map(({ href, label, icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[#E5DDD0] hover:border-[#C9962A] hover:bg-[#C9962A]/[0.04] transition-colors text-center group"
-            >
-              <span className="text-2xl leading-none">{icon}</span>
-              <span className="text-xs font-medium text-[#6B7280] group-hover:text-[#1A2B4A]">{label}</span>
-            </Link>
-          ))}
+      {/* Top spesa ingredienti (se ci sono acquisti reali) */}
+      {topSpend.length > 0 && (
+        <div className="bg-white rounded-2xl border border-[#E5DDD0] px-6 py-5">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide">Top ingredienti per spesa</p>
+            <Link href="/analytics" className="text-xs font-semibold text-[#C9962A] hover:underline">Analisi →</Link>
+          </div>
+          <div className="mt-3 space-y-2">
+            {topSpend.map((item, idx) => {
+              const max = topSpend[0]?.totalSpend || 1;
+              return (
+                <div key={item.ingredientProductId} className="flex items-center gap-3">
+                  <span className="text-xs font-mono text-[#6B7280] w-4">{idx + 1}</span>
+                  <span className="text-sm text-[#1A2B4A] w-40 truncate">{item.ingredientName}</span>
+                  <div className="flex-1 h-2 bg-[#F0EBE1] rounded-full overflow-hidden">
+                    <div className="h-full bg-[#C9962A] rounded-full" style={{ width: `${Math.max(4, Math.round((item.totalSpend / max) * 100))}%` }} />
+                  </div>
+                  <span className="text-xs font-mono font-semibold text-[#1A2B4A] w-20 text-right">€{formatCurrency(item.totalSpend)}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
-
+      )}
     </div>
   );
 }

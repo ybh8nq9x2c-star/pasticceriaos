@@ -116,6 +116,7 @@ export async function listOpenOrders(orgId: string): Promise<OpenOrder[]> {
     status:         r.status,
     orderDate:      r.order_date,
     expectedDate:   r.expected_date ?? null,
+    sentAt:         r.sent_at ?? null,
     lineItemsCount: num(r.line_items_count),
     totalAmount:    numOrNull(r.total_amount),
   }));

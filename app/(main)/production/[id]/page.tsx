@@ -10,6 +10,7 @@ import { notFound } from 'next/navigation';
 import { getPlan } from '@/modules/production/service';
 import { getIngredientRequirements } from '@/modules/reporting/service';
 import { completePlanAction, cancelPlanAction } from '@/modules/production/actions';
+import { DraftOrdersButton } from './DraftOrdersButton';
 import type { PlanStatus } from '@/modules/production/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { UNIT_LABELS } from '@/lib/utils';
@@ -205,7 +206,7 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
               </table>
 
               {shortageItems.length > 0 && (
-                <div className="px-6 py-4 border-t border-[#F0EBE1] bg-[#FAF7F2] flex items-center justify-between">
+                <div className="px-6 py-4 border-t border-[#F0EBE1] bg-[#FAF7F2] flex items-center justify-between gap-3">
                   <p className="text-xs text-[#6B7280]">
                     {shortageItems.length} ingrediente/i non sufficienti per completare il piano.
                     {shortageItems.some((s) => s.estimatedShortageCost !== null) && (
@@ -216,12 +217,7 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
                       </>
                     )}
                   </p>
-                  <Link
-                    href={`/orders/new?plan=${plan.id}`}
-                    className="text-xs font-semibold text-[#C9962A] hover:underline shrink-0 ml-3"
-                  >
-                    Genera bozza ordine →
-                  </Link>
+                  <DraftOrdersButton planId={plan.id} />
                 </div>
               )}
             </div>

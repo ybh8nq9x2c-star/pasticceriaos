@@ -5,7 +5,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { mapSupabaseError, NotFoundError } from '@/lib/errors';
-import type { InventoryLevel, InventoryMovement, LowStockAlert } from './types';
+import type { InventoryLevel, InventoryMovement, LowStockAlert, IngredientBatch, ExpiringBatch } from './types';
 import type { CreateMovementInput, UpdateThresholdInput } from './schemas';
 
 // ---------------------------------------------------------------------------
@@ -105,6 +105,102 @@ export async function insertMovement(
 
   if (error) throw mapSupabaseError(error);
   return toMovement(data);
+}
+
+// ---------------------------------------------------------------------------
+// Lotti ingredienti (HACCP-lite)
+// ---------------------------------------------------------------------------
+
+export async function insertBatch(
+  orgId: string,
+  input: {
+    ingredientProductId: string;
+    purchaseOrderId: string | null;
+    supplierId: string | null;
+    lotNumber: string | null;
+    expiryDate: string;
+    quantity: number;
+    unit: string;
+    notes: string | null;
+  },
+): Promise<string> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('ingredient_batches')
+    .insert({
+      organization_id:       orgId,
+      ingredient_product_id: input.ingredientProductId,
+      purchase_order_id:     input.purchaseOrderId,
+      supplier_id:           input.supplierId,
+      lot_number:            input.lotNumber,
+      expiry_date:           input.expiryDate,
+      quantity_received:     input.quantity,
+      quantity_remaining:    input.quantity,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      unit:                  input.unit as any,
+      notes:                 input.notes,
+    })
+    .select('id')
+    .single();
+  if (error) throw mapSupabaseError(error);
+  return data.id as string;
+}
+
+export async function listBatchesForOrder(orgId: string, purchaseOrderId: string): Promise<IngredientBatch[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('ingredient_batches')
+    .select('*, ingredient_products(name)')
+    .eq('organization_id', orgId)
+    .eq('purchase_order_id', purchaseOrderId)
+    .order('created_at');
+  if (error) throw mapSupabaseError(error);
+  return (data ?? []).map(toBatch);
+}
+
+export async function listExpiringBatches(orgId: string, withinDays: number): Promise<ExpiringBatch[]> {
+  const supabase = await createClient();
+  const limitDate = new Date();
+  limitDate.setDate(limitDate.getDate() + withinDays);
+  const limitIso = limitDate.toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from('v_expiring_batches')
+    .select('*')
+    .eq('organization_id', orgId)
+    .lte('expiry_date', limitIso)
+    .order('expiry_date');
+  if (error) throw mapSupabaseError(error);
+
+  return (data ?? []).map((r) => ({
+    batchId:             r.batch_id,
+    ingredientProductId: r.ingredient_product_id,
+    ingredientName:      r.ingredient_name,
+    lotNumber:           r.lot_number,
+    expiryDate:          r.expiry_date,
+    quantityRemaining:   Number(r.quantity_remaining),
+    unit:                r.unit,
+    daysToExpiry:        Number(r.days_to_expiry),
+    supplierName:        r.supplier_name,
+    suggestedRecipes:    r.suggested_recipes ?? [],
+  }));
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toBatch(row: any): IngredientBatch {
+  return {
+    id:                  row.id,
+    ingredientProductId: row.ingredient_product_id,
+    ingredientName:      row.ingredient_products?.name ?? '',
+    purchaseOrderId:     row.purchase_order_id,
+    lotNumber:           row.lot_number,
+    expiryDate:          row.expiry_date,
+    quantityReceived:    Number(row.quantity_received),
+    quantityRemaining:   Number(row.quantity_remaining),
+    unit:                row.unit,
+    receivedAt:          row.received_at,
+    notes:               row.notes,
+  };
 }
 
 // ---------------------------------------------------------------------------
