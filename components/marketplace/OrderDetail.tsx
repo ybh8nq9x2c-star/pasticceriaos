@@ -3,7 +3,15 @@ import { StatusActions } from './StatusActions';
 import { ORDER_STATUS_LABELS, type MarketplaceOrderDetail, type AccountType } from '@/modules/marketplace/types';
 import { formatCurrency } from '@/lib/utils';
 
-export function OrderDetail({ order, side }: { order: MarketplaceOrderDetail; side: AccountType }) {
+export function OrderDetail({
+  order,
+  side,
+  footer,
+}: {
+  order: MarketplaceOrderDetail;
+  side: AccountType;
+  footer?: React.ReactNode;
+}) {
   const counterpartyLabel = side === 'supplier' ? 'Cliente' : 'Fornitore';
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto space-y-5 sm:space-y-6">
@@ -67,6 +75,8 @@ export function OrderDetail({ order, side }: { order: MarketplaceOrderDetail; si
           <p className="text-xs text-[#6B7280] uppercase mb-1">Note</p>{order.notes}
         </div>
       )}
+
+      {footer}
 
       <div className="bg-white rounded-2xl border border-[#E5DDD0] p-4 sm:p-5">
         <h2 className="font-semibold mb-3">Azioni</h2>

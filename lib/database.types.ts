@@ -113,6 +113,7 @@ export interface Database {
         Row: {
           id: string;
           organization_id: string;
+          supplier_org_id: string | null;
           name: string;
           email: string;
           phone: string | null;
@@ -123,6 +124,7 @@ export interface Database {
         Insert: {
           id?: string;
           organization_id: string;
+          supplier_org_id?: string | null;
           name: string;
           email: string;
           phone?: string | null;
@@ -136,6 +138,7 @@ export interface Database {
           phone?: string | null;
           notes?: string | null;
           is_active?: boolean;
+          supplier_org_id?: string | null;
         };
         Relationships: [
           {
@@ -204,6 +207,7 @@ export interface Database {
           category: string | null;
           emoji: string | null;
           base_portions: number;
+          sell_price_per_portion: number | null;
           notes: string | null;
           is_active: boolean;
           created_at: string;
@@ -216,6 +220,7 @@ export interface Database {
           category?: string | null;
           emoji?: string | null;
           base_portions: number;
+          sell_price_per_portion?: number | null;
           notes?: string | null;
           is_active?: boolean;
           created_at?: string;
@@ -226,6 +231,7 @@ export interface Database {
           category?: string | null;
           emoji?: string | null;
           base_portions?: number;
+          sell_price_per_portion?: number | null;
           notes?: string | null;
           is_active?: boolean;
           updated_at?: string;
@@ -422,8 +428,11 @@ export interface Database {
           order_date: string;
           expected_date: string | null;
           notes: string | null;
+          total_amount: number | null;
           email_message_id: string | null;
+          marketplace_order_id: string | null;
           sent_at: string | null;
+          created_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -435,8 +444,11 @@ export interface Database {
           order_date?: string;
           expected_date?: string | null;
           notes?: string | null;
+          total_amount?: number | null;
           email_message_id?: string | null;
+          marketplace_order_id?: string | null;
           sent_at?: string | null;
+          created_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -446,7 +458,9 @@ export interface Database {
           order_date?: string;
           expected_date?: string | null;
           notes?: string | null;
+          total_amount?: number | null;
           email_message_id?: string | null;
+          marketplace_order_id?: string | null;
           sent_at?: string | null;
           updated_at?: string;
         };
@@ -538,13 +552,19 @@ export interface Database {
           production_plan_id: string;
           organization_id: string;
           plan_date: string;
+          plan_status: PlanStatus;
           ingredient_product_id: string;
           ingredient_name: string;
+          ingredient_sku: string | null;
           unit: UnitOfMeasure;
           total_required: number;
           current_stock: number;
           estimated_shortage: number;
+          current_unit_price: number | null;
           estimated_shortage_cost: number | null;
+          supplier_id: string | null;
+          supplier_name: string | null;
+          supplier_email: string | null;
         };
         Relationships: [];
       };
@@ -572,7 +592,135 @@ export interface Database {
           sent_at: string | null;
           supplier_id: string;
           supplier_name: string;
+          supplier_email: string | null;
           line_items_count: number;
+        };
+        Relationships: [];
+      };
+      v_recipe_costs: {
+        Row: {
+          recipe_id: string;
+          organization_id: string;
+          name: string;
+          emoji: string | null;
+          category: string | null;
+          base_portions: number;
+          sell_price_per_portion: number | null;
+          is_active: boolean;
+          ingredient_count: number;
+          priced_ingredient_count: number;
+          batch_cost: number | null;
+          cost_per_portion: number | null;
+          margin_pct: number | null;
+        };
+        Relationships: [];
+      };
+      v_recipe_cost_breakdown: {
+        Row: {
+          organization_id: string;
+          recipe_id: string;
+          recipe_ingredient_id: string;
+          ingredient_product_id: string;
+          ingredient_name: string;
+          quantity: number;
+          unit: UnitOfMeasure;
+          price_unit: UnitOfMeasure;
+          unit_price: number | null;
+          line_cost: number | null;
+          sort_order: number;
+        };
+        Relationships: [];
+      };
+      v_received_order_lines: {
+        Row: {
+          organization_id: string;
+          purchase_order_id: string;
+          supplier_id: string;
+          received_at: string;
+          ingredient_product_id: string;
+          quantity_ordered: number;
+          unit: UnitOfMeasure;
+          unit_price_snapshot: number | null;
+          line_total: number;
+        };
+        Relationships: [];
+      };
+      v_monthly_purchase_spend: {
+        Row: {
+          organization_id: string;
+          month: string;
+          orders_received: number;
+          total_spend: number;
+        };
+        Relationships: [];
+      };
+      v_ingredient_purchase_stats: {
+        Row: {
+          organization_id: string;
+          ingredient_product_id: string;
+          ingredient_name: string;
+          unit: UnitOfMeasure;
+          orders_count: number;
+          total_quantity: number;
+          total_spend: number;
+          first_price: number | null;
+          last_price: number | null;
+          last_received_at: string | null;
+        };
+        Relationships: [];
+      };
+      v_marketplace_order_facts: {
+        Row: {
+          order_id: string;
+          supplier_org_id: string;
+          customer_org_id: string;
+          supplier_name: string | null;
+          customer_name: string | null;
+          status: MarketplaceOrderStatus;
+          created_at: string;
+          submitted_at: string | null;
+          accepted_at: string | null;
+          shipped_at: string | null;
+          delivered_at: string | null;
+          cancelled_at: string | null;
+          line_count: number;
+          total_value: number;
+        };
+        Relationships: [];
+      };
+      v_supplier_monthly_sales: {
+        Row: {
+          supplier_org_id: string;
+          month: string;
+          orders_count: number;
+          total_value: number;
+          customers_count: number;
+        };
+        Relationships: [];
+      };
+      v_supplier_product_sales: {
+        Row: {
+          supplier_org_id: string;
+          catalog_item_id: string | null;
+          name_snapshot: string;
+          unit: UnitOfMeasure;
+          orders_count: number;
+          total_quantity: number;
+          total_revenue: number;
+          customers_count: number;
+          last_ordered_at: string | null;
+        };
+        Relationships: [];
+      };
+      v_supplier_customer_stats: {
+        Row: {
+          supplier_org_id: string;
+          customer_org_id: string;
+          customer_name: string | null;
+          orders_count: number;
+          total_value: number | null;
+          delivered_count: number;
+          last_order_at: string | null;
         };
         Relationships: [];
       };
@@ -586,8 +734,13 @@ export interface Database {
           unit_price: number | null;
           current_quantity: number;
           min_threshold: number;
+          last_updated_at: string;
           stock_status: 'out_of_stock' | 'critical' | 'low' | 'ok';
-          stock_value: number | null;
+          deficit: number;
+          supplier_id: string | null;
+          supplier_email: string | null;
+          is_active: boolean;
+          sku: string | null;
         };
         Relationships: [];
       };
@@ -916,6 +1069,14 @@ export interface Database {
       marketplace_order_actor_for_transition: {
         Args: { p_from: MarketplaceOrderStatus; p_to: MarketplaceOrderStatus };
         Returns: AccountType;
+      };
+      receive_marketplace_order: {
+        Args: { p_order_id: string };
+        Returns: string;
+      };
+      unit_conversion_factor: {
+        Args: { p_from: UnitOfMeasure; p_to: UnitOfMeasure };
+        Returns: number | null;
       };
     };
 

@@ -109,6 +109,7 @@ export async function updateRecipe(id: string, raw: unknown): Promise<Recipe> {
     category:     input.category,
     emoji:        input.emoji,
     basePortions: input.basePortions,
+    sellPricePerPortion: input.sellPricePerPortion,
     notes:        input.notes,
     isActive:     input.isActive,
   });

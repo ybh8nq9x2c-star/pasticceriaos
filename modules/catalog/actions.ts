@@ -148,6 +148,7 @@ export async function createRecipeAction(
       category:     formData.get('category'),
       emoji:        formData.get('emoji'),
       basePortions: formData.get('basePortions'),
+      sellPricePerPortion: formData.get('sellPricePerPortion') as string | null,
       notes:        formData.get('notes'),
       ingredients,
     });
@@ -173,6 +174,7 @@ export async function updateRecipeAction(
       category:     formData.get('category'),
       emoji:        formData.get('emoji'),
       basePortions: formData.get('basePortions'),
+      sellPricePerPortion: formData.get('sellPricePerPortion') as string | null,
       notes:        formData.get('notes'),
       isActive:     formData.get('isActive') === 'true',
       ...(ingredients !== undefined ? { ingredients } : {}),

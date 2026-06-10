@@ -6,7 +6,6 @@
 import { requireOrgId } from '@/modules/identity/service';
 import { createClient } from '@/lib/supabase/server';
 import { BusinessRuleError, mapSupabaseError } from '@/lib/errors';
-import { todayISODate } from '@/lib/utils';
 import * as repo from './repository';
 import { createPlanSchema, updatePlanSchema } from './schemas';
 import type { ProductionPlan, ProductionPlanListItem } from './types';
@@ -48,18 +47,20 @@ export async function updatePlan(id: string, raw: unknown): Promise<ProductionPl
     );
   }
 
-  const completedAt =
-    input.status === 'completed'
-      ? todayISODate()
-      : input.status === 'draft' || input.status === 'in_progress'
-      ? null
-      : existing.completedAt;
+  // INVARIANTE CONTABILE: il completamento passa SOLO da completePlan() (RPC
+  // transazionale che scarica il magazzino). Un PATCH a 'completed' qui
+  // marcherebbe il piano completo SENZA movimenti production_usage.
+  if (input.status === 'completed') {
+    throw new BusinessRuleError(
+      'Usa l\'azione "Segna come completato": il completamento registra anche i consumi a magazzino.',
+    );
+  }
 
   await repo.patchPlan(id, {
     planDate:    input.planDate,
     notes:       input.notes,
     status:      input.status,
-    completedAt: completedAt as string | null,
+    completedAt: null,
   });
 
   if (input.items && input.items.length > 0) {

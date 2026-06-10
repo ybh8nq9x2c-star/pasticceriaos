@@ -5,9 +5,14 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getInventoryStockFull, getOpenOrders } from '@/modules/reporting/service';
-import { formatCurrency, UNIT_LABELS } from '@/lib/utils';
-import type { InventoryStockFull, OpenOrder } from '@/modules/reporting/types';
+import {
+  getInventoryStockFull,
+  getOpenOrders,
+  getMonthlySpend,
+  getIngredientPurchaseStats,
+  getRecipeCosts,
+} from '@/modules/reporting/service';
+import { formatCurrency, UNIT_LABELS, UNIT_SHORT } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 export const metadata: Metadata = { title: 'Analisi' };
@@ -86,15 +91,24 @@ function StatusBar({ items }: { items: { label: string; count: number; color: st
 // Page
 // ---------------------------------------------------------------------------
 
-export default async function AnalyticsPage() {
-  let stock: InventoryStockFull[] = [];
-  let orders: OpenOrder[] = [];
+function monthLabel(iso: string) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', {
+    month: 'short', year: '2-digit',
+  });
+}
 
-  try {
-    [stock, orders] = await Promise.all([getInventoryStockFull(), getOpenOrders()]);
-  } catch {
-    // empty state
-  }
+export default async function AnalyticsPage() {
+  // Tutto da query reali; errori → error boundary, non zeri fittizi.
+  const [stock, orders, monthlySpend, ingredientStats, recipeCosts] = await Promise.all([
+    getInventoryStockFull(),
+    getOpenOrders(),
+    getMonthlySpend(6),
+    getIngredientPurchaseStats(10),
+    getRecipeCosts(),
+  ]);
+
+  const activeRecipeCosts = recipeCosts.filter((r) => r.isActive);
+  const maxMonthSpend = Math.max(...monthlySpend.map((m) => m.totalSpend), 0);
 
   // ── Stock aggregates ─────────────────────────────────────────────────────
 
@@ -255,6 +269,148 @@ export default async function AnalyticsPage() {
         </div>
       </div>
 
+      {/* ── Spesa mensile reale (ordini ricevuti) ────────────────────────── */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">
+          <h2 className="font-playfair text-base font-bold text-[#1A2B4A] mb-1">
+            Spesa mensile
+          </h2>
+          <p className="text-xs text-[#6B7280] mb-4">
+            Valore ordini ricevuti, da prezzi snapshot reali (ultimi 6 mesi)
+          </p>
+
+          {monthlySpend.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-[#6B7280]">Nessun ordine ricevuto finora.</p>
+              <Link href="/orders" className="text-xs font-semibold text-[#C9962A] hover:underline mt-1 inline-block">
+                Vai agli ordini →
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {monthlySpend.map((m) => (
+                <div key={m.month} className="flex items-center gap-3">
+                  <span className="text-xs font-mono text-[#6B7280] w-14 capitalize">{monthLabel(m.month)}</span>
+                  <div className="flex-1 h-5 bg-[#F0EBE1] rounded-md overflow-hidden">
+                    <div
+                      className="h-full bg-[#1A2B4A] rounded-md flex items-center"
+                      style={{ width: `${maxMonthSpend > 0 ? Math.max(3, Math.round((m.totalSpend / maxMonthSpend) * 100)) : 0}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono font-semibold text-[#1A2B4A] w-24 text-right">
+                    €{formatCurrency(m.totalSpend)}
+                  </span>
+                  <span className="text-[10px] text-[#6B7280] w-12 text-right">{m.ordersReceived} ord.</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Food cost per ricetta */}
+        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">
+          <h2 className="font-playfair text-base font-bold text-[#1A2B4A] mb-1">
+            Food cost per ricetta
+          </h2>
+          <p className="text-xs text-[#6B7280] mb-4">
+            Costo/porzione dai prezzi ingredienti correnti; margine se il prezzo di vendita è impostato
+          </p>
+
+          {activeRecipeCosts.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-[#6B7280]">Nessuna ricetta attiva.</p>
+              <Link href="/recipes/new" className="text-xs font-semibold text-[#C9962A] hover:underline mt-1 inline-block">
+                Crea la prima ricetta →
+              </Link>
+            </div>
+          ) : (
+            <div className="divide-y divide-[#F0EBE1]">
+              {activeRecipeCosts.slice(0, 6).map((r) => (
+                <Link
+                  key={r.recipeId}
+                  href={`/recipes/${r.recipeId}`}
+                  className="flex items-center gap-3 py-2.5 group"
+                >
+                  <span className="text-lg leading-none">{r.emoji ?? '📖'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[#1A2B4A] group-hover:text-[#C9962A] truncate">{r.name}</p>
+                    {r.costPerPortion === null && (
+                      <p className="text-[10px] text-[#E67E22]">
+                        {r.ingredientCount === 0
+                          ? 'nessun ingrediente'
+                          : `${r.ingredientCount - r.pricedIngredientCount} ingredienti senza prezzo`}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-mono font-semibold text-[#1A2B4A]">
+                      {r.costPerPortion !== null ? `€${formatCurrency(r.costPerPortion)}/porz.` : '—'}
+                    </p>
+                    {r.marginPct !== null && (
+                      <p className={`text-[10px] font-semibold ${r.marginPct >= 60 ? 'text-[#27AE60]' : r.marginPct >= 30 ? 'text-[#C9962A]' : 'text-[#C0392B]'}`}>
+                        margine {r.marginPct}%
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              ))}
+              {activeRecipeCosts.length > 6 && (
+                <p className="text-xs text-[#6B7280] pt-2.5">+{activeRecipeCosts.length - 6} altre ricette</p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Spesa per ingrediente + variazione prezzo fornitore ──────────── */}
+      {ingredientStats.length > 0 && (
+        <div>
+          <h2 className="font-semibold text-sm text-[#6B7280] uppercase tracking-wide mb-3">
+            Top ingredienti per spesa (ordini ricevuti)
+          </h2>
+          <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-[#FAF7F2] border-b border-[#E5DDD0]">
+                <tr>
+                  <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Ingrediente</th>
+                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Qtà acquistata</th>
+                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Spesa totale</th>
+                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Ultimo prezzo</th>
+                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Variazione</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#F0EBE1]">
+                {ingredientStats.map((item) => (
+                  <tr key={item.ingredientProductId} className="hover:bg-[#FAF7F2] transition-colors">
+                    <td className="px-6 py-3.5 font-medium text-[#1A2B4A]">{item.ingredientName}</td>
+                    <td className="px-6 py-3.5 text-right font-mono text-[#6B7280] text-xs">
+                      {item.totalQuantity} {UNIT_SHORT[item.unit]}
+                    </td>
+                    <td className="px-6 py-3.5 text-right font-mono font-semibold text-[#1A2B4A]">
+                      €{formatCurrency(item.totalSpend)}
+                    </td>
+                    <td className="px-6 py-3.5 text-right font-mono text-[#6B7280] text-xs">
+                      {item.lastPrice !== null ? `€${formatCurrency(item.lastPrice)}/${UNIT_SHORT[item.unit]}` : '—'}
+                    </td>
+                    <td className="px-6 py-3.5 text-right">
+                      {item.priceChangePct === null ? (
+                        <span className="text-xs text-[#6B7280]">—</span>
+                      ) : item.priceChangePct === 0 ? (
+                        <span className="text-xs font-semibold text-[#6B7280]">stabile</span>
+                      ) : (
+                        <span className={`text-xs font-semibold ${item.priceChangePct > 0 ? 'text-[#C0392B]' : 'text-[#27AE60]'}`}>
+                          {item.priceChangePct > 0 ? '▲' : '▼'} {Math.abs(item.priceChangePct)}%
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* ── Top ingredienti per valore ───────────────────────────────────── */}
       {topByValue.length > 0 && (
         <div>
@@ -368,7 +524,7 @@ export default async function AnalyticsPage() {
       )}
 
       {/* Empty state */}
-      {total === 0 && orders.length === 0 && (
+      {total === 0 && orders.length === 0 && monthlySpend.length === 0 && activeRecipeCosts.length === 0 && (
         <div className="text-center py-20 bg-white rounded-2xl border border-[#E5DDD0]">
           <p className="text-4xl mb-3">📊</p>
           <p className="font-playfair text-lg font-bold text-[#1A2B4A]">Nessun dato disponibile</p>

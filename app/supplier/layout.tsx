@@ -8,13 +8,9 @@ import Link from 'next/link';
 import { requireSupplierSession } from '@/modules/identity/workspace';
 import { signOutAction } from '@/modules/identity/actions';
 import { MobileChrome } from '@/components/layout/MobileChrome';
+import { SUPPLIER_NAV } from '@/components/layout/navConfig';
 
-const NAV = [
-  { href: '/supplier',           label: 'Ordini in arrivo', emoji: '📥' },
-  { href: '/supplier/customers', label: 'Clienti collegati', emoji: '🤝' },
-  { href: '/supplier/catalog',   label: 'Catalogo',          emoji: '📦' },
-  { href: '/supplier/keys',      label: 'Chiavi di accesso', emoji: '🔑' },
-];
+const NAV = SUPPLIER_NAV;
 
 export default async function SupplierLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSupplierSession();

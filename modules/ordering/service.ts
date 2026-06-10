@@ -6,7 +6,7 @@
 import { requireOrgId } from '@/modules/identity/service';
 import { createClient } from '@/lib/supabase/server';
 import { AuthError, BusinessRuleError, mapSupabaseError } from '@/lib/errors';
-import { todayISODate } from '@/lib/utils';
+import { dispatchOrderToSupplier } from '@/lib/order-dispatch';
 import * as repo from './repository';
 import { createOrderSchema, updateOrderSchema, changeStatusSchema } from './schemas';
 import type {
@@ -61,7 +61,17 @@ export async function getOrderHistory(id: string): Promise<OrderStatusEvent[]> {
 export async function createOrder(raw: unknown): Promise<PurchaseOrder> {
   const orgId = await requireOrgId();
   const input: CreateOrderInput = createOrderSchema.parse(raw);
-  return repo.insertOrder(orgId, input);
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new AuthError();
+
+  const order = await repo.insertOrder(orgId, input);
+
+  // Ogni ordine nasce con la sua history: (null -> draft).
+  await repo.appendStatusHistory(order.id, null, 'draft', user.id);
+
+  return order;
 }
 
 export async function updateOrder(id: string, raw: unknown): Promise<PurchaseOrder> {
@@ -117,8 +127,27 @@ export async function changeOrderStatus(
   const patchFields: Parameters<typeof repo.patchOrder>[1] = {
     status: input.status,
   };
+
+  let historyNotes = input.notes;
+
   if (input.status === 'sent') {
     patchFields.sentAt = new Date().toISOString();
+    // Canale di invio reale, con fallback ESPLICITO se non configurato.
+    const dispatch = await dispatchOrderToSupplier({
+      orderId:       existing.id,
+      supplierName:  existing.supplierName,
+      supplierEmail: existing.supplierEmail,
+      orderDate:     existing.orderDate,
+      expectedDate:  existing.expectedDate,
+      notes:         existing.notes,
+      lines: existing.lineItems.map((li) => ({
+        name:      li.ingredientName,
+        quantity:  li.quantity,
+        unit:      li.unitSnapshot,
+        unitPrice: li.unitPriceSnapshot,
+      })),
+    });
+    historyNotes = [input.notes, dispatch.detail].filter(Boolean).join(' — ');
   }
 
   await repo.patchOrder(id, patchFields);
@@ -127,7 +156,7 @@ export async function changeOrderStatus(
     existing.status,
     input.status,
     user.id,
-    input.notes,
+    historyNotes,
   );
 
   return repo.getOrderById(id);

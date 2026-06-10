@@ -48,8 +48,9 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
     notFound();
   }
 
-  // Fabbisogno ingredienti — best effort, non blocca la pagina
-  const requirements = await getIngredientRequirements(plan.id).catch(() => []);
+  // Fabbisogno ingredienti reale: un errore qui deve emergere (error boundary),
+  // non nascondere silenziosamente la sezione shortage.
+  const requirements = await getIngredientRequirements(plan.id);
 
   const canComplete = plan.status === 'draft' || plan.status === 'in_progress';
   const canCancel   = plan.status !== 'completed' && plan.status !== 'cancelled';
@@ -207,12 +208,19 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
                 <div className="px-6 py-4 border-t border-[#F0EBE1] bg-[#FAF7F2] flex items-center justify-between">
                   <p className="text-xs text-[#6B7280]">
                     {shortageItems.length} ingrediente/i non sufficienti per completare il piano.
+                    {shortageItems.some((s) => s.estimatedShortageCost !== null) && (
+                      <> Costo riordino stimato:{' '}
+                        <span className="font-mono font-semibold text-[#1A2B4A]">
+                          €{shortageItems.reduce((sum, s) => sum + (s.estimatedShortageCost ?? 0), 0).toFixed(2)}
+                        </span>
+                      </>
+                    )}
                   </p>
                   <Link
-                    href="/orders/new"
-                    className="text-xs font-semibold text-[#C9962A] hover:underline"
+                    href={`/orders/new?plan=${plan.id}`}
+                    className="text-xs font-semibold text-[#C9962A] hover:underline shrink-0 ml-3"
                   >
-                    Crea ordine di acquisto →
+                    Genera bozza ordine →
                   </Link>
                 </div>
               )}

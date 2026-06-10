@@ -397,6 +397,47 @@ export async function getOrder(orderId: string): Promise<MarketplaceOrderDetail>
   };
 }
 
+// =============================================================================
+// CUSTOMER · receive delivered order into inventory
+// =============================================================================
+
+/**
+ * Registra il carico a magazzino di un ordine marketplace CONSEGNATO.
+ * Tutto-o-niente lato DB (RPC transazionale): crea il purchase_order specchio,
+ * le righe, i movimenti purchase_receipt e la history. Idempotente:
+ * richiamarla restituisce il purchase_order già creato, senza doppi movimenti.
+ * Ritorna l'id del purchase_order locale.
+ */
+export async function receiveMarketplaceOrderIntoInventory(orderId: string): Promise<string> {
+  await requireCustomerSession();
+  const db = await createMarketplaceClient();
+
+  const { data, error } = await db.rpc('receive_marketplace_order', { p_order_id: orderId });
+  if (error) mapPgError(error.code, error.message);
+
+  const session = await requireSession();
+  await audit(db, session.organizationId, 'order.received_into_inventory', 'marketplace_order', orderId, {
+    purchase_order_id: data,
+  });
+  return data as string;
+}
+
+/**
+ * Se l'ordine marketplace è già stato registrato a magazzino, ritorna l'id del
+ * purchase_order locale; altrimenti null. Usato dalla UI per la CTA.
+ */
+export async function getLinkedPurchaseOrderId(orderId: string): Promise<string | null> {
+  await requireCustomerSession();
+  const db = await createMarketplaceClient();
+  const { data, error } = await db
+    .from('purchase_orders')
+    .select('id')
+    .eq('marketplace_order_id', orderId)
+    .maybeSingle();
+  if (error) throw new AppError(error.message);
+  return data?.id ?? null;
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 async function loadMyConnection(db: Db, connectionId: string) {
   const { data, error } = await db

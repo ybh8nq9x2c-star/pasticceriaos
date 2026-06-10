@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
-// Root → redirect to sign-in
+// Root → il middleware smista gli utenti autenticati al loro workspace;
+// chi arriva qui non autenticato va al login (rotta reale: /login).
 export default function RootPage() {
-  redirect("/auth/sign-in");
+  redirect("/login");
 }

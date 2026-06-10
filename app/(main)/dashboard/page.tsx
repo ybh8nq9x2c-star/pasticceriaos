@@ -6,7 +6,11 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getDashboardSummary, getOpenOrders } from '@/modules/reporting/service';
+import {
+  getDashboardSummary,
+  getOpenOrders,
+  getIngredientPurchaseStats,
+} from '@/modules/reporting/service';
 import { getLowStockAlerts } from '@/modules/inventory/service';
 import { requireSession } from '@/modules/identity/service';
 import { formatCurrency } from '@/lib/utils';
@@ -88,17 +92,13 @@ function KpiCard({
 export default async function DashboardPage() {
   const session = await requireSession();
 
-  const [summary, openOrders, stockAlerts] = await Promise.all([
-    getDashboardSummary().catch(() => ({
-      lowStockCount: 0,
-      outOfStockCount: 0,
-      openOrdersCount: 0,
-      openOrdersTotalValue: null as number | null,
-      activePlansCount: 0,
-      todayPlan: null as { id: string; status: string; itemsCount: number } | null,
-    })),
-    getOpenOrders().catch(() => []),
-    getLowStockAlerts().catch(() => []),
+  // Nessun fallback fittizio: se le query falliscono interviene l'error
+  // boundary del route group, non numeri a zero spacciati per reali.
+  const [summary, openOrders, stockAlerts, topSpend] = await Promise.all([
+    getDashboardSummary(),
+    getOpenOrders(),
+    getLowStockAlerts(),
+    getIngredientPurchaseStats(3),
   ]);
 
   const totalAlerts   = summary.lowStockCount + summary.outOfStockCount;
@@ -153,17 +153,19 @@ export default async function DashboardPage() {
           accentClass={summary.activePlansCount > 0 ? 'bg-[#1A2B4A]' : undefined}
         />
         <KpiCard
-          label="Piano di oggi"
+          label="Produzione di oggi"
           value={
             summary.todayPlan
               ? summary.todayPlan.status === 'completed'
-                ? 'Completato'
-                : `${summary.todayPlan.itemsCount} ricette`
+                ? 'Completata'
+                : `${summary.todayPlan.totalPortions} porz.`
               : '—'
           }
           sub={
             summary.todayPlan
-              ? `Stato: ${summary.todayPlan.status === 'completed' ? 'completato' : summary.todayPlan.status}`
+              ? summary.todayPlan.status === 'completed'
+                ? `${summary.todayPlan.itemsCount} ricette prodotte`
+                : `${summary.todayPlan.itemsCount} ricette · stato: ${summary.todayPlan.status === 'in_progress' ? 'in corso' : 'bozza'}`
               : 'Nessun piano oggi'
           }
           href={summary.todayPlan ? `/production/${summary.todayPlan.id}` : '/production/new'}
@@ -173,6 +175,57 @@ export default async function DashboardPage() {
             undefined
           }
         />
+      </div>
+
+      {/* KPI riga 2: spesa reale del mese (ordini ricevuti) + top ingredienti */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <KpiCard
+          label="Spesa del mese"
+          value={summary.monthSpend > 0 ? `€${formatCurrency(summary.monthSpend)}` : '—'}
+          sub={
+            summary.monthOrdersReceived > 0
+              ? `${summary.monthOrdersReceived} ordini ricevuti questo mese`
+              : 'Nessun ordine ricevuto questo mese'
+          }
+          href="/analytics"
+          accentClass={summary.monthSpend > 0 ? 'bg-[#C9962A]' : undefined}
+        />
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-[#E5DDD0] px-6 py-5">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide">
+              Top ingredienti per spesa
+            </p>
+            <Link href="/analytics" className="text-xs font-semibold text-[#C9962A] hover:underline">
+              Analisi →
+            </Link>
+          </div>
+          {topSpend.length === 0 ? (
+            <p className="text-sm text-[#6B7280] mt-3">
+              Ancora nessun ordine ricevuto: la spesa per ingrediente apparirà qui.
+            </p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {topSpend.map((item, idx) => {
+                const max = topSpend[0]?.totalSpend || 1;
+                return (
+                  <div key={item.ingredientProductId} className="flex items-center gap-3">
+                    <span className="text-xs font-mono text-[#6B7280] w-4">{idx + 1}</span>
+                    <span className="text-sm text-[#1A2B4A] w-40 truncate">{item.ingredientName}</span>
+                    <div className="flex-1 h-2 bg-[#F0EBE1] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#C9962A] rounded-full"
+                        style={{ width: `${Math.max(4, Math.round((item.totalSpend / max) * 100))}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-mono font-semibold text-[#1A2B4A] w-20 text-right">
+                      €{formatCurrency(item.totalSpend)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 2-col panel: ordini recenti + alert scorte */}

@@ -48,6 +48,7 @@ export interface Recipe {
   category: string | null;
   emoji: string | null;
   basePortions: number;
+  sellPricePerPortion: number | null;
   notes: string | null;
   isActive: boolean;
   ingredients: RecipeIngredient[];

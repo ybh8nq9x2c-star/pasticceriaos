@@ -67,8 +67,15 @@ function normalizeSign(input: CreateMovementInput): CreateMovementInput {
   } else if (MUST_BE_POSITIVE.includes(input.movementType)) {
     delta = Math.abs(delta);
   }
-  // manual_adjustment: pass as-is (sign set explicitly by user)
-  return { ...input, quantityDelta: delta };
+  // Vincolo DB reference_consistency: reference_type e reference_id vanno
+  // valorizzati in coppia. Se ne arriva solo uno, azzera entrambi.
+  const hasRef = !!input.referenceType && !!input.referenceId;
+  return {
+    ...input,
+    quantityDelta: delta,
+    referenceType: hasRef ? input.referenceType : undefined,
+    referenceId:   hasRef ? input.referenceId : undefined,
+  };
 }
 
 export async function recordMovement(raw: unknown): Promise<InventoryMovement> {

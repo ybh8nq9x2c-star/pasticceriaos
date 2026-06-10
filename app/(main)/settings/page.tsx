@@ -36,10 +36,11 @@ function Row({ label, value, badge }: { label: string; value: string; badge?: st
   );
 }
 
+// Allineato all'enum org_role del DB: owner | baker | viewer.
 const ROLE_LABELS: Record<string, string> = {
-  owner: 'Proprietario',
-  admin: 'Amministratore',
-  member: 'Membro',
+  owner:  'Titolare',
+  baker:  'Responsabile laboratorio',
+  viewer: 'Operatore (sola lettura)',
 };
 
 export default async function SettingsPage() {
@@ -76,13 +77,22 @@ export default async function SettingsPage() {
         </div>
       </SectionCard>
 
-      {/* Coming soon */}
-      <div className="rounded-2xl border border-[#C9962A]/30 bg-[#C9962A]/[0.06] p-5 text-sm text-[#8A6418]">
-        <p className="font-semibold mb-1">🚧 In arrivo</p>
-        <p className="text-[#6B7280]">
-          Gestione membri del team, notifiche email automatiche e personalizzazione del workspace.
-        </p>
-      </div>
+      {/* Canale invio ordini */}
+      <SectionCard title="Invio ordini ai fornitori">
+        <div className="py-4 space-y-2">
+          <p className="text-sm text-[#6B7280]">
+            <span className="font-medium text-[#1A2B4A]">Fornitori collegati (marketplace):</span>{' '}
+            gli ordini creati dal Marketplace arrivano direttamente nel workspace del fornitore,
+            che ne aggiorna lo stato fino alla consegna.
+          </p>
+          <p className="text-sm text-[#6B7280]">
+            <span className="font-medium text-[#1A2B4A]">Fornitori solo-email:</span>{' '}
+            {process.env.ORDER_DISPATCH_WEBHOOK_URL
+              ? 'l\'invio email automatico è configurato; l\'esito viene registrato nello storico stato di ogni ordine.'
+              : 'l\'invio email automatico non è configurato: segnando un ordine come "inviato" la trasmissione resta manuale e lo storico stato lo riporta esplicitamente.'}
+          </p>
+        </div>
+      </SectionCard>
     </div>
   );
 }

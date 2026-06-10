@@ -69,6 +69,16 @@ export const createRecipeSchema = z.object({
     .number()
     .int('Le porzioni devono essere un numero intero')
     .positive('Le porzioni devono essere maggiori di 0'),
+  sellPricePerPortion: z
+    .union([z.string(), z.number(), z.null()])
+    .optional()
+    .transform((v) => {
+      if (v === null || v === undefined) return null;
+      const s = String(v).trim();
+      if (s === '') return null;
+      return parseFloat(s.replace(',', '.'));
+    })
+    .pipe(z.number().min(0, 'Il prezzo di vendita non può essere negativo').nullable()),
   notes: z.string().trim().max(2000).optional().or(z.literal('')),
   ingredients: z
     .array(recipeIngredientLineSchema)

@@ -43,21 +43,25 @@ export const CUSTOMER_BOTTOM: NavItem[] = [
 
 // ── Supplier workspace (`/supplier`) ─────────────────────────────────────────
 export const SUPPLIER_NAV: NavItem[] = [
-  { href: '/supplier',           label: 'Ordini in arrivo',  emoji: '📥' },
-  { href: '/supplier/customers', label: 'Clienti collegati', emoji: '🤝' },
+  { href: '/supplier',           label: 'Dashboard',         emoji: '🏠' },
+  { href: '/supplier/orders',    label: 'Ordini clienti',    emoji: '📥' },
   { href: '/supplier/catalog',   label: 'Catalogo',          emoji: '📦' },
+  { href: '/supplier/customers', label: 'Clienti collegati', emoji: '🤝' },
+  { href: '/supplier/analytics', label: 'Analisi',           emoji: '📊' },
   { href: '/supplier/keys',      label: 'Chiavi di accesso', emoji: '🔑' },
+  { href: '/supplier/settings',  label: 'Impostazioni',      emoji: '⚙️' },
 ];
 
-// All four fit a bottom bar directly (no overflow drawer needed).
+// Primary destinations for the mobile bottom bar.
 export const SUPPLIER_BOTTOM: NavItem[] = [
-  { href: '/supplier',           label: 'Ordini',   emoji: '📥' },
-  { href: '/supplier/customers', label: 'Clienti',  emoji: '🤝' },
+  { href: '/supplier',           label: 'Home',     emoji: '🏠' },
+  { href: '/supplier/orders',    label: 'Ordini',   emoji: '📥' },
   { href: '/supplier/catalog',   label: 'Catalogo', emoji: '📦' },
-  { href: '/supplier/keys',      label: 'Chiavi',   emoji: '🔑' },
+  { href: '/supplier/analytics', label: 'Analisi',  emoji: '📊' },
 ];
 
 /** Longest-prefix active match (shared by every nav surface). */
 export function isActivePath(pathname: string, href: string): boolean {
+  if (href === '/supplier') return pathname === href; // home: exact match only
   return pathname === href || pathname.startsWith(href + '/');
 }

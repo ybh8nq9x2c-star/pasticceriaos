@@ -215,6 +215,7 @@ export async function insertRecipe(orgId: string, input: CreateRecipeInput): Pro
       category:      input.category || null,
       emoji:         input.emoji || null,
       base_portions: input.basePortions,
+      sell_price_per_portion: input.sellPricePerPortion ?? null,
       notes:         input.notes || null,
     })
     .select()
@@ -253,7 +254,7 @@ export async function deleteRecipeIngredients(recipeId: string): Promise<void> {
 
 export async function patchRecipe(
   id: string,
-  fields: { name?: string; category?: string | null; emoji?: string | null; basePortions?: number; notes?: string | null; isActive?: boolean },
+  fields: { name?: string; category?: string | null; emoji?: string | null; basePortions?: number; sellPricePerPortion?: number | null; notes?: string | null; isActive?: boolean },
 ): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase
@@ -263,6 +264,7 @@ export async function patchRecipe(
       category:      fields.category,
       emoji:         fields.emoji,
       base_portions: fields.basePortions,
+      sell_price_per_portion: fields.sellPricePerPortion,
       notes:         fields.notes,
       is_active:     fields.isActive,
     })
@@ -315,6 +317,9 @@ function toRecipe(row: any): Recipe {
     category:       row.category,
     emoji:          row.emoji,
     basePortions:   row.base_portions,
+    sellPricePerPortion: row.sell_price_per_portion !== null && row.sell_price_per_portion !== undefined
+      ? Number(row.sell_price_per_portion)
+      : null,
     notes:          row.notes,
     isActive:       row.is_active,
     createdAt:      row.created_at,

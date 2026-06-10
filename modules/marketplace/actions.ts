@@ -96,6 +96,25 @@ export async function placeOrderAction(_prev: ActionState, formData: FormData): 
   redirect(`/marketplace/orders/${orderId}`);
 }
 
+/** Customer registers a delivered marketplace order into inventory (idempotent). */
+export async function receiveMarketplaceOrderAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const orderId = formData.get('orderId') as string;
+  try {
+    await service.receiveMarketplaceOrderIntoInventory(orderId);
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+  revalidatePath(`/marketplace/orders/${orderId}`);
+  revalidatePath('/inventory');
+  revalidatePath('/inventory/movements');
+  revalidatePath('/orders');
+  revalidatePath('/dashboard');
+  return { status: 'success', message: 'Carico registrato a magazzino.' };
+}
+
 /** Either side advances the order; the trigger + service enforce who may do what. */
 export async function changeOrderStatusAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const orderId = formData.get('orderId') as string;

@@ -85,12 +85,9 @@ function formatQty(n: number) {
 // ---------------------------------------------------------------------------
 
 export default async function InventoryPage() {
-  let levels: InventoryStockFull[];
-  try {
-    levels = await getInventoryStockFull();
-  } catch {
-    levels = [];
-  }
+  // Errore DB → error boundary del route group: meglio un errore esplicito
+  // che un magazzino mostrato (falsamente) vuoto.
+  const levels: InventoryStockFull[] = await getInventoryStockFull();
 
   const alertItems = levels.filter((l) => l.stockStatus !== 'ok');
   const okItems    = levels.filter((l) => l.stockStatus === 'ok');

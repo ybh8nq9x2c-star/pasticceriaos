@@ -1,15 +1,16 @@
 'use client';
+
+// =============================================================================
+// app/(main)/recipes/[id]/edit/EditRecipeForm.tsx
+// Form modifica ricetta (client). Dati iniziali reali dal server component.
+// =============================================================================
+
+import { useEffect, useState } from 'react';
 import { useFormState } from 'react-dom';
-
-// =============================================================================
-// app/(main)/recipes/new/page.tsx
-// Form creazione ricetta con riga ingredienti dinamica (client component).
-// =============================================================================
-
-import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { IDLE_STATE } from '@/lib/utils';
-import { createRecipeAction } from '@/modules/catalog/actions';
+import { IDLE_STATE, type ActionState } from '@/lib/utils';
+import { updateRecipeAction } from '@/modules/catalog/actions';
 
 const UNITS = ['g', 'kg', 'ml', 'l', 'pz', 'bustina', 'foglio'] as const;
 
@@ -20,31 +21,44 @@ interface IngredientRow {
   unit: string;
 }
 
-interface IngredientOption {
+interface IngredientOption { id: string; name: string; unit: string }
+
+export interface EditableRecipe {
   id: string;
   name: string;
-  unit: string;
+  category: string | null;
+  emoji: string | null;
+  basePortions: number;
+  sellPricePerPortion: number | null;
+  notes: string | null;
+  isActive: boolean;
+  ingredients: { ingredientProductId: string; quantity: string; unit: string }[];
 }
 
 let keyCounter = 0;
 
-// Stile condiviso per campi
 const fieldClass = 'w-full rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30 focus:border-[#C9962A] bg-white';
 const labelClass = 'block text-sm font-medium text-[#1A2B4A] mb-1.5';
 
-export default function NewRecipePage() {
-  const [state, formAction, pending] = useFormState(createRecipeAction, IDLE_STATE);
-  const [rows, setRows] = useState<IngredientRow[]>([
-    { key: ++keyCounter, ingredientProductId: '', quantity: '', unit: 'g' },
-  ]);
-  const [ingredientOptions, setIngredientOptions] = useState<IngredientOption[]>([]);
+export function EditRecipeForm({
+  recipe,
+  ingredientOptions,
+}: {
+  recipe: EditableRecipe;
+  ingredientOptions: IngredientOption[];
+}) {
+  const router = useRouter();
+  const boundAction = updateRecipeAction.bind(null, recipe.id) as (
+    prev: ActionState,
+    formData: FormData,
+  ) => Promise<ActionState>;
+  const [state, formAction, pending] = useFormState(boundAction, IDLE_STATE);
 
-  useEffect(() => {
-    fetch('/api/catalog/ingredients')
-      .then((r) => r.ok ? r.json() : [])
-      .then((data) => setIngredientOptions(data))
-      .catch(() => setIngredientOptions([]));
-  }, []);
+  const [rows, setRows] = useState<IngredientRow[]>(
+    recipe.ingredients.length > 0
+      ? recipe.ingredients.map((i) => ({ ...i, key: ++keyCounter }))
+      : [{ key: ++keyCounter, ingredientProductId: '', quantity: '', unit: 'g' }],
+  );
 
   function addRow() {
     setRows((prev) => [
@@ -71,16 +85,21 @@ export default function NewRecipePage() {
       sortOrder:           idx,
     }));
     formData.set('ingredients', JSON.stringify(ingredients));
+    formData.set('isActive', String(recipe.isActive));
     formAction(formData);
   }
+
+  useEffect(() => {
+    if (state.status === 'success') router.push(`/recipes/${recipe.id}`);
+  }, [state, router, recipe.id]);
 
   return (
     <div className="p-8 max-w-2xl mx-auto">
       <div className="mb-6">
-        <Link href="/recipes" className="text-sm text-[#6B7280] hover:text-[#1A2B4A] transition-colors">
-          ← Ricette
+        <Link href={`/recipes/${recipe.id}`} className="text-sm text-[#6B7280] hover:text-[#1A2B4A] transition-colors">
+          ← {recipe.name}
         </Link>
-        <h1 className="font-playfair text-3xl font-bold text-[#1A2B4A] mt-3">Nuova ricetta</h1>
+        <h1 className="font-playfair text-3xl font-bold text-[#1A2B4A] mt-3">Modifica ricetta</h1>
       </div>
 
       <form action={handleSubmit} className="space-y-6">
@@ -101,7 +120,7 @@ export default function NewRecipePage() {
                 name="emoji"
                 type="text"
                 maxLength={10}
-                placeholder="🎂"
+                defaultValue={recipe.emoji ?? ''}
                 className={`${fieldClass} text-center`}
               />
             </div>
@@ -114,7 +133,7 @@ export default function NewRecipePage() {
                 type="text"
                 required
                 maxLength={200}
-                placeholder="es. Torta Margherita"
+                defaultValue={recipe.name}
                 className={fieldClass}
               />
             </div>
@@ -129,7 +148,7 @@ export default function NewRecipePage() {
                 name="category"
                 type="text"
                 maxLength={100}
-                placeholder="es. Torte, Croissant…"
+                defaultValue={recipe.category ?? ''}
                 className={fieldClass}
               />
             </div>
@@ -142,7 +161,7 @@ export default function NewRecipePage() {
                 type="number"
                 required
                 min={1}
-                defaultValue={1}
+                defaultValue={recipe.basePortions}
                 className={fieldClass}
               />
             </div>
@@ -158,6 +177,7 @@ export default function NewRecipePage() {
               type="number"
               step="0.01"
               min={0}
+              defaultValue={recipe.sellPricePerPortion ?? ''}
               placeholder="es. 4,50"
               className={fieldClass}
             />
@@ -171,6 +191,7 @@ export default function NewRecipePage() {
               name="notes"
               rows={2}
               maxLength={2000}
+              defaultValue={recipe.notes ?? ''}
               className={`${fieldClass} resize-none`}
             />
           </div>
@@ -238,21 +259,11 @@ export default function NewRecipePage() {
               </div>
             ))}
           </div>
-
-          {ingredientOptions.length === 0 && (
-            <p className="mt-4 text-xs text-[#8A6418] bg-[#C9962A]/[0.08] border border-[#C9962A]/30 rounded-xl p-3">
-              Nessun ingrediente disponibile.{' '}
-              <Link href="/ingredients/new" className="underline font-semibold">
-                Aggiungi ingredienti
-              </Link>{' '}
-              prima di creare una ricetta.
-            </p>
-          )}
         </div>
 
         <div className="flex gap-3">
           <Link
-            href="/recipes"
+            href={`/recipes/${recipe.id}`}
             className="flex-1 py-3 text-center rounded-xl border border-[#E5DDD0] text-sm font-semibold text-[#1A2B4A] hover:bg-[#FAF7F2] transition-colors"
           >
             Annulla
@@ -262,7 +273,7 @@ export default function NewRecipePage() {
             disabled={pending}
             className="flex-1 py-3 bg-[#1A2B4A] text-white rounded-xl text-sm font-semibold hover:bg-[#243660] disabled:opacity-60 transition-colors"
           >
-            {pending ? 'Salvataggio…' : 'Salva ricetta'}
+            {pending ? 'Salvataggio…' : 'Salva modifiche'}
           </button>
         </div>
       </form>
