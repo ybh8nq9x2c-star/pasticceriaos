@@ -20,9 +20,10 @@ const OPERATIVO: NavItem[] = [
 ];
 
 const GESTIONE: NavItem[] = [
-  { href: '/inventory', label: 'Magazzino', emoji: '📦' },
-  { href: '/orders',    label: 'Ordini',    emoji: '🛒' },
-  { href: '/analytics', label: 'Analisi',   emoji: '📊' },
+  { href: '/inventory',             label: 'Magazzino',   emoji: '📦' },
+  { href: '/orders',                label: 'Ordini',      emoji: '🛒' },
+  { href: '/marketplace/suppliers', label: 'Marketplace', emoji: '🔗' },
+  { href: '/analytics',             label: 'Analisi',     emoji: '📊' },
 ];
 
 const SISTEMA: NavItem[] = [
@@ -62,7 +63,7 @@ export function AppSidebar({ orgName, userEmail, lowStockCount = 0 }: AppSidebar
   }
 
   return (
-    <aside className="w-60 bg-[#1A2B4A] text-white flex flex-col min-h-screen shrink-0">
+    <aside className="hidden lg:flex w-60 bg-[#1A2B4A] text-white flex-col min-h-screen shrink-0">
       {/* Logo */}
       <div className="px-6 pt-7 pb-5 border-b border-white/[0.08]">
         <div className="font-playfair text-xl font-black tracking-tight leading-none">

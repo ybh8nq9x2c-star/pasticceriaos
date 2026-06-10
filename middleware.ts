@@ -1,36 +1,29 @@
 // =============================================================================
 // middleware.ts
-// Route protection per PasticceriaOS MVP.
+// Route protection + dual-workspace gating.
 //
-// Struttura route:
-//   /login           → pubblico (solo se non autenticato)
-//   /signup          → pubblico (solo se non autenticato)
-//   /auth/callback   → pubblico (handler OAuth/magic link)
-//   /onboarding      → autenticato, senza organizzazione
-//   /dashboard/*     → autenticato + organizzazione
-//   tutto il resto   → autenticato + organizzazione
+//   /login /signup /auth/callback       -> public
+//   /onboarding                         -> authed, org optional (account-type chosen here)
+//   /supplier/*                         -> authed + org + account_type = 'supplier'
+//   everything else (the (main) app)    -> authed + org + account_type = 'customer'
 //
-// Flusso:
-//   1. Refresh sessione Supabase (obbligatorio su ogni request)
-//   2. Non autenticato + route protetta → /login
-//   3. Autenticato + route auth → /dashboard (se ha org) o /onboarding
-//   4. Autenticato + /onboarding + ha già org → /dashboard
-//   5. Autenticato + route principale + nessuna org → /onboarding
+// This is the FAST first-line gate. Server-component guards
+// (requireCustomerSession / requireSupplierSession) are authoritative, and RLS
+// is the DB boundary. A wrong-workspace user is redirected here before the page
+// renders, so no data is leaked.
 // =============================================================================
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
-// Route che non richiedono autenticazione
 const PUBLIC_ROUTES = ['/login', '/signup', '/auth/callback'];
-// Route che richiedono autenticazione ma non un'organizzazione
 const SEMI_AUTH_ROUTES = ['/onboarding'];
+const SUPPLIER_PREFIX = '/supplier';
 
 export async function middleware(request: NextRequest) {
   const { supabaseResponse, user, supabase } = await updateSession(request);
   const { pathname } = request.nextUrl;
 
-  // Asset statici: lascia passare
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
@@ -41,49 +34,64 @@ export async function middleware(request: NextRequest) {
 
   const isPublicRoute   = PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + '/'));
   const isSemiAuthRoute = SEMI_AUTH_ROUTES.some((r) => pathname === r || pathname.startsWith(r + '/'));
+  const isUnauthorized  = pathname === '/unauthorized';
+  const isSupplierRoute = pathname === SUPPLIER_PREFIX || pathname.startsWith(SUPPLIER_PREFIX + '/');
 
-  // ── Utente non autenticato ─────────────────────────────────────────────────
+  // ── Unauthenticated ─────────────────────────────────────────────────────────
   if (!user) {
     if (isPublicRoute || isSemiAuthRoute) return supabaseResponse;
-
-    // Qualsiasi altra route → login
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // ── Utente autenticato ─────────────────────────────────────────────────────
-
-  // Controlla se l'utente ha un'organizzazione
+  // ── Authenticated: organization + account type ──────────────────────────────
   const { data: member } = await supabase
     .from('org_members')
     .select('organization_id')
     .eq('user_id', user.id)
     .limit(1)
     .maybeSingle();
-
   const hasOrg = !!member?.organization_id;
 
-  // Autenticato su route di autenticazione (login/signup) → redirect
+  // account_type via SECURITY DEFINER RPC. Cast localized until database.types
+  // is regenerated post-migration (then this becomes fully typed).
+  let accountType: 'customer' | 'supplier' | null = null;
+  if (hasOrg) {
+    const rpc = supabase.rpc as unknown as (fn: string) => Promise<{ data: 'customer' | 'supplier' | null }>;
+    const { data } = await rpc('current_account_type');
+    accountType = data ?? null;
+  }
+  const home = accountType === 'supplier' ? SUPPLIER_PREFIX : '/dashboard';
+
+  // Authed on a public (login/signup) page → push to the right place.
   if (isPublicRoute) {
-    const dest = hasOrg ? '/dashboard' : '/onboarding';
-    return NextResponse.redirect(new URL(dest, request.url));
+    return NextResponse.redirect(new URL(hasOrg ? home : '/onboarding', request.url));
   }
 
-  // Autenticato + /onboarding + ha già org → /dashboard
-  if (isSemiAuthRoute && hasOrg) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
-
-  // Autenticato + route principale + nessuna org → /onboarding
-  if (!isSemiAuthRoute && !isPublicRoute && !hasOrg) {
+  // No org yet → onboarding only.
+  if (!hasOrg) {
+    if (isSemiAuthRoute || isUnauthorized) return supabaseResponse;
     return NextResponse.redirect(new URL('/onboarding', request.url));
   }
 
-  // Root / → redirect appropriato
+  // Has org, sitting on onboarding → go home.
+  if (isSemiAuthRoute) {
+    return NextResponse.redirect(new URL(home, request.url));
+  }
+
+  if (isUnauthorized) return supabaseResponse;
+
+  // ── Workspace gating ────────────────────────────────────────────────────────
+  if (accountType === 'supplier' && !isSupplierRoute) {
+    return NextResponse.redirect(new URL(SUPPLIER_PREFIX, request.url));
+  }
+  if (accountType !== 'supplier' && isSupplierRoute) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
+
   if (pathname === '/') {
-    const dest = hasOrg ? '/dashboard' : '/onboarding';
-    return NextResponse.redirect(new URL(dest, request.url));
+    return NextResponse.redirect(new URL(home, request.url));
   }
 
   return supabaseResponse;

@@ -34,6 +34,29 @@ body {
 .font-display { font-family: 'Playfair Display', Georgia, serif; }
 .font-mono { font-family: 'DM Mono', ui-monospace, monospace; }
 
+/* ── Mobile / accessibility baseline ───────────────────────────────────────
+   Visible keyboard focus on every interactive element (a11y), and a guard
+   against iOS auto-zooming form fields whose font-size is < 16px. Inputs that
+   opt into a smaller desktop size do so from the `sm` breakpoint up. */
+a:focus-visible,
+button:focus-visible,
+[role='button']:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 /* Badge utilities */
 .badge {
   @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;

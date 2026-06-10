@@ -74,16 +74,19 @@ export async function createOrganizationAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const accountType = formData.get('accountType') === 'supplier' ? 'supplier' : 'customer';
   try {
     await service.createOrganization({
-      orgName: formData.get('orgName') as string,
-      city:    (formData.get('city') as string) || undefined,
-      email:   (formData.get('email') as string) || undefined,
+      orgName:     formData.get('orgName') as string,
+      city:        (formData.get('city') as string) || undefined,
+      email:       (formData.get('email') as string) || undefined,
+      accountType,
     });
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };
   }
 
-  revalidatePath('/dashboard');
-  redirect('/dashboard');
+  const home = accountType === 'supplier' ? '/supplier' : '/dashboard';
+  revalidatePath(home);
+  redirect(home);
 }

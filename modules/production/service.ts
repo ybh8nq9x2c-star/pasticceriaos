@@ -5,10 +5,9 @@
 
 import { requireOrgId } from '@/modules/identity/service';
 import { createClient } from '@/lib/supabase/server';
-import { AuthError, BusinessRuleError } from '@/lib/errors';
+import { BusinessRuleError, mapSupabaseError } from '@/lib/errors';
 import { todayISODate } from '@/lib/utils';
 import * as repo from './repository';
-import { insertMovement } from '@/modules/inventory/repository';
 import { createPlanSchema, updatePlanSchema } from './schemas';
 import type { ProductionPlan, ProductionPlanListItem } from './types';
 import type { CreatePlanInput, UpdatePlanInput } from './schemas';
@@ -87,37 +86,12 @@ export async function completePlan(id: string): Promise<void> {
     throw new BusinessRuleError('Non è possibile completare un piano cancellato.');
   }
 
-  const orgId = await requireOrgId();
+  // Chiusura piano = write-path TRANSAZIONALE (RPC 019): inserisce i movimenti
+  // production_usage (negativi) per ogni ingrediente × batch e poi marca il piano
+  // 'completed', atomicamente. Niente scarico parziale né doppio scarico al retry.
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new AuthError();
-
-  // Inserisci un inventory_movement production_usage per ogni ingrediente × batch
-  for (const item of existing.items) {
-    const { data: riRows, error: riError } = await supabase
-      .from('recipe_ingredients')
-      .select('ingredient_product_id, quantity, unit')
-      .eq('recipe_id', item.recipeId);
-
-    if (riError) throw riError;
-
-    for (const ri of riRows ?? []) {
-      await insertMovement(orgId, user.id, {
-        ingredientProductId: ri.ingredient_product_id,
-        movementType:        'production_usage',
-        // negativo: DB CHECK richiede quantity_delta < 0 per production_usage
-        quantityDelta:       -(ri.quantity * item.batchCount),
-        unit:                ri.unit,
-        referenceType:       'production_plan',
-        referenceId:         id,
-      });
-    }
-  }
-
-  await repo.patchPlan(id, {
-    status:      'completed',
-    completedAt: new Date().toISOString(),
-  });
+  const { error } = await supabase.rpc('complete_production_plan', { p_plan_id: id });
+  if (error) throw mapSupabaseError(error);
 }
 
 export async function cancelPlan(id: string): Promise<void> {

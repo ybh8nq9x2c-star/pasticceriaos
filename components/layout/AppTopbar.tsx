@@ -38,7 +38,7 @@ export function AppTopbar({ lowStockCount = 0 }: AppTopbarProps) {
   const label = getSectionLabel(pathname);
 
   return (
-    <div className="h-[60px] bg-white border-b border-[#E5DDD0] px-8 flex items-center justify-between sticky top-0 z-40">
+    <div className="hidden lg:flex h-[60px] bg-white border-b border-[#E5DDD0] px-8 items-center justify-between sticky top-0 z-40">
       {/* Sezione corrente */}
       <span className="font-playfair text-[18px] font-bold text-[#1A2B4A] leading-none">
         {label}

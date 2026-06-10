@@ -25,6 +25,21 @@ export type PlanStatus = 'draft' | 'in_progress' | 'completed' | 'cancelled';
 
 export type OrgRole = 'owner' | 'baker' | 'viewer';
 
+// ── marketplace enums (migrations 012–016) ────────────────────────────────────
+
+export type AccountType = 'customer' | 'supplier';
+
+export type ConnectionStatus = 'active' | 'revoked';
+
+export type MarketplaceOrderStatus =
+  | 'draft'
+  | 'submitted'
+  | 'accepted'
+  | 'in_preparation'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled';
+
 // ── Database type ─────────────────────────────────────────────────────────────
 // NOTA: ogni tabella/vista richiede `Relationships` dal supabase-js v2.49+.
 
@@ -39,6 +54,7 @@ export interface Database {
           slug: string;
           city: string | null;
           email: string | null;
+          account_type: AccountType;
           created_at: string;
           updated_at: string;
         };
@@ -48,6 +64,7 @@ export interface Database {
           slug: string;
           city?: string | null;
           email?: string | null;
+          account_type?: AccountType;
           created_at?: string;
           updated_at?: string;
         };
@@ -56,6 +73,7 @@ export interface Database {
           slug?: string;
           city?: string | null;
           email?: string | null;
+          account_type?: AccountType;
           updated_at?: string;
         };
         Relationships: [];
@@ -573,6 +591,284 @@ export interface Database {
         };
         Relationships: [];
       };
+
+      // ── marketplace (migrations 012–016) ─────────────────────────────────────
+      supplier_connection_keys: {
+        Row: {
+          id: string;
+          supplier_org_id: string;
+          label: string | null;
+          key_prefix: string;
+          key_hash: string;
+          is_active: boolean;
+          created_by: string | null;
+          created_at: string;
+          revoked_at: string | null;
+          revoked_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          supplier_org_id: string;
+          label?: string | null;
+          key_prefix: string;
+          key_hash: string;
+          is_active?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          supplier_org_id?: string;
+          label?: string | null;
+          key_prefix?: string;
+          key_hash?: string;
+          is_active?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+        };
+        Relationships: [];
+      };
+
+      supplier_customer_connections: {
+        Row: {
+          id: string;
+          supplier_org_id: string;
+          customer_org_id: string;
+          connection_key_id: string | null;
+          status: ConnectionStatus;
+          created_by: string | null;
+          created_at: string;
+          revoked_at: string | null;
+          revoked_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          supplier_org_id: string;
+          customer_org_id: string;
+          connection_key_id?: string | null;
+          status?: ConnectionStatus;
+          created_by?: string | null;
+          created_at?: string;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          supplier_org_id?: string;
+          customer_org_id?: string;
+          connection_key_id?: string | null;
+          status?: ConnectionStatus;
+          created_by?: string | null;
+          created_at?: string;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+        };
+        Relationships: [];
+      };
+
+      supplier_catalog_items: {
+        Row: {
+          id: string;
+          supplier_org_id: string;
+          name: string;
+          sku: string | null;
+          unit: UnitOfMeasure;
+          unit_price: number | null;
+          is_active: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          supplier_org_id: string;
+          name: string;
+          sku?: string | null;
+          unit: UnitOfMeasure;
+          unit_price?: number | null;
+          is_active?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          supplier_org_id?: string;
+          name?: string;
+          sku?: string | null;
+          unit?: UnitOfMeasure;
+          unit_price?: number | null;
+          is_active?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      marketplace_orders: {
+        Row: {
+          id: string;
+          customer_org_id: string;
+          supplier_org_id: string;
+          connection_id: string;
+          status: MarketplaceOrderStatus;
+          notes: string | null;
+          idempotency_key: string | null;
+          created_by: string | null;
+          submitted_at: string | null;
+          accepted_at: string | null;
+          shipped_at: string | null;
+          delivered_at: string | null;
+          cancelled_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          customer_org_id: string;
+          supplier_org_id: string;
+          connection_id: string;
+          status?: MarketplaceOrderStatus;
+          notes?: string | null;
+          idempotency_key?: string | null;
+          created_by?: string | null;
+          submitted_at?: string | null;
+          accepted_at?: string | null;
+          shipped_at?: string | null;
+          delivered_at?: string | null;
+          cancelled_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          customer_org_id?: string;
+          supplier_org_id?: string;
+          connection_id?: string;
+          status?: MarketplaceOrderStatus;
+          notes?: string | null;
+          idempotency_key?: string | null;
+          created_by?: string | null;
+          submitted_at?: string | null;
+          accepted_at?: string | null;
+          shipped_at?: string | null;
+          delivered_at?: string | null;
+          cancelled_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      marketplace_order_lines: {
+        Row: {
+          id: string;
+          order_id: string;
+          catalog_item_id: string | null;
+          name_snapshot: string;
+          sku_snapshot: string | null;
+          unit: UnitOfMeasure;
+          quantity: number;
+          unit_price_snapshot: number | null;
+          sort_order: number;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          catalog_item_id?: string | null;
+          name_snapshot: string;
+          sku_snapshot?: string | null;
+          unit: UnitOfMeasure;
+          quantity: number;
+          unit_price_snapshot?: number | null;
+          sort_order?: number;
+        };
+        Update: {
+          id?: string;
+          order_id?: string;
+          catalog_item_id?: string | null;
+          name_snapshot?: string;
+          sku_snapshot?: string | null;
+          unit?: UnitOfMeasure;
+          quantity?: number;
+          unit_price_snapshot?: number | null;
+          sort_order?: number;
+        };
+        Relationships: [];
+      };
+
+      marketplace_order_status_history: {
+        Row: {
+          id: string;
+          order_id: string;
+          from_status: MarketplaceOrderStatus | null;
+          to_status: MarketplaceOrderStatus;
+          changed_by: string | null;
+          changed_by_org_id: string | null;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          from_status?: MarketplaceOrderStatus | null;
+          to_status: MarketplaceOrderStatus;
+          changed_by?: string | null;
+          changed_by_org_id?: string | null;
+          note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          order_id?: string;
+          from_status?: MarketplaceOrderStatus | null;
+          to_status?: MarketplaceOrderStatus;
+          changed_by?: string | null;
+          changed_by_org_id?: string | null;
+          note?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      audit_logs: {
+        Row: {
+          id: string;
+          org_id: string;
+          actor_user_id: string | null;
+          action: string;
+          entity_type: string;
+          entity_id: string | null;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          org_id: string;
+          actor_user_id?: string | null;
+          action: string;
+          entity_type: string;
+          entity_id?: string | null;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          org_id?: string;
+          actor_user_id?: string | null;
+          action?: string;
+          entity_type?: string;
+          entity_id?: string | null;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
 
     Functions: {
@@ -584,17 +880,42 @@ export interface Database {
         Args: Record<never, never>;
         Returns: boolean;
       };
+      receive_purchase_order: {
+        Args: { p_order_id: string };
+        Returns: undefined;
+      };
+      complete_production_plan: {
+        Args: { p_plan_id: string };
+        Returns: undefined;
+      };
       create_organization: {
         Args: {
           p_name: string;
           p_slug: string;
           p_city?: string | null;
           p_email?: string | null;
+          p_account_type?: AccountType;
         };
         Returns: {
           organization_id: string;
           member_id: string;
         }[];
+      };
+      current_account_type: {
+        Args: Record<never, never>;
+        Returns: AccountType;
+      };
+      assert_org_is_supplier: {
+        Args: { p_org_id: string };
+        Returns: undefined;
+      };
+      connect_supplier_by_key_hash: {
+        Args: { p_key_hash: string };
+        Returns: string;
+      };
+      marketplace_order_actor_for_transition: {
+        Args: { p_from: MarketplaceOrderStatus; p_to: MarketplaceOrderStatus };
+        Returns: AccountType;
       };
     };
 
@@ -604,6 +925,9 @@ export interface Database {
       order_status: OrderStatus;
       plan_status: PlanStatus;
       org_role: OrgRole;
+      account_type: AccountType;
+      connection_status: ConnectionStatus;
+      marketplace_order_status: MarketplaceOrderStatus;
     };
 
     CompositeTypes: Record<never, never>;

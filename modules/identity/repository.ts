@@ -5,6 +5,7 @@
 // =============================================================================
 
 import { createClient } from '@/lib/supabase/server';
+import { createMarketplaceClient } from '@/modules/marketplace/db';
 import { mapSupabaseError, NotFoundError } from '@/lib/errors';
 import type { Organization, OrgMember, CreateOrganizationResult } from './types';
 import type { OnboardingInput } from './schemas';
@@ -120,15 +121,17 @@ export async function listOrgMembers(orgId: string): Promise<OrgMember[]> {
 export async function rpcCreateOrganization(
   input: OnboardingInput,
 ): Promise<CreateOrganizationResult> {
-  const supabase = await createClient();
+  // Marketplace-typed client: knows the 5-arg create_organization signature.
+  const supabase = await createMarketplaceClient();
 
   const slug = slugify(input.orgName);
 
   const { data, error } = await supabase.rpc('create_organization', {
-    p_name:  input.orgName,
-    p_slug:  slug,
-    p_city:  input.city ?? null,
-    p_email: input.email || null,
+    p_name:         input.orgName,
+    p_slug:         slug,
+    p_city:         input.city || undefined,
+    p_email:        input.email || undefined,
+    p_account_type: input.accountType,
   });
 
   if (error) throw mapSupabaseError(error);

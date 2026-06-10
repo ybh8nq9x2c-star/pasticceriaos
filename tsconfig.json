@@ -21,12 +21,8 @@
     "scripts",
     "_typetest.ts",
     "next.config.ts.bak",
-    "app/app",
-    "app/cliente",
-    "app/fornitore",
-    "app/(auth)/sign-in",
-    "app/(auth)/sign-up",
-    "components/cliente",
-    "components/fornitore"
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "vitest.config.ts"
   ]
 }

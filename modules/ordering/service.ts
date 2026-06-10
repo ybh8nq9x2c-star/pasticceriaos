@@ -5,10 +5,9 @@
 
 import { requireOrgId } from '@/modules/identity/service';
 import { createClient } from '@/lib/supabase/server';
-import { AuthError, BusinessRuleError } from '@/lib/errors';
+import { AuthError, BusinessRuleError, mapSupabaseError } from '@/lib/errors';
 import { todayISODate } from '@/lib/utils';
 import * as repo from './repository';
-import { insertMovement } from '@/modules/inventory/repository';
 import { createOrderSchema, updateOrderSchema, changeStatusSchema } from './schemas';
 import type {
   PurchaseOrder,
@@ -104,16 +103,25 @@ export async function changeOrderStatus(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new AuthError();
 
+  // Ricezione = write-path TRANSAZIONALE (RPC 019): inserisce i movimenti
+  // purchase_receipt per ogni riga, aggiorna quantity_received, rinfresca il
+  // prezzo cache su ingredient_products, porta lo stato a 'received' e scrive la
+  // history — tutto atomicamente. Niente scritture parziali su fallimento.
+  if (input.status === 'received') {
+    const { error } = await supabase.rpc('receive_purchase_order', { p_order_id: id });
+    if (error) throw mapSupabaseError(error);
+    return repo.getOrderById(id);
+  }
+
+  // Altre transizioni: solo stato + history (nessun effetto su magazzino).
   const patchFields: Parameters<typeof repo.patchOrder>[1] = {
     status: input.status,
   };
-
   if (input.status === 'sent') {
     patchFields.sentAt = new Date().toISOString();
   }
 
   await repo.patchOrder(id, patchFields);
-
   await repo.appendStatusHistory(
     id,
     existing.status,
@@ -121,22 +129,6 @@ export async function changeOrderStatus(
     user.id,
     input.notes,
   );
-
-  // Registra entrata merce in magazzino quando l'ordine viene ricevuto
-  if (input.status === 'received') {
-    const orgId = await requireOrgId();
-    for (const li of existing.lineItems) {
-      await insertMovement(orgId, user.id, {
-        ingredientProductId: li.ingredientProductId,
-        movementType:        'purchase_receipt',
-        // positivo: DB CHECK richiede quantity_delta > 0 per purchase_receipt
-        quantityDelta:       Math.abs(li.quantity),
-        unit:                li.unitSnapshot,
-        referenceType:       'purchase_order',
-        referenceId:         id,
-      });
-    }
-  }
 
   return repo.getOrderById(id);
 }

@@ -43,6 +43,9 @@ export const onboardingSchema = z.object({
     .email('Email non valida')
     .optional()
     .or(z.literal('')),
+  accountType: z.enum(['customer', 'supplier'], {
+    errorMap: () => ({ message: 'Seleziona il tipo di account' }),
+  }),
 });
 
 export type SignUpInput     = z.infer<typeof signUpSchema>;

@@ -4,25 +4,20 @@
 // Legge la sessione server-side e inietta orgName/email nella sidebar.
 // =============================================================================
 
-import { redirect } from 'next/navigation';
-import { requireSession } from '@/modules/identity/service';
+import { requireCustomerSession } from '@/modules/identity/workspace';
 import { getLowStockAlerts } from '@/modules/inventory/service';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { AppTopbar } from '@/components/layout/AppTopbar';
+import { MobileChrome } from '@/components/layout/MobileChrome';
 
 export default async function MainLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // requireSession lancia AuthError → il middleware ha già gestito il redirect,
-  // ma lasciamo il fallback esplicito per sicurezza.
-  let session;
-  try {
-    session = await requireSession();
-  } catch {
-    redirect('/login');
-  }
+  // Authoritative customer-workspace guard: redirects suppliers to /supplier and
+  // unauthenticated users to /login BEFORE any customer data is rendered.
+  const session = await requireCustomerSession();
 
   // Conta alert stock basso (best-effort: se fallisce non blocca il layout)
   let lowStockCount = 0;
@@ -40,9 +35,15 @@ export default async function MainLayout({
         userEmail={session.email}
         lowStockCount={lowStockCount}
       />
-      <main className="flex-1 flex flex-col min-h-screen overflow-y-auto">
+      <main className="flex-1 flex flex-col min-h-screen overflow-y-auto min-w-0">
         <AppTopbar lowStockCount={lowStockCount} />
-        <div className="flex-1">
+        <MobileChrome
+          variant="customer"
+          orgName={session.organizationName}
+          userEmail={session.email}
+          lowStockCount={lowStockCount}
+        />
+        <div className="flex-1 pb-24 lg:pb-0">
           {children}
         </div>
       </main>

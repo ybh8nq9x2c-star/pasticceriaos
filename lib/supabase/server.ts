@@ -12,7 +12,7 @@ type CookieToSet = { name: string; value: string; options?: Record<string, unkno
  * Crea un client Supabase server-side con Database generic type.
  * Usare in Server Components, Server Actions e Route Handlers.
  */
-export async function createClient() {
+export async function createClient<DB = Database>() {
   const cookieStore = await cookies();
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,7 +24,7 @@ export async function createClient() {
     );
   }
 
-  return createServerClient<Database>(
+  return createServerClient<DB>(
     supabaseUrl,
     supabaseAnonKey,
     {
