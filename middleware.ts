@@ -54,13 +54,28 @@ export async function middleware(request: NextRequest) {
     .maybeSingle();
   const hasOrg = !!member?.organization_id;
 
-  // account_type via SECURITY DEFINER RPC. Cast localized until database.types
-  // is regenerated post-migration (then this becomes fully typed).
+  // account_type via SECURITY DEFINER RPC (typed: current_account_type è in
+  // database.types). MAI staccare .rpc dall'istanza: il metodo usa `this.rest`
+  // e una chiamata unbound crasha a runtime con
+  // "Cannot read properties of undefined (reading 'rest')" (500 in prod).
+  // Se l'RPC fallisce: accountTypeKnown resta false e il workspace gating viene
+  // saltato (fail-open SOLO sul gating) — i layout guard
+  // (requireCustomerSession / requireSupplierSession) + RLS restano i layer
+  // autoritativi. Auth e onboarding (sotto) restano fail-closed.
   let accountType: 'customer' | 'supplier' | null = null;
+  let accountTypeKnown = false;
   if (hasOrg) {
-    const rpc = supabase.rpc as unknown as (fn: string) => Promise<{ data: 'customer' | 'supplier' | null }>;
-    const { data } = await rpc('current_account_type');
-    accountType = data ?? null;
+    try {
+      const { data, error } = await supabase.rpc('current_account_type');
+      if (!error) {
+        accountType = (data as 'customer' | 'supplier' | null) ?? null;
+        accountTypeKnown = true;
+      } else {
+        console.error('[middleware] current_account_type failed', error.code, error.message);
+      }
+    } catch (error) {
+      console.error('[middleware] current_account_type failed', error);
+    }
   }
   const home = accountType === 'supplier' ? SUPPLIER_PREFIX : '/dashboard';
 
@@ -83,10 +98,13 @@ export async function middleware(request: NextRequest) {
   if (isUnauthorized) return supabaseResponse;
 
   // ── Workspace gating ────────────────────────────────────────────────────────
-  if (accountType === 'supplier' && !isSupplierRoute) {
+  // Redirect role-based SOLO se il tipo è stato risolto con certezza: con
+  // accountTypeKnown=false si passa oltre e decidono i layout guard (nessun
+  // 500, nessun redirect loop, nessun leak — il fetch dati è dopo i guard).
+  if (accountTypeKnown && accountType === 'supplier' && !isSupplierRoute) {
     return NextResponse.redirect(new URL(SUPPLIER_PREFIX, request.url));
   }
-  if (accountType !== 'supplier' && isSupplierRoute) {
+  if (accountTypeKnown && accountType !== 'supplier' && isSupplierRoute) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
