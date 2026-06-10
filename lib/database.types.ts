@@ -835,7 +835,15 @@ export interface Database {
           deposit_paid?: number | null;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'customer_orders_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          }
+        ];
       };
 
       customer_order_items: {
@@ -867,7 +875,22 @@ export interface Database {
           notes?: string | null;
           sort_order?: number;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'customer_order_items_customer_order_id_fkey';
+            columns: ['customer_order_id'];
+            isOneToOne: false;
+            referencedRelation: 'customer_orders';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'customer_order_items_recipe_id_fkey';
+            columns: ['recipe_id'];
+            isOneToOne: false;
+            referencedRelation: 'recipes';
+            referencedColumns: ['id'];
+          }
+        ];
       };
     };
 
