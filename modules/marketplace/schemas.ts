@@ -21,7 +21,8 @@ export const revokeConnectionSchema = z.object({ connectionId: z.string().uuid()
 
 export const catalogItemSchema = z.object({
   name: z.string().trim().min(1, 'Il nome è obbligatorio').max(200),
-  sku: z.string().trim().max(50).optional().or(z.literal('')),
+  // nullish: difesa in profondità — formData.get() può produrre null a monte.
+  sku: z.string().trim().max(50).nullish().or(z.literal('')),
   unit: z.enum(UNITS, { errorMap: () => ({ message: 'Unità non valida' }) }),
   unitPrice: z
     .string()

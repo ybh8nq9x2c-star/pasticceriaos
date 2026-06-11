@@ -1,0 +1,8 @@
+.auth/
+artifacts/test-results/
+artifacts/html-report/
+artifacts/screenshots/
+artifacts/*.jsonl
+artifacts/*.log
+artifacts/state.json
+node_modules/

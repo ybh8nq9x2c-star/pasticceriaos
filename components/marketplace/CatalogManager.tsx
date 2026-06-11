@@ -18,8 +18,9 @@ export function CatalogManager({ items }: { items: CatalogItem[] }) {
 
   return (
     <div className="space-y-6">
-      <form action={addAction} className="bg-white rounded-2xl border border-[#E5DDD0] p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
+      <form action={addAction} className="bg-white rounded-2xl border border-[#E5DDD0] p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 items-end">
         <div className="sm:col-span-2"><label className="block text-xs text-[#6B7280] mb-1">Nome *</label><input name="name" required className={`${field} w-full`} /></div>
+        <div><label className="block text-xs text-[#6B7280] mb-1">SKU</label><input name="sku" maxLength={50} placeholder="FAR-00-25" className={`${field} w-full`} /></div>
         <div><label className="block text-xs text-[#6B7280] mb-1">Unità *</label>
           <select name="unit" required className={`${field} w-full`}>{UNITS.map((u) => <option key={u} value={u}>{u}</option>)}</select></div>
         <div><label className="block text-xs text-[#6B7280] mb-1">€/u</label><input name="unitPrice" inputMode="decimal" placeholder="1,20" className={`${field} w-full`} /></div>

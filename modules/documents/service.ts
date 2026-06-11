@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/server';
 import { uploadCommercialDocument } from '@/lib/storage';
 import { AuthError, BusinessRuleError, NotFoundError, mapSupabaseError } from '@/lib/errors';
 import * as repo from './repository';
+import { normalizeName } from './matching';
 import { createDocumentSchema, supplierUploadSchema, resolveAnomalySchema } from './schemas';
 import type { CommercialDocument, DocumentListItem } from './types';
 import type { AnomalyType } from '@/lib/database.types';
@@ -19,6 +20,7 @@ const QTY_EPSILON = 0.001;
 function priceThreshold(orderedPrice: number): number {
   return Math.max(0.01, Math.abs(orderedPrice) * 0.01);
 }
+
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -102,12 +104,30 @@ export async function matchDocumentToOrder(
   const doc = await repo.getDocumentById(documentId);
   if (doc.organizationId !== orgId) throw new NotFoundError('Documento');
 
-  const targetOrderId = purchaseOrderId ?? doc.purchaseOrderId;
+  const supabase = await createClient();
+
+  // Auto-associazione: se il documento nasce da un ordine marketplace e la
+  // merce è già stata registrata, il PO specchio è ricavabile senza che
+  // l'utente debba selezionarlo a mano (BUG-03).
+  let targetOrderId = purchaseOrderId ?? doc.purchaseOrderId;
+  if (!targetOrderId && doc.marketplaceOrderId) {
+    const { data: mirrorPo, error: mirrorErr } = await supabase
+      .from('purchase_orders')
+      .select('id')
+      .eq('marketplace_order_id', doc.marketplaceOrderId)
+      .maybeSingle();
+    if (mirrorErr) throw mapSupabaseError(mirrorErr);
+    targetOrderId = mirrorPo?.id ?? null;
+    if (!targetOrderId) {
+      throw new BusinessRuleError(
+        'La merce di questo ordine non è ancora stata registrata a magazzino: ' +
+        'registra il carico dall\'ordine marketplace, poi esegui la verifica.',
+      );
+    }
+  }
   if (!targetOrderId) {
     throw new BusinessRuleError('Associa il documento a un ordine prima di eseguire il matching.');
   }
-
-  const supabase = await createClient();
   const { data: orderLines, error } = await supabase
     .from('order_line_items')
     .select('id, ingredient_product_id, quantity_ordered, unit_price_snapshot, ingredient_products(name)')
@@ -126,12 +146,20 @@ export async function matchDocumentToOrder(
   const matchedOrderLineIds = new Set<string>();
 
   for (const line of doc.lines) {
-    // 1) match esplicito per order_line_item_id, altrimenti per ingrediente
+    // Match in ordine di affidabilità: 1) order_line_item_id esplicito,
+    // 2) ingrediente, 3) fallback per nome normalizzato — necessario per le
+    // righe caricate dal fornitore, che non conoscono gli ID del cliente
+    // (BUG-03: senza fallback ogni riga risultava "non ordinata"+"mancante").
+    const lineName = normalizeName(line.description);
     const target =
       (line.orderLineItemId && orderLines.find((o) => o.id === line.orderLineItemId)) ||
       (line.ingredientProductId &&
         orderLines.find(
           (o) => o.ingredient_product_id === line.ingredientProductId && !matchedOrderLineIds.has(o.id),
+        )) ||
+      (lineName !== '' &&
+        orderLines.find(
+          (o) => normalizeName(o.ingredient_products?.name) === lineName && !matchedOrderLineIds.has(o.id),
         )) ||
       null;
 
@@ -219,10 +247,25 @@ export async function matchDocumentToOrder(
 
   await repo.insertAnomalies(documentId, anomalies);
 
+  // Backfill fornitore: i documenti caricati dal fornitore possono nascere
+  // senza supplier_id (anagrafica cliente non ancora creata al momento
+  // dell'upload); l'ordine associato lo conosce.
+  let supplierIdPatch: string | null | undefined;
+  if (!doc.supplierId) {
+    const { data: poSupplier, error: poSupErr } = await supabase
+      .from('purchase_orders')
+      .select('supplier_id')
+      .eq('id', targetOrderId)
+      .maybeSingle();
+    if (poSupErr) throw mapSupabaseError(poSupErr);
+    supplierIdPatch = poSupplier?.supplier_id ?? undefined;
+  }
+
   const status = anomalies.length === 0 ? 'matched' : 'anomaly';
   await repo.patchDocument(documentId, {
     status,
     purchaseOrderId: targetOrderId,
+    supplierId: supplierIdPatch,
     matchedAt: status === 'matched' ? now : null,
   });
 
@@ -306,6 +349,27 @@ export async function supplierUploadDocument(raw: unknown): Promise<string> {
     .eq('marketplace_order_id', mo.id)
     .maybeSingle();
 
+  // Se il PO specchio esiste, le sue righe permettono di popolare subito
+  // order_line_item_id / ingredient_product_id sulle righe documento
+  // (BUG-03: la provenienza è nota, gli ID non devono restare null).
+  // Mappa per nome normalizzato: è la stessa chiave usata dal ponte di
+  // ricezione per creare le righe PO dagli snapshot marketplace.
+  const poLineByName = new Map<string, { id: string; ingredient_product_id: string }>();
+  if (poRow) {
+    const { data: poLines, error: poLinesErr } = await supabase
+      .from('order_line_items')
+      .select('id, ingredient_product_id, ingredient_products(name)')
+      .eq('purchase_order_id', poRow.id)
+      .returns<{ id: string; ingredient_product_id: string; ingredient_products: { name: string } | null }[]>();
+    if (poLinesErr) throw mapSupabaseError(poLinesErr);
+    for (const pl of poLines ?? []) {
+      const key = normalizeName(pl.ingredient_products?.name);
+      if (key && !poLineByName.has(key)) {
+        poLineByName.set(key, { id: pl.id, ingredient_product_id: pl.ingredient_product_id });
+      }
+    }
+  }
+
   // Le righe del documento sono lo snapshot delle righe ordine marketplace.
   const { data: moLines, error: linesErr } = await supabase
     .from('marketplace_order_lines')
@@ -328,13 +392,16 @@ export async function supplierUploadDocument(raw: unknown): Promise<string> {
       notes:              input.notes || null,
       uploadedByOrgId:    supplierOrgId,
     },
-    (moLines ?? []).map((l) => ({
-      orderLineItemId:     null,
-      ingredientProductId: null,
-      description:         l.name_snapshot,
-      quantity:            Number(l.quantity),
-      unit:                l.unit,
-      unitPrice:           l.unit_price_snapshot !== null ? Number(l.unit_price_snapshot) : null,
-    })),
+    (moLines ?? []).map((l) => {
+      const poLine = poLineByName.get(normalizeName(l.name_snapshot)) ?? null;
+      return {
+        orderLineItemId:     poLine?.id ?? null,
+        ingredientProductId: poLine?.ingredient_product_id ?? null,
+        description:         l.name_snapshot,
+        quantity:            Number(l.quantity),
+        unit:                l.unit,
+        unitPrice:           l.unit_price_snapshot !== null ? Number(l.unit_price_snapshot) : null,
+      };
+    }),
   );
 }

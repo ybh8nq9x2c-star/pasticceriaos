@@ -39,13 +39,29 @@ export async function createDraftsFromShortageAction(planId: string): Promise<Ac
     const result = await service.createDraftOrdersFromShortage(planId);
     revalidatePath('/orders');
     revalidatePath(`/production/${planId}`);
+
+    const created = result.createdOrderIds.length;
+    const skipped = result.skippedIngredients.length;
+
+    // BUG-05: zero bozze NON è un successo. Messaggio actionable, mai "✓ 0".
+    if (created === 0) {
+      return {
+        status: 'error',
+        error:
+          skipped > 0
+            ? `Nessuna bozza creata: ${skipped} ingredient${skipped === 1 ? 'e è' : 'i sono'} senza fornitore ` +
+              `(${result.skippedIngredients.join(', ')}). Assegna un fornitore dalla scheda di ogni ingrediente e riprova.`
+            : 'Nessuna bozza creata: il piano non ha shortage da riordinare.',
+      };
+    }
+
     const skippedNote =
-      result.skippedIngredients.length > 0
-        ? ` ${result.skippedIngredients.length} ingredienti senza fornitore esclusi: ${result.skippedIngredients.join(', ')}.`
+      skipped > 0
+        ? ` Attenzione: ${skipped} ingredienti senza fornitore esclusi (${result.skippedIngredients.join(', ')}).`
         : '';
     return {
       status: 'success',
-      message: `${result.createdOrderIds.length} bozze ordine create.${skippedNote}`,
+      message: `${created} bozz${created === 1 ? 'a' : 'e'} ordine create.${skippedNote}`,
     };
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };

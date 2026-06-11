@@ -25,6 +25,8 @@
     "**/__tests__/**",
     "**/*.test.ts",
     "vitest.config.ts",
-    "supabase/functions/**"
+    "supabase/functions/**",
+    "e2e",
+    "playwright.config.ts"
   ]
 }

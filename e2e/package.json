@@ -1,0 +1,13 @@
+{
+  "name": "pasticceriaos-e2e",
+  "private": true,
+  "description": "Suite E2E audit bakery↔supplier per PasticceriaOS (Playwright). Self-contained: non tocca i node_modules dell'app.",
+  "scripts": {
+    "test": "playwright test",
+    "test:setup": "playwright test tests/00-auth.setup.ts",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1"
+  }
+}

@@ -6,9 +6,12 @@ import { useFormState } from 'react-dom';
 // Form creazione ingrediente. Carica fornitori via fetch client-side.
 // =============================================================================
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { createIngredientAction } from '@/modules/catalog/actions';
+
+interface SupplierOption { id: string; name: string }
 
 // Stile campo condiviso
 const fieldClass = 'w-full rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30 focus:border-[#C9962A] bg-white';
@@ -27,6 +30,16 @@ const UNITS = [
 
 export default function NewIngredientPage() {
   const [state, formAction, pending] = useFormState(createIngredientAction, IDLE_STATE);
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
+
+  // BUG-05: il fornitore deve essere assegnabile già alla creazione, altrimenti
+  // l'auto-riordino ("Genera bozze per fornitore") esclude l'ingrediente.
+  useEffect(() => {
+    fetch('/api/catalog/suppliers')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setSuppliers(Array.isArray(data) ? data : []))
+      .catch(() => setSuppliers([]));
+  }, []);
 
   return (
     <div className="p-8 max-w-xl mx-auto">
@@ -102,6 +115,18 @@ export default function NewIngredientPage() {
               placeholder="es. 1,25"
               className={fieldClass}
             />
+          </div>
+
+          <div>
+            <label className={labelClass}>
+              Fornitore <span className={optClass}>(opz. — necessario per il riordino automatico)</span>
+            </label>
+            <select name="supplierId" defaultValue="" className={fieldClass}>
+              <option value="">— Nessun fornitore —</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
           </div>
 
           <div>

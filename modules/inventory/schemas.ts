@@ -78,14 +78,16 @@ export const initialStockSchema = z.object({
 export const createBatchSchema = z.object({
   ingredientProductId: z.string().uuid('ID ingrediente non valido'),
   purchaseOrderId: z.string().uuid().nullish().or(z.literal('')),
-  lotNumber: z.string().trim().max(100).optional().or(z.literal('')),
+  // nullish: difesa in profondità — il form non espone questi campi e
+  // formData.get() può produrre null a monte (root cause BUG-02).
+  lotNumber: z.string().trim().max(100).nullish().or(z.literal('')),
   expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data scadenza non valida'),
   quantity: z
     .string()
     .transform((v) => parseFloat(v.replace(',', '.')))
     .pipe(z.number().positive('La quantità deve essere maggiore di 0')),
   unit: z.enum(UNITS),
-  notes: z.string().trim().max(500).optional().or(z.literal('')),
+  notes: z.string().trim().max(500).nullish().or(z.literal('')),
 });
 
 export type CreateMovementInput  = z.infer<typeof createMovementSchema>;

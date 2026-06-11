@@ -23,6 +23,23 @@ export type ActionState =
 
 export const IDLE_STATE: ActionState = { status: 'idle' };
 
+/**
+ * Lettura null-safe di un campo testuale da FormData per gli schemi Zod.
+ *
+ * `formData.get(key)` restituisce `null` quando il campo NON esiste nel form:
+ * gli schemi `z.string().optional().or(z.literal(''))` accettano
+ * `string | undefined | ''` ma NON `null`, e l'action fallisce con un errore
+ * di validazione per un campo che l'utente non ha mai visto (root cause di
+ * BUG-01 catalogo fornitore e BUG-02 lotti). Questa utility normalizza
+ * `null → undefined` ed è il modo canonico di passare campi opzionali di
+ * FormData a Zod. I `File` non sono testo: vengono trattati come assenti.
+ */
+export function formField(formData: FormData, key: string): string | undefined {
+  const value = formData.get(key);
+  if (value === null || value instanceof File) return undefined;
+  return value;
+}
+
 // ---------------------------------------------------------------------------
 // Slug
 // ---------------------------------------------------------------------------

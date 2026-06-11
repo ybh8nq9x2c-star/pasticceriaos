@@ -8,7 +8,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getErrorMessage } from '@/lib/errors';
-import type { ActionState } from '@/lib/utils';
+import { formField, type ActionState } from '@/lib/utils';
 import * as service from './service';
 
 export async function generateKeyAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -55,10 +55,11 @@ export async function revokeConnectionAction(_prev: ActionState, formData: FormD
 
 export async function upsertCatalogItemAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    const id = (formData.get('id') as string) || undefined;
+    const id = formField(formData, 'id') || undefined;
+    // formField: null-safe (campo assente → undefined, mai null). Vedi BUG-01.
     await service.upsertCatalogItem({
-      name: formData.get('name'), sku: formData.get('sku'),
-      unit: formData.get('unit'), unitPrice: formData.get('unitPrice'),
+      name: formField(formData, 'name'), sku: formField(formData, 'sku'),
+      unit: formField(formData, 'unit'), unitPrice: formField(formData, 'unitPrice'),
     }, id);
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };

@@ -100,12 +100,21 @@ Avvia il server Next.js in modalità produzione. Usa la variabile `PORT` (impost
 
 ### Variabili ambiente su Railway
 
-Nel dashboard Railway → tuo servizio → **Variables**, aggiungi:
+Nel dashboard Railway → tuo servizio → **Variables**. Checklist completa:
 
-```
-NEXT_PUBLIC_SUPABASE_URL     = https://your-project-ref.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY = your-anon-key-here
-```
+| Variabile | Obbligatoria | Note |
+|-----------|--------------|------|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | URL progetto Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Chiave anon Supabase |
+| `SUPPLIER_TOKEN_SECRET` | ✅ per il portale fornitore | ≥32 char, `openssl rand -hex 32`. Senza: la generazione link portale è disabilitata con errore chiaro |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ per portale + storage documenti | Solo server-side, mai nel client |
+| `NEXT_PUBLIC_APP_URL` | ✅ in produzione | URL pubblico (es. `https://….up.railway.app`): usato per i link assoluti del portale e i redirect OAuth |
+| `SUPABASE_STORAGE_BUCKET` | ➖ | Default `commercial-documents` |
+| `CRON_SECRET` | ➖ | Solo se usi l'edge function `expiry-alerts` |
+
+> Dopo aver aggiunto/cambiato variabili, Railway riavvia il servizio: verifica
+> dal pannello **Fornitori → scheda fornitore → Genera link portale** che il
+> portale risponda correttamente.
 
 ### Autodeploy
 

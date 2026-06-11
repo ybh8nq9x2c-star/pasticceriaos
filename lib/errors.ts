@@ -74,18 +74,43 @@ export class BusinessRuleError extends AppError {
   }
 }
 
+/**
+ * Configurazione ambiente mancante/invalida (env var assente sul deploy).
+ * Il `message` è pensato per l'utente finale; i dettagli tecnici vanno
+ * loggati server-side nel punto in cui l'errore viene sollevato.
+ */
+export class ConfigurationError extends AppError {
+  constructor(message: string) {
+    super(message, 'CONFIGURATION_ERROR');
+    this.name = 'ConfigurationError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Utility
 // ---------------------------------------------------------------------------
+
+/** Messaggi di default Zod (inglesi/tecnici) da non mostrare mai così come sono. */
+const ZOD_TECHNICAL_MESSAGE = /^(invalid input|required|invalid|expected .+|invalid_type.*)$/i;
 
 /**
  * Estrae un messaggio leggibile da qualsiasi tipo di errore.
  * Usata nelle Server Actions per restituire messaggi all'utente.
  */
 export function getErrorMessage(error: unknown): string {
-  // ZodError: mostra il primo messaggio leggibile invece del dump JSON grezzo.
+  // ZodError: mai il dump JSON né i default tecnici ("Invalid input").
+  // Se lo schema ha un messaggio italiano custom lo usa; altrimenti indica
+  // almeno QUALE campo non è valido.
   if (error instanceof ZodError) {
-    return error.issues[0]?.message ?? 'Dati inseriti non validi';
+    const issue = error.issues[0];
+    if (!issue) return 'Dati inseriti non validi.';
+    const field = issue.path.filter((p): p is string => typeof p === 'string').join('.');
+    if (ZOD_TECHNICAL_MESSAGE.test(issue.message.trim())) {
+      return field
+        ? `Il campo "${field}" non è valido o è mancante. Correggi e riprova.`
+        : 'Dati inseriti non validi. Controlla i campi e riprova.';
+    }
+    return field ? `${issue.message} (campo: ${field})` : issue.message;
   }
   if (error instanceof AppError) return error.message;
   if (error instanceof Error) return error.message;

@@ -7,8 +7,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { getErrorMessage } from '@/lib/errors';
-import type { ActionState } from '@/lib/utils';
+import { formField, type ActionState } from '@/lib/utils';
 import * as service from './service';
+
+// NB: tutti i campi testuali passano da formField (null-safe): un campo
+// assente nel form deve arrivare a Zod come undefined, mai come null (BUG-02).
 
 export async function recordMovementAction(
   _prev: ActionState,
@@ -16,13 +19,13 @@ export async function recordMovementAction(
 ): Promise<ActionState> {
   try {
     await service.recordMovement({
-      ingredientProductId: formData.get('ingredientProductId'),
-      movementType:        formData.get('movementType'),
-      quantityDelta:       formData.get('quantityDelta'),
-      unit:                formData.get('unit'),
-      notes:               formData.get('notes'),
-      referenceType:       formData.get('referenceType'),
-      referenceId:         formData.get('referenceId'),
+      ingredientProductId: formField(formData, 'ingredientProductId'),
+      movementType:        formField(formData, 'movementType'),
+      quantityDelta:       formField(formData, 'quantityDelta'),
+      unit:                formField(formData, 'unit'),
+      notes:               formField(formData, 'notes'),
+      referenceType:       formField(formData, 'referenceType'),
+      referenceId:         formField(formData, 'referenceId'),
     });
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };
@@ -38,10 +41,10 @@ export async function recordInitialStockAction(
 ): Promise<ActionState> {
   try {
     await service.recordInitialStock({
-      ingredientProductId: formData.get('ingredientProductId'),
-      quantity:            formData.get('quantity'),
-      unit:                formData.get('unit'),
-      notes:               formData.get('notes'),
+      ingredientProductId: formField(formData, 'ingredientProductId'),
+      quantity:            formField(formData, 'quantity'),
+      unit:                formField(formData, 'unit'),
+      notes:               formField(formData, 'notes'),
     });
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };
@@ -57,19 +60,19 @@ export async function recordBatchAction(
 ): Promise<ActionState> {
   try {
     await service.recordBatch({
-      ingredientProductId: formData.get('ingredientProductId'),
-      purchaseOrderId:     formData.get('purchaseOrderId'),
-      lotNumber:           formData.get('lotNumber'),
-      expiryDate:          formData.get('expiryDate'),
-      quantity:            formData.get('quantity'),
-      unit:                formData.get('unit'),
-      notes:               formData.get('notes'),
+      ingredientProductId: formField(formData, 'ingredientProductId'),
+      purchaseOrderId:     formField(formData, 'purchaseOrderId'),
+      lotNumber:           formField(formData, 'lotNumber'),
+      expiryDate:          formField(formData, 'expiryDate'),
+      quantity:            formField(formData, 'quantity'),
+      unit:                formField(formData, 'unit'),
+      notes:               formField(formData, 'notes'),
     });
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };
   }
 
-  const orderId = formData.get('purchaseOrderId') as string | null;
+  const orderId = formField(formData, 'purchaseOrderId');
   if (orderId) revalidatePath(`/orders/${orderId}`);
   revalidatePath('/inventory/batches');
   revalidatePath('/dashboard');
@@ -82,8 +85,8 @@ export async function updateThresholdAction(
 ): Promise<ActionState> {
   try {
     await service.updateThreshold({
-      ingredientProductId: formData.get('ingredientProductId'),
-      minThreshold:        formData.get('minThreshold'),
+      ingredientProductId: formField(formData, 'ingredientProductId'),
+      minThreshold:        formField(formData, 'minThreshold'),
     });
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };

@@ -10,6 +10,8 @@
 
 import 'server-only';
 
+import { ConfigurationError } from '@/lib/errors';
+
 export interface SupplierTokenPayload {
   supplierId: string;
   organizationId: string;
@@ -21,10 +23,25 @@ export interface SupplierTokenPayload {
 
 const ONE_YEAR_S = 60 * 60 * 24 * 365;
 
+/** True se il portale fornitore è configurato su questo ambiente. */
+export function isPortalConfigured(): boolean {
+  const secret = process.env.SUPPLIER_TOKEN_SECRET;
+  return typeof secret === 'string' && secret.length >= 32;
+}
+
 function getSecret(): Uint8Array {
   const secret = process.env.SUPPLIER_TOKEN_SECRET;
   if (!secret || secret.length < 32) {
-    throw new Error('SUPPLIER_TOKEN_SECRET mancante o troppo corto: configura .env.local');
+    // Dettaglio tecnico nei log del server; all'utente un messaggio chiaro
+    // e non tecnico (in produzione l'istruzione ".env.local" era fuorviante).
+    console.error(
+      '[supplier-token] SUPPLIER_TOKEN_SECRET mancante o < 32 caratteri. ' +
+      'Imposta la variabile d\'ambiente sul deploy (Railway → Variables). Vedi .env.example.',
+    );
+    throw new ConfigurationError(
+      'Il portale fornitore non è configurato su questo ambiente. ' +
+      'Contatta chi gestisce il deploy: manca la chiave di firma dei link (SUPPLIER_TOKEN_SECRET).',
+    );
   }
   return new TextEncoder().encode(secret);
 }

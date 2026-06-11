@@ -32,7 +32,18 @@ export function DraftOrdersButton({ planId }: { planId: string }) {
   return (
     <div className="text-right shrink-0">
       {state.status === 'error' && (
-        <p className="text-xs text-[#C0392B] mb-1">{state.error}</p>
+        <div className="mb-1">
+          <p className="text-xs text-[#C0392B]">{state.error}</p>
+          {/* CTA: il caso più comune è "ingredienti senza fornitore" (BUG-05) */}
+          {/fornitore/i.test(state.error) && (
+            <Link
+              href="/ingredients"
+              className="inline-block mt-0.5 text-xs font-semibold text-[#C9962A] hover:underline"
+            >
+              Assegna fornitori →
+            </Link>
+          )}
+        </div>
       )}
       <form action={formAction}>
         <button
