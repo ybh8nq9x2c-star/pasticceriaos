@@ -657,7 +657,15 @@ export interface Database {
           matched_at?: string | null;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'commercial_documents_supplier_id_fkey';
+            columns: ['supplier_id'];
+            isOneToOne: false;
+            referencedRelation: 'suppliers';
+            referencedColumns: ['id'];
+          }
+        ];
       };
 
       document_line_items: {
