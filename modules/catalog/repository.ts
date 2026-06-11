@@ -273,6 +273,111 @@ export async function patchRecipe(
 }
 
 // ---------------------------------------------------------------------------
+// Listino prezzi fornitore (supplier_price_list, migration 026)
+// Storico per valid_from; la riga attiva è quella con is_active = true.
+// ---------------------------------------------------------------------------
+
+export interface PriceListEntry {
+  id: string;
+  ingredientProductId: string;
+  ingredientName: string;
+  ingredientSku: string | null;
+  unit: string;
+  unitPrice: number;
+  validFrom: string;
+}
+
+export async function listSupplierPriceList(
+  orgId: string,
+  supplierId: string,
+): Promise<PriceListEntry[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('supplier_price_list')
+    .select('id, ingredient_product_id, unit_price, unit, valid_from, ingredient_products(name, sku)')
+    .eq('organization_id', orgId)
+    .eq('supplier_id', supplierId)
+    .eq('is_active', true)
+    .order('valid_from', { ascending: false });
+  if (error) throw mapSupabaseError(error);
+
+  return (data ?? [])
+    .map((r) => ({
+      id:                  r.id,
+      ingredientProductId: r.ingredient_product_id,
+      ingredientName:      (r.ingredient_products as { name: string; sku: string | null } | null)?.name ?? '',
+      ingredientSku:       (r.ingredient_products as { name: string; sku: string | null } | null)?.sku ?? null,
+      unit:                r.unit,
+      unitPrice:           Number(r.unit_price),
+      validFrom:           r.valid_from,
+    }))
+    .sort((a, b) => a.ingredientName.localeCompare(b.ingredientName));
+}
+
+export async function countActivePriceListEntries(orgId: string, supplierId: string): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from('supplier_price_list')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', orgId)
+    .eq('supplier_id', supplierId)
+    .eq('is_active', true);
+  if (error) throw mapSupabaseError(error);
+  return count ?? 0;
+}
+
+export async function upsertSupplierPrice(params: {
+  orgId: string;
+  supplierId: string;
+  ingredientProductId: string;
+  unitPrice: number;
+  unit: string;
+}): Promise<void> {
+  const supabase = await createClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Riga attiva esistente per la tripletta
+  const { data: active, error: selErr } = await supabase
+    .from('supplier_price_list')
+    .select('id, valid_from')
+    .eq('organization_id', params.orgId)
+    .eq('supplier_id', params.supplierId)
+    .eq('ingredient_product_id', params.ingredientProductId)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (selErr) throw mapSupabaseError(selErr);
+
+  if (active && active.valid_from === today) {
+    // Stesso giorno: correggi la riga senza creare storico fasullo.
+    const { error } = await supabase
+      .from('supplier_price_list')
+      .update({ unit_price: params.unitPrice, unit: params.unit as never })
+      .eq('id', active.id);
+    if (error) throw mapSupabaseError(error);
+    return;
+  }
+
+  if (active) {
+    // Chiudi la voce precedente (lo storico resta interrogabile per valid_from).
+    const { error } = await supabase
+      .from('supplier_price_list')
+      .update({ is_active: false })
+      .eq('id', active.id);
+    if (error) throw mapSupabaseError(error);
+  }
+
+  const { error: insErr } = await supabase.from('supplier_price_list').insert({
+    organization_id:       params.orgId,
+    supplier_id:           params.supplierId,
+    ingredient_product_id: params.ingredientProductId,
+    unit_price:            params.unitPrice,
+    unit:                  params.unit as never,
+    valid_from:            today,
+  });
+  if (insErr) throw mapSupabaseError(insErr);
+}
+
+// ---------------------------------------------------------------------------
 // Mappers (DB row → domain type)
 // ---------------------------------------------------------------------------
 

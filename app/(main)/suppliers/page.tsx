@@ -141,9 +141,10 @@ export default async function SuppliersPage() {
             </thead>
             <tbody className="divide-y divide-[#F0EBE1]">
               {suppliers.map((s) => {
-                const level: 1 | 2 | 3 = s.supplierOrgId
-                  ? (priceListCounts.get(s.id) ?? 0) > 0 ? 3 : 2
-                  : 1;
+                // L3 = listino consolidato (>= 5 voci attive), a prescindere dal
+                // canale: anche un fornitore solo-email con listino è "attivo".
+                const hasPriceList = (priceListCounts.get(s.id) ?? 0) >= 5;
+                const level: 1 | 2 | 3 = hasPriceList ? 3 : s.supplierOrgId ? 2 : 1;
                 return (
                   <tr key={s.id} className="hover:bg-[#FAF7F2] transition-colors">
                     <td className="px-6 py-4">

@@ -19,17 +19,21 @@ export async function createDocumentAction(
   try {
     const rawLines = formData.get('lines');
     const lines = rawLines ? JSON.parse(rawLines as string) : [];
-    documentId = await service.createDocument({
-      supplierId:      formData.get('supplierId'),
-      purchaseOrderId: formData.get('purchaseOrderId'),
-      documentType:    formData.get('documentType'),
-      documentNumber:  formData.get('documentNumber'),
-      documentDate:    formData.get('documentDate'),
-      dueDate:         formData.get('dueDate'),
-      totalAmount:     formData.get('totalAmount') as string | null,
-      notes:           formData.get('notes'),
-      lines,
-    });
+    const file = formData.get('file');
+    documentId = await service.createDocument(
+      {
+        supplierId:      formData.get('supplierId'),
+        purchaseOrderId: formData.get('purchaseOrderId'),
+        documentType:    formData.get('documentType'),
+        documentNumber:  formData.get('documentNumber'),
+        documentDate:    formData.get('documentDate'),
+        dueDate:         formData.get('dueDate'),
+        totalAmount:     formData.get('totalAmount') as string | null,
+        notes:           formData.get('notes'),
+        lines,
+      },
+      file instanceof File ? file : null,
+    );
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };
   }

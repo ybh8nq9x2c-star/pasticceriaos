@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { updateSupplierAction, deactivateSupplierAction } from '@/modules/catalog/actions';
+import { PortalLinkPanel } from '@/components/suppliers/PortalLinkPanel';
 import type { Supplier } from '@/modules/catalog/types';
 
 const fieldClass = 'w-full rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30 focus:border-[#C9962A] bg-white';
@@ -162,6 +163,26 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
           </button>
         </div>
       </form>
+
+      {/* Portale fornitore + listino */}
+      <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <PortalLinkPanel supplierId={params.id} />
+        <Link
+          href={`/suppliers/${params.id}/price-list`}
+          className="bg-white rounded-2xl border border-[#E5DDD0] p-5 hover:border-[#C9962A] transition-colors flex flex-col justify-between"
+        >
+          <div>
+            <h2 className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide mb-2">
+              Listino prezzi
+            </h2>
+            <p className="text-xs text-[#6B7280]">
+              Prezzi concordati per ingrediente: alimentano le bozze d'ordine e
+              il livello di connessione L3.
+            </p>
+          </div>
+          <span className="mt-3 text-sm font-semibold text-[#C9962A]">Gestisci listino →</span>
+        </Link>
+      </div>
 
       {supplier.isActive && (
         <div className="mt-8 border border-[#C0392B]/30 rounded-2xl p-5">

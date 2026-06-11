@@ -140,6 +140,18 @@ export function NewDocumentForm({
             <label className={labelClass}>Note</label>
             <textarea name="notes" rows={2} maxLength={2000} className={`${fieldClass} resize-none`} />
           </div>
+
+          <div>
+            <label className={labelClass}>
+              File documento <span className="text-[#6B7280] font-normal text-xs">(PDF o foto, max 10MB — opz.)</span>
+            </label>
+            <input
+              name="file"
+              type="file"
+              accept=".pdf,image/*"
+              className="w-full text-sm text-[#6B7280] file:mr-3 file:min-h-[44px] file:px-4 file:rounded-xl file:border-0 file:bg-[#1A2B4A] file:text-white file:text-sm file:font-semibold"
+            />
+          </div>
         </div>
 
         {/* Righe */}

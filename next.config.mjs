@@ -1,17 +1,37 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Server Actions are enabled by default in Next.js 14+.
-  // No allowedOrigins restriction: same-origin requests are always permitted,
-  // which is correct for standard web app deployments (Railway, Vercel, etc.).
-  //
-  // NOTE: the legacy prototype scaffolding (app/app/*, app/(auth)/sign-in,
-  // app/(auth)/sign-up, components/cliente|fornitore, lib/actions, lib/data,
-  // lib/types) has been REMOVED, so `next build` now type-checks the whole
-  // active tree (no ignoreBuildErrors). Type safety is enforced both here and
-  // via `npm run typecheck`.
+  // NOTA su `experimental.ppr`: richiede Next canary — su 14.2 stable rompe la
+  // build. Lo streaming si ottiene comunque con i loading.tsx route-level.
   eslint: {
-    // Linting is run separately via `npm run lint`.
+    // Linting eseguito separatamente via `npm run lint`.
     ignoreDuringBuilds: true,
+  },
+
+  // Compressione gzip e header puliti
+  compress: true,
+  poweredByHeader: false,
+
+  images: {
+    formats: ['image/avif', 'image/webp'],
+  },
+
+  async headers() {
+    return [
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+      {
+        // Il portale fornitore contiene il token nel path: mai in cache condivise.
+        source: '/portal/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'no-store' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+        ],
+      },
+    ];
   },
 };
 

@@ -143,3 +143,70 @@ export async function updateRecipe(id: string, raw: unknown): Promise<Recipe> {
 export async function deactivateRecipe(id: string): Promise<void> {
   await repo.patchRecipe(id, { isActive: false });
 }
+
+// ---------------------------------------------------------------------------
+// Listino prezzi fornitore
+// ---------------------------------------------------------------------------
+
+export async function getSupplierPriceList(supplierId: string) {
+  const orgId = await requireOrgId();
+  return repo.listSupplierPriceList(orgId, supplierId);
+}
+
+export async function setSupplierPrice(input: {
+  supplierId: string;
+  ingredientProductId: string;
+  unitPrice: number;
+  unit: string;
+}): Promise<void> {
+  const orgId = await requireOrgId();
+  if (!Number.isFinite(input.unitPrice) || input.unitPrice < 0) {
+    throw new NotFoundError('Prezzo non valido');
+  }
+  await repo.upsertSupplierPrice({ orgId, ...input });
+}
+
+/**
+ * Importa nel listino i prezzi snapshot dell'ULTIMO ordine ricevuto del
+ * fornitore. Ritorna quante righe importate e quante saltate (prezzo nullo).
+ */
+export async function importPricesFromLastReceivedOrder(
+  supplierId: string,
+): Promise<{ imported: number; skipped: number }> {
+  const orgId = await requireOrgId();
+  const supabase = (await import('@/lib/supabase/server')).createClient;
+  const client = await supabase();
+
+  const { data: order, error } = await client
+    .from('purchase_orders')
+    .select('id, order_line_items(ingredient_product_id, unit, unit_price_snapshot)')
+    .eq('organization_id', orgId)
+    .eq('supplier_id', supplierId)
+    .eq('status', 'received')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    const { mapSupabaseError } = await import('@/lib/errors');
+    throw mapSupabaseError(error);
+  }
+  if (!order) return { imported: 0, skipped: 0 };
+
+  let imported = 0;
+  let skipped = 0;
+  for (const line of order.order_line_items ?? []) {
+    if (line.unit_price_snapshot === null) {
+      skipped++;
+      continue;
+    }
+    await repo.upsertSupplierPrice({
+      orgId,
+      supplierId,
+      ingredientProductId: line.ingredient_product_id,
+      unitPrice: Number(line.unit_price_snapshot),
+      unit: line.unit,
+    });
+    imported++;
+  }
+  return { imported, skipped };
+}

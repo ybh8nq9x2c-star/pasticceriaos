@@ -23,6 +23,7 @@ export interface InsertDocumentRow {
   totalAmount: number | null;
   notes: string | null;
   uploadedByOrgId: string | null;
+  storagePath?: string | null;
 }
 
 export interface InsertLineRow {
@@ -50,6 +51,7 @@ export async function insertDocument(doc: InsertDocumentRow, lines: InsertLineRo
       total_amount:         doc.totalAmount,
       notes:                doc.notes,
       uploaded_by_org_id:   doc.uploadedByOrgId,
+      storage_path:         doc.storagePath ?? null,
     })
     .select('id')
     .single();
@@ -124,6 +126,7 @@ export async function getDocumentById(id: string): Promise<CommercialDocument> {
     taxAmount:          numOrNull(data.tax_amount),
     totalAmount:        numOrNull(data.total_amount),
     notes:              data.notes,
+    storagePath:        data.storage_path ?? null,
     uploadedByOrgId:    data.uploaded_by_org_id,
     matchedAt:          data.matched_at,
     createdAt:          data.created_at,

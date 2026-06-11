@@ -137,6 +137,7 @@ export interface Database {
           id: string;
           organization_id: string;
           supplier_org_id: string | null;
+          portal_token_version: number;
           name: string;
           email: string;
           phone: string | null;
@@ -162,6 +163,7 @@ export interface Database {
           notes?: string | null;
           is_active?: boolean;
           supplier_org_id?: string | null;
+          portal_token_version?: number;
         };
         Relationships: [
           {
@@ -618,6 +620,7 @@ export interface Database {
           total_amount: number | null;
           notes: string | null;
           file_url: string | null;
+          storage_path: string | null;
           uploaded_by_org_id: string | null;
           matched_at: string | null;
           created_at: string;
@@ -639,6 +642,7 @@ export interface Database {
           total_amount?: number | null;
           notes?: string | null;
           file_url?: string | null;
+          storage_path?: string | null;
           uploaded_by_org_id?: string | null;
           matched_at?: string | null;
         };
@@ -654,6 +658,7 @@ export interface Database {
           total_amount?: number | null;
           notes?: string | null;
           file_url?: string | null;
+          storage_path?: string | null;
           matched_at?: string | null;
           updated_at?: string;
         };
@@ -796,6 +801,33 @@ export interface Database {
         };
         Insert: never;
         Update: never;
+        Relationships: [];
+      };
+
+      // ── notifiche di sistema (migration 032) ─────────────────────────────────
+      notifications: {
+        Row: {
+          id: string;
+          organization_id: string;
+          type: 'info' | 'warn' | 'error';
+          title: string;
+          message: string | null;
+          href: string | null;
+          read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          type?: 'info' | 'warn' | 'error';
+          title: string;
+          message?: string | null;
+          href?: string | null;
+          read?: boolean;
+        };
+        Update: {
+          read?: boolean;
+        };
         Relationships: [];
       };
 

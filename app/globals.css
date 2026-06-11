@@ -57,6 +57,22 @@ textarea:focus-visible {
   }
 }
 
+/* ── Safe area (notch) e touch polish ──────────────────────────────────────── */
+.safe-area-pb { padding-bottom: env(safe-area-inset-bottom); }
+.safe-area-pt { padding-top: env(safe-area-inset-top); }
+
+/* Niente flash grigio al tap su iOS; lo stato attivo è gestito da Tailwind */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* Scroll fluido su iOS senza bloccare lo scroll del documento
+   (overflow:hidden su html romperebbe position:sticky e lo scroll naturale) */
+body { -webkit-overflow-scrolling: touch; }
+
+/* Evita scroll orizzontale accidentale da contenuti larghi su mobile */
+@media (max-width: 767px) {
+  html, body { overflow-x: hidden; }
+}
+
 /* Badge utilities */
 .badge {
   @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;

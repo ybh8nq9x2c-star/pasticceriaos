@@ -89,7 +89,37 @@ export default async function DocumentsPage({
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+        <>
+        {/* Mobile: card stack */}
+        <div className="md:hidden space-y-3">
+          {filtered.map((d) => (
+            <Link
+              key={d.id}
+              href={`/documents/${d.id}`}
+              className="block bg-white rounded-xl border border-[#E5DDD0] p-4 active:bg-[#FAF7F2]"
+            >
+              <div className="flex justify-between items-start gap-3 mb-1.5">
+                <span className="text-sm font-semibold text-[#1A2B4A]">
+                  {DOCUMENT_TYPE_LABELS[d.documentType]}
+                  {d.documentNumber && <span className="font-mono font-normal text-[#6B7280]"> {d.documentNumber}</span>}
+                </span>
+                <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_BADGE[d.documentStatus]}`}>
+                  {DOCUMENT_STATUS_LABELS[d.documentStatus]}{d.openAnomalies > 0 && ` (${d.openAnomalies})`}
+                </span>
+              </div>
+              <p className="text-xs text-[#6B7280]">{d.supplierName ?? '—'}</p>
+              <div className="mt-2 flex justify-between items-center text-xs">
+                <span className="font-mono text-[#6B7280]">{fmtDate(d.documentDate)}</span>
+                <span className="font-mono font-semibold text-[#1A2B4A]">
+                  {d.totalAmount !== null ? `€${formatCurrency(d.totalAmount)}` : `${d.linesCount} righe`}
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+
+        {/* Desktop: tabella */}
+        <div className="hidden md:block bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-[#FAF7F2] border-b border-[#E5DDD0]">
               <tr>
@@ -129,6 +159,7 @@ export default async function DocumentsPage({
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

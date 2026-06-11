@@ -1,0 +1,12 @@
+# Configurazione Supabase CLI (sviluppo locale).
+# In produzione la function è deployata con verify_jwt=true e lo schedule è
+# gestito da pg_cron (migration 034), non da questo file.
+
+[functions.expiry-alerts]
+verify_jwt = true
+
+# Per test locale:
+#   supabase functions serve expiry-alerts
+#   curl -X POST http://localhost:54321/functions/v1/expiry-alerts \
+#     -H "Authorization: Bearer <anon key locale>" \
+#     -H "x-cron-secret: <CRON_SECRET>"

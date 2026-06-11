@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDocument } from '@/modules/documents/service';
 import { listOrders } from '@/modules/ordering/service';
+import { getDocumentSignedUrl } from '@/lib/storage';
 import { resolveAnomalyAction, archiveDocumentAction } from '@/modules/documents/actions';
 import { MatchPanel } from './MatchPanel';
 import {
@@ -42,6 +43,17 @@ export default async function DocumentDetailPage({ params }: { params: { id: str
 
   const openAnomalies = doc.anomalies.filter((a) => !a.resolved);
   const documentId = doc.id;
+
+  // Signed URL generata server-side (1h): lo storage_path non arriva al client.
+  let fileUrl: string | null = null;
+  if (doc.storagePath) {
+    try {
+      fileUrl = await getDocumentSignedUrl(doc.storagePath);
+    } catch {
+      fileUrl = null; // file mancante/storage non disponibile: la pagina resta usabile
+    }
+  }
+  const isPdf = doc.storagePath?.toLowerCase().endsWith('.pdf') ?? false;
 
   async function handleArchive(): Promise<void> {
     'use server';
@@ -80,6 +92,29 @@ export default async function DocumentDetailPage({ params }: { params: { id: str
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
+          {/* File allegato (signed URL, 1h) */}
+          {fileUrl && (
+            <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+              <div className="px-6 py-3 border-b border-[#F0EBE1] flex items-center justify-between">
+                <h2 className="font-semibold text-[15px] text-[#1A2B4A]">File allegato</h2>
+                <a
+                  href={fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-semibold text-[#C9962A] hover:underline"
+                >
+                  Apri in nuova scheda ↗
+                </a>
+              </div>
+              {isPdf ? (
+                <iframe src={fileUrl} title="Documento" className="w-full h-96 bg-[#FAF7F2]" />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={fileUrl} alt="Documento allegato" className="w-full max-h-96 object-contain bg-[#FAF7F2]" />
+              )}
+            </div>
+          )}
+
           {/* Righe con varianze */}
           <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
             <div className="px-6 py-4 border-b border-[#F0EBE1]">

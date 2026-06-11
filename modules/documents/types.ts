@@ -50,6 +50,7 @@ export interface CommercialDocument {
   taxAmount: number | null;
   totalAmount: number | null;
   notes: string | null;
+  storagePath: string | null;
   uploadedByOrgId: string | null;
   matchedAt: string | null;
   createdAt: string;

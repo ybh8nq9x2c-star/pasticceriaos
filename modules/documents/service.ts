@@ -7,6 +7,7 @@
 import { requireOrgId } from '@/modules/identity/service';
 import { requireSupplierSession } from '@/modules/identity/workspace';
 import { createClient } from '@/lib/supabase/server';
+import { uploadCommercialDocument } from '@/lib/storage';
 import { AuthError, BusinessRuleError, NotFoundError, mapSupabaseError } from '@/lib/errors';
 import * as repo from './repository';
 import { createDocumentSchema, supplierUploadSchema, resolveAnomalySchema } from './schemas';
@@ -39,9 +40,15 @@ export async function getDocument(id: string): Promise<CommercialDocument> {
 // Creazione (lato bakery)
 // ---------------------------------------------------------------------------
 
-export async function createDocument(raw: unknown): Promise<string> {
+export async function createDocument(raw: unknown, file?: File | null): Promise<string> {
   const orgId = await requireOrgId();
   const input = createDocumentSchema.parse(raw);
+
+  // Upload del PDF/foto PRIMA del record: se fallisce, nessun documento orfano.
+  let storagePath: string | null = null;
+  if (file && file.size > 0) {
+    storagePath = await uploadCommercialDocument(file, orgId, input.documentType);
+  }
 
   const documentId = await repo.insertDocument(
     {
@@ -56,6 +63,7 @@ export async function createDocument(raw: unknown): Promise<string> {
       totalAmount:        input.totalAmount,
       notes:              input.notes || null,
       uploadedByOrgId:    orgId,
+      storagePath,
     },
     input.lines.map((l) => ({
       orderLineItemId:     l.orderLineItemId || null,

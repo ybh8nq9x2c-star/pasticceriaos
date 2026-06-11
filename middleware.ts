@@ -21,8 +21,16 @@ const SEMI_AUTH_ROUTES = ['/onboarding'];
 const SUPPLIER_PREFIX = '/supplier';
 
 export async function middleware(request: NextRequest) {
-  const { supabaseResponse, user, supabase } = await updateSession(request);
   const { pathname } = request.nextUrl;
+
+  // Portale fornitore via link JWT: NESSUNA auth Supabase. Il token nel path
+  // è verificato dal layout/service del portale; il middleware non deve
+  // toccare la sessione (early return PRIMA di updateSession: zero overhead).
+  if (pathname === '/portal' || pathname.startsWith('/portal/')) {
+    return NextResponse.next();
+  }
+
+  const { supabaseResponse, user, supabase } = await updateSession(request);
 
   if (
     pathname.startsWith('/_next') ||
@@ -117,6 +125,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Esclusi: asset statici, manifest e il portale fornitore token-based.
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|portal/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
