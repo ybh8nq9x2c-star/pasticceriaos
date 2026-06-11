@@ -78,43 +78,85 @@ export async function insertDocument(doc: InsertDocumentRow, lines: InsertLineRo
 
 export async function listDocuments(orgId: string): Promise<DocumentListItem[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+
+  // Query base sui documenti; fornitori, conteggio righe e anomalie aperte
+  // arrivano da query separate indicizzate (le relazioni non sono dichiarate
+  // nei tipi: nessun embed forzato con cast).
+  const { data: docs, error } = await supabase
     .from('commercial_documents')
-    .select('id, document_type, document_status, document_number, document_date, total_amount, purchase_order_id, suppliers(name), document_line_items(id), document_anomalies(id, resolved)')
+    .select('id, document_type, document_status, document_number, document_date, total_amount, purchase_order_id, supplier_id')
     .eq('organization_id', orgId)
     .order('document_date', { ascending: false })
     .order('created_at', { ascending: false });
   if (error) throw mapSupabaseError(error);
+  if (!docs || docs.length === 0) return [];
 
-  return (data ?? []).map((d) => ({
+  const docIds = docs.map((d) => d.id);
+  const supplierIds = [...new Set(docs.map((d) => d.supplier_id).filter((id): id is string => id !== null))];
+
+  const [suppliersRes, linesRes, anomaliesRes] = await Promise.all([
+    supplierIds.length > 0
+      ? supabase.from('suppliers').select('id, name').in('id', supplierIds)
+      : Promise.resolve({ data: [], error: null }),
+    supabase.from('document_line_items').select('id, document_id').in('document_id', docIds),
+    supabase.from('document_anomalies').select('id, document_id, resolved').in('document_id', docIds),
+  ]);
+  if (suppliersRes.error) throw mapSupabaseError(suppliersRes.error);
+  if (linesRes.error) throw mapSupabaseError(linesRes.error);
+  if (anomaliesRes.error) throw mapSupabaseError(anomaliesRes.error);
+
+  const supplierName = new Map((suppliersRes.data ?? []).map((s) => [s.id, s.name]));
+  const linesCount = new Map<string, number>();
+  for (const l of linesRes.data ?? []) {
+    linesCount.set(l.document_id, (linesCount.get(l.document_id) ?? 0) + 1);
+  }
+  const openAnomalies = new Map<string, number>();
+  for (const a of anomaliesRes.data ?? []) {
+    if (!a.resolved) openAnomalies.set(a.document_id, (openAnomalies.get(a.document_id) ?? 0) + 1);
+  }
+
+  return docs.map((d) => ({
     id:              d.id,
     documentType:    d.document_type,
     documentStatus:  d.document_status,
     documentNumber:  d.document_number,
     documentDate:    d.document_date,
     totalAmount:     numOrNull(d.total_amount),
-    supplierName:    (d.suppliers as { name: string } | null)?.name ?? null,
+    supplierName:    d.supplier_id ? supplierName.get(d.supplier_id) ?? null : null,
     purchaseOrderId: d.purchase_order_id,
-    openAnomalies:   (d.document_anomalies ?? []).filter((a: { resolved: boolean }) => !a.resolved).length,
-    linesCount:      (d.document_line_items ?? []).length,
+    openAnomalies:   openAnomalies.get(d.id) ?? 0,
+    linesCount:      linesCount.get(d.id) ?? 0,
   }));
 }
 
 export async function getDocumentById(id: string): Promise<CommercialDocument> {
   const supabase = await createClient();
+
+  // Documento base + tre query correlate tipizzate (niente embed forzati).
   const { data, error } = await supabase
     .from('commercial_documents')
-    .select('*, suppliers(name), document_line_items(*), document_anomalies(*)')
+    .select('*')
     .eq('id', id)
     .single();
   if (error) throw mapSupabaseError(error);
   if (!data) throw new NotFoundError('Documento');
 
+  const [supplierRes, linesRes, anomaliesRes] = await Promise.all([
+    data.supplier_id
+      ? supabase.from('suppliers').select('name').eq('id', data.supplier_id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    supabase.from('document_line_items').select('*').eq('document_id', id).order('created_at'),
+    supabase.from('document_anomalies').select('*').eq('document_id', id).order('created_at'),
+  ]);
+  if (supplierRes.error) throw mapSupabaseError(supplierRes.error);
+  if (linesRes.error) throw mapSupabaseError(linesRes.error);
+  if (anomaliesRes.error) throw mapSupabaseError(anomaliesRes.error);
+
   return {
     id:                 data.id,
     organizationId:     data.organization_id,
     supplierId:         data.supplier_id,
-    supplierName:       (data.suppliers as { name: string } | null)?.name ?? null,
+    supplierName:       supplierRes.data?.name ?? null,
     purchaseOrderId:    data.purchase_order_id,
     marketplaceOrderId: data.marketplace_order_id,
     documentType:       data.document_type,
@@ -130,8 +172,7 @@ export async function getDocumentById(id: string): Promise<CommercialDocument> {
     uploadedByOrgId:    data.uploaded_by_org_id,
     matchedAt:          data.matched_at,
     createdAt:          data.created_at,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    lines: ((data.document_line_items as any[]) ?? []).map((l) => ({
+    lines: (linesRes.data ?? []).map((l) => ({
       id:                  l.id,
       orderLineItemId:     l.order_line_item_id,
       ingredientProductId: l.ingredient_product_id,
@@ -144,8 +185,7 @@ export async function getDocumentById(id: string): Promise<CommercialDocument> {
       priceVariance:       numOrNull(l.price_variance),
       matchedAt:           l.matched_at,
     })),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    anomalies: ((data.document_anomalies as any[]) ?? []).map((a) => ({
+    anomalies: (anomaliesRes.data ?? []).map((a) => ({
       id:            a.id,
       anomalyType:   a.anomaly_type,
       description:   a.description,

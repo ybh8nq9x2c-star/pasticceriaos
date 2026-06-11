@@ -47,9 +47,10 @@ export async function getPortalContext(token: string): Promise<PortalContext> {
   const payload = await verifySupplierToken(token);
   const db = createAdminClient();
 
+  // Niente embed: organizations è letta con query separata tipizzata.
   const { data: supplier, error } = await db
     .from('suppliers')
-    .select('id, name, is_active, portal_token_version, organization_id, organizations!suppliers_organization_id_fkey(name)')
+    .select('id, name, is_active, portal_token_version, organization_id')
     .eq('id', payload.supplierId)
     .eq('organization_id', payload.organizationId)
     .maybeSingle();
@@ -59,11 +60,17 @@ export async function getPortalContext(token: string): Promise<PortalContext> {
     throw new BusinessRuleError('Link revocato: chiedi alla pasticceria un nuovo link.');
   }
 
+  const { data: org, error: orgErr } = await db
+    .from('organizations')
+    .select('name')
+    .eq('id', payload.organizationId)
+    .maybeSingle();
+  if (orgErr) throw new Error(orgErr.message);
+
   return {
     ...payload,
     supplierName: supplier.name,
-    organizationName:
-      (supplier.organizations as unknown as { name: string } | null)?.name ?? 'Pasticceria',
+    organizationName: org?.name ?? 'Pasticceria',
   };
 }
 

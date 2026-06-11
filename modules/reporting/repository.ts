@@ -180,12 +180,9 @@ export async function getDashboardSummary(
     ? openOrders.reduce((sum, o) => sum + num(o.total_amount), 0)
     : null;
 
-  interface TodayPlanRow {
-    id: string;
-    status: string;
-    production_plan_items: { batch_count: number; recipes: { base_portions: number } | null }[];
-  }
-  const todayPlanData = todayPlanResult.data as unknown as TodayPlanRow | null;
+  // Embed tipizzato: production_plan_items dichiara le FK verso plans e recipes
+  // nei tipi, quindi nessun cast è necessario.
+  const todayPlanData = todayPlanResult.data;
   const todayItems = todayPlanData?.production_plan_items ?? [];
 
   return {

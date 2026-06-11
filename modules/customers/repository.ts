@@ -60,26 +60,47 @@ export async function listOrders(orgId: string, includeClosed = false): Promise<
   const supabase = await createClient();
   let query = supabase
     .from('customer_orders')
-    .select('id, customer_name, pickup_date, pickup_time, status, total_amount, customer_order_items(quantity)')
+    .select('id, customer_name, pickup_date, pickup_time, status, total_amount')
     .eq('organization_id', orgId)
     .order('pickup_date')
     .order('pickup_time', { nullsFirst: false });
 
   if (!includeClosed) query = query.not('status', 'in', '(delivered,cancelled)');
 
-  const { data, error } = await query;
+  const { data: orders, error } = await query;
   if (error) throw mapSupabaseError(error);
+  if (!orders || orders.length === 0) return [];
 
-  return (data ?? []).map((o) => ({
-    id:           o.id,
-    customerName: o.customer_name,
-    pickupDate:   o.pickup_date,
-    pickupTime:   o.pickup_time,
-    status:       o.status,
-    totalAmount:  numOrNull(o.total_amount),
-    itemsCount:   (o.customer_order_items ?? []).length,
-    piecesCount:  (o.customer_order_items ?? []).reduce((s: number, i: { quantity: number }) => s + i.quantity, 0),
-  }));
+  // Item con query separata (relazione non dichiarata nei tipi: niente embed
+  // forzato) e aggregazione in memoria per ordine.
+  const orderIds = orders.map((o) => o.id);
+  const { data: items, error: itemsErr } = await supabase
+    .from('customer_order_items')
+    .select('customer_order_id, quantity')
+    .in('customer_order_id', orderIds);
+  if (itemsErr) throw mapSupabaseError(itemsErr);
+
+  const agg = new Map<string, { count: number; pieces: number }>();
+  for (const item of items ?? []) {
+    const a = agg.get(item.customer_order_id) ?? { count: 0, pieces: 0 };
+    a.count += 1;
+    a.pieces += item.quantity;
+    agg.set(item.customer_order_id, a);
+  }
+
+  return orders.map((o) => {
+    const a = agg.get(o.id) ?? { count: 0, pieces: 0 };
+    return {
+      id:           o.id,
+      customerName: o.customer_name,
+      pickupDate:   o.pickup_date,
+      pickupTime:   o.pickup_time,
+      status:       o.status,
+      totalAmount:  numOrNull(o.total_amount),
+      itemsCount:   a.count,
+      piecesCount:  a.pieces,
+    };
+  });
 }
 
 export async function listOrdersForDate(orgId: string, pickupDate: string): Promise<CustomerOrder[]> {

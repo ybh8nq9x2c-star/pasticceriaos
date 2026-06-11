@@ -292,25 +292,42 @@ export async function listSupplierPriceList(
   supplierId: string,
 ): Promise<PriceListEntry[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+
+  // Query base sul listino (nessun embed: la relazione non è dichiarata nei
+  // tipi e non va forzata con cast). I dettagli ingrediente arrivano da una
+  // seconda query indicizzata per id.
+  const { data: rows, error } = await supabase
     .from('supplier_price_list')
-    .select('id, ingredient_product_id, unit_price, unit, valid_from, ingredient_products(name, sku)')
+    .select('id, ingredient_product_id, unit_price, unit, valid_from')
     .eq('organization_id', orgId)
     .eq('supplier_id', supplierId)
     .eq('is_active', true)
     .order('valid_from', { ascending: false });
   if (error) throw mapSupabaseError(error);
+  if (!rows || rows.length === 0) return [];
 
-  return (data ?? [])
-    .map((r) => ({
-      id:                  r.id,
-      ingredientProductId: r.ingredient_product_id,
-      ingredientName:      (r.ingredient_products as { name: string; sku: string | null } | null)?.name ?? '',
-      ingredientSku:       (r.ingredient_products as { name: string; sku: string | null } | null)?.sku ?? null,
-      unit:                r.unit,
-      unitPrice:           Number(r.unit_price),
-      validFrom:           r.valid_from,
-    }))
+  const ingredientIds = [...new Set(rows.map((r) => r.ingredient_product_id))];
+  const { data: ingredients, error: ingErr } = await supabase
+    .from('ingredient_products')
+    .select('id, name, sku')
+    .in('id', ingredientIds);
+  if (ingErr) throw mapSupabaseError(ingErr);
+
+  const byId = new Map((ingredients ?? []).map((i) => [i.id, i]));
+
+  return rows
+    .map((r) => {
+      const ing = byId.get(r.ingredient_product_id);
+      return {
+        id:                  r.id,
+        ingredientProductId: r.ingredient_product_id,
+        ingredientName:      ing?.name ?? '',
+        ingredientSku:       ing?.sku ?? null,
+        unit:                r.unit,
+        unitPrice:           Number(r.unit_price),
+        validFrom:           r.valid_from,
+      };
+    })
     .sort((a, b) => a.ingredientName.localeCompare(b.ingredientName));
 }
 

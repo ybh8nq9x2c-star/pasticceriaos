@@ -24,6 +24,7 @@
     "next.config.ts.bak",
     "**/__tests__/**",
     "**/*.test.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "supabase/functions/**"
   ]
 }

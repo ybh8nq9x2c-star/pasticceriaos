@@ -1,0 +1,7 @@
+{
+  "//": "Contesto Deno per la Edge Function: separato dal tsconfig della web app Next (che esclude supabase/functions/**). Il typecheck Deno si esegue con `deno check index.ts` o `supabase functions serve`.",
+  "compilerOptions": {
+    "lib": ["deno.window"],
+    "strict": true
+  }
+}
