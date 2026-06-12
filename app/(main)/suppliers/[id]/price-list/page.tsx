@@ -31,14 +31,14 @@ export default async function PriceListPage({ params }: { params: { id: string }
   return (
     <div className="p-8 max-w-3xl mx-auto space-y-6">
       <div>
-        <Link href={`/suppliers/${params.id}`} className="text-sm text-[#6B7280] hover:text-[#1A2B4A] transition-colors">
+        <Link href={`/suppliers/${params.id}`} className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← {supplier.name}
         </Link>
-        <h1 className="font-playfair text-3xl font-bold text-[#1A2B4A] mt-3">Listino prezzi</h1>
-        <p className="text-sm text-[#6B7280] mt-1">
+        <h1 className="text-3xl font-bold text-ink mt-3">Listino prezzi</h1>
+        <p className="text-sm text-ink-muted mt-1">
           Prezzi concordati con {supplier.name} — {entries.length} {entries.length === 1 ? 'voce attiva' : 'voci attive'}
           {entries.length >= 5 && (
-            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#1A2B4A]/10 text-[#1A2B4A]">
+            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-neutral-light text-ink">
               L3 · Listino attivo
             </span>
           )}

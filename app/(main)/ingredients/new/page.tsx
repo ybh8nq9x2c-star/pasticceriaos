@@ -14,9 +14,9 @@ import { createIngredientAction } from '@/modules/catalog/actions';
 interface SupplierOption { id: string; name: string }
 
 // Stile campo condiviso
-const fieldClass = 'w-full rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30 focus:border-[#C9962A] bg-white';
-const labelClass = 'block text-sm font-medium text-[#1A2B4A] mb-1.5';
-const optClass   = 'text-[#6B7280] font-normal text-xs';
+const fieldClass = 'w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary bg-surface-2';
+const labelClass = 'block text-sm font-medium text-ink mb-1.5';
+const optClass   = 'text-ink-muted font-normal text-xs';
 
 const UNITS = [
   { value: 'g',       label: 'Grammi (g)' },
@@ -44,28 +44,28 @@ export default function NewIngredientPage() {
   return (
     <div className="p-8 max-w-xl mx-auto">
       <div className="mb-6">
-        <Link href="/ingredients" className="text-sm text-[#6B7280] hover:text-[#1A2B4A] transition-colors">
+        <Link href="/ingredients" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Ingredienti
         </Link>
-        <h1 className="font-playfair text-3xl font-bold text-[#1A2B4A] mt-3">Nuovo ingrediente</h1>
+        <h1 className="text-3xl font-bold text-ink mt-3">Nuovo ingrediente</h1>
       </div>
 
-      <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">
+      <div className="bg-surface-2 rounded-2xl border border-border p-6">
         <form action={formAction} className="space-y-5">
           {state.status === 'error' && (
-            <div className="rounded-xl bg-[#C0392B]/[0.06] border border-[#C0392B]/30 p-3 text-sm text-[#C0392B]">
+            <div className="rounded-xl bg-danger-light border border-danger-soft p-3 text-sm text-danger">
               {state.error}
             </div>
           )}
           {state.status === 'success' && (
-            <div className="rounded-xl bg-[#27AE60]/[0.06] border border-[#27AE60]/30 p-3 text-sm text-[#1E7E45]">
+            <div className="rounded-xl bg-success-light border border-success-soft p-3 text-sm text-success-strong">
               {state.message}
             </div>
           )}
 
           <div>
             <label className={labelClass}>
-              Nome <span className="text-[#C0392B]">*</span>
+              Nome <span className="text-danger">*</span>
             </label>
             <input
               name="name"
@@ -80,7 +80,7 @@ export default function NewIngredientPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>
-                Unità di misura <span className="text-[#C0392B]">*</span>
+                Unità di misura <span className="text-danger">*</span>
               </label>
               <select name="unit" required className={fieldClass}>
                 <option value="">Seleziona…</option>
@@ -145,14 +145,14 @@ export default function NewIngredientPage() {
           <div className="flex gap-3 pt-1">
             <Link
               href="/ingredients"
-              className="flex-1 py-3 text-center rounded-xl border border-[#E5DDD0] text-sm font-semibold text-[#1A2B4A] hover:bg-[#FAF7F2] transition-colors"
+              className="flex-1 py-3 text-center rounded-xl border border-border text-sm font-semibold text-ink hover:bg-surface-offset transition-colors"
             >
               Annulla
             </Link>
             <button
               type="submit"
               disabled={pending}
-              className="flex-1 py-3 bg-[#1A2B4A] text-white rounded-xl text-sm font-semibold hover:bg-[#243660] disabled:opacity-60 transition-colors"
+              className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
             >
               {pending ? 'Salvataggio…' : 'Salva ingrediente'}
             </button>

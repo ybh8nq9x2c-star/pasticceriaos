@@ -117,27 +117,27 @@ export default function NewProductionPage() {
   return (
     <div className="p-8 max-w-2xl mx-auto">
       <div className="mb-6">
-        <Link href="/production" className="text-sm text-[#6B7280] hover:text-[#1A2B4A] transition-colors">
+        <Link href="/production" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Produzione
         </Link>
-        <h1 className="font-playfair text-3xl font-bold text-[#1A2B4A] mt-3">Nuovo piano di produzione</h1>
+        <h1 className="text-3xl font-bold text-ink mt-3">Nuovo piano di produzione</h1>
       </div>
 
       <form action={handleSubmit} className="space-y-6">
         {state.status === 'error' && (
-          <div className="rounded-xl bg-[#C0392B]/[0.06] border border-[#C0392B]/30 p-3 text-sm text-[#C0392B]">
+          <div className="rounded-xl bg-danger-light border border-danger-soft p-3 text-sm text-danger">
             {state.error}
           </div>
         )}
 
         {/* Dati piano */}
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6 space-y-5">
-          <h2 className="font-playfair text-base font-bold text-[#1A2B4A]">Dettagli piano</h2>
+        <div className="bg-surface-2 rounded-2xl border border-border p-6 space-y-5">
+          <h2 className="text-base font-bold text-ink">Dettagli piano</h2>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-[#1A2B4A] mb-1.5">
-                Data produzione <span className="text-[#C0392B]">*</span>
+              <label className="block text-sm font-medium text-ink mb-1.5">
+                Data produzione <span className="text-danger">*</span>
               </label>
               <input
                 name="planDate"
@@ -145,36 +145,36 @@ export default function NewProductionPage() {
                 required
                 value={planDate}
                 onChange={(e) => setPlanDate(e.target.value)}
-                className="w-full rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30 focus:border-[#C9962A]"
+                className="w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#1A2B4A] mb-1.5">
-              Note <span className="text-[#6B7280] font-normal">(opz.)</span>
+            <label className="block text-sm font-medium text-ink mb-1.5">
+              Note <span className="text-ink-muted font-normal">(opz.)</span>
             </label>
             <textarea
               name="notes"
               rows={2}
               maxLength={2000}
-              className="w-full rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30 focus:border-[#C9962A] resize-none"
+              className="w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary resize-none"
             />
           </div>
         </div>
 
         {/* Ordini clienti per la data scelta */}
         {customerOrders.length > 0 && (
-          <div className="rounded-2xl border border-[#C9962A]/30 bg-[#C9962A]/[0.06] p-5">
+          <div className="rounded-2xl border border-primary-soft bg-primary-light p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-[#8A6418]">
+                <p className="text-sm font-semibold text-primary-hover">
                   🎂 {customerOrders.length} {customerOrders.length === 1 ? 'ordine cliente' : 'ordini clienti'} con ritiro in questa data
                 </p>
-                <ul className="mt-2 space-y-1 text-xs text-[#6B7280]">
+                <ul className="mt-2 space-y-1 text-xs text-ink-muted">
                   {customerOrders.map((o) => (
                     <li key={o.id}>
-                      <span className="font-medium text-[#1A2B4A]">{o.customerName}</span>
+                      <span className="font-medium text-ink">{o.customerName}</span>
                       {o.pickupTime && ` (${o.pickupTime.slice(0, 5)})`}
                       {' — '}
                       {o.items.map((i) => `${i.quantity}× ${i.recipeName ?? i.description}`).join(', ')}
@@ -186,14 +186,14 @@ export default function NewProductionPage() {
                 <button
                   type="button"
                   onClick={addFromCustomerOrders}
-                  className="shrink-0 px-3 py-2 bg-[#1A2B4A] text-white rounded-xl text-xs font-semibold hover:bg-[#243660]"
+                  className="shrink-0 px-3 py-2 bg-primary text-primary-fg rounded-xl text-xs font-semibold hover:bg-primary-hover"
                 >
                   + Aggiungi al piano
                 </button>
               )}
             </div>
             {customerOrders.some((o) => o.items.some((i) => !i.recipeId)) && (
-              <p className="mt-2 text-[11px] text-[#8A6418]">
+              <p className="mt-2 text-xs text-primary-hover">
                 Gli articoli fuori ricettario non hanno distinta base: vanno pianificati a mano.
               </p>
             )}
@@ -201,15 +201,15 @@ export default function NewProductionPage() {
         )}
 
         {/* Ricette nel piano */}
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">
+        <div className="bg-surface-2 rounded-2xl border border-border p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-playfair text-base font-bold text-[#1A2B4A]">
-              Ricette <span className="text-[#C0392B]">*</span>
+            <h2 className="text-base font-bold text-ink">
+              Ricette <span className="text-danger">*</span>
             </h2>
             <button
               type="button"
               onClick={addRow}
-              className="text-xs font-semibold text-[#C9962A] hover:underline"
+              className="text-xs font-semibold text-primary hover:underline"
             >
               + Aggiungi ricetta
             </button>
@@ -221,12 +221,12 @@ export default function NewProductionPage() {
               const totalPortions = recipe ? recipe.basePortions * (parseInt(row.batchCount) || 0) : null;
               return (
                 <div key={row.key} className="flex gap-2 items-center">
-                  <span className="text-xs text-[#6B7280] w-5 text-center font-mono">{idx + 1}</span>
+                  <span className="text-xs text-ink-muted w-5 text-center font-mono">{idx + 1}</span>
 
                   <select
                     value={row.recipeId}
                     onChange={(e) => updateRow(row.key, 'recipeId', e.target.value)}
-                    className="flex-1 rounded-xl border border-[#E5DDD0] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30 bg-white"
+                    className="flex-1 rounded-xl border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring bg-surface-2"
                   >
                     <option value="">Seleziona ricetta…</option>
                     {recipes.map((r) => (
@@ -242,10 +242,10 @@ export default function NewProductionPage() {
                       min={1}
                       value={row.batchCount}
                       onChange={(e) => updateRow(row.key, 'batchCount', e.target.value)}
-                      className="w-16 rounded-xl border border-[#E5DDD0] px-2 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30"
+                      className="w-16 rounded-xl border border-border px-2 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
                     />
                     {totalPortions !== null && (
-                      <span className="text-xs text-[#6B7280] mt-0.5 font-mono">{totalPortions} pz</span>
+                      <span className="text-xs text-ink-muted mt-0.5 font-mono">{totalPortions} pz</span>
                     )}
                   </div>
 
@@ -253,7 +253,7 @@ export default function NewProductionPage() {
                     <button
                       type="button"
                       onClick={() => removeRow(row.key)}
-                      className="text-[#E5DDD0] hover:text-[#C0392B] transition-colors text-lg leading-none"
+                      className="text-ink-faint hover:text-danger transition-colors text-lg leading-none"
                     >
                       ×
                     </button>
@@ -264,7 +264,7 @@ export default function NewProductionPage() {
           </div>
 
           {recipes.length === 0 && (
-            <p className="mt-3 text-xs text-[#8A6418] bg-[#C9962A]/[0.1] rounded-xl p-3">
+            <p className="mt-3 text-xs text-primary-hover bg-primary-light rounded-xl p-3">
               Nessuna ricetta disponibile.{' '}
               <Link href="/recipes/new" className="underline">Crea una ricetta</Link>{' '}
               prima di pianificare.
@@ -275,14 +275,14 @@ export default function NewProductionPage() {
         <div className="flex gap-3">
           <Link
             href="/production"
-            className="flex-1 py-3 text-center rounded-xl border border-[#E5DDD0] text-sm font-semibold text-[#1A2B4A] hover:bg-[#FAF7F2]"
+            className="flex-1 py-3 text-center rounded-xl border border-border text-sm font-semibold text-ink hover:bg-surface-offset"
           >
             Annulla
           </Link>
           <button
             type="submit"
             disabled={pending}
-            className="flex-1 py-3 bg-[#1A2B4A] text-white rounded-xl text-sm font-semibold hover:bg-[#243660] disabled:opacity-60 transition-colors"
+            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
           >
             {pending ? 'Creazione…' : 'Crea piano'}
           </button>

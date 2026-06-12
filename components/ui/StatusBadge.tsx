@@ -1,9 +1,12 @@
 // =============================================================================
-// components/ui/StatusBadge.tsx
-// Badge di stato riutilizzabile con varianti semantiche.
+// <StatusBadge> — adapter di compatibilità sopra <Badge>.
+// Le varianti storiche (gray/blue/…/navy/teal) mappano sulle 6 semantiche del
+// design system. Nuovo codice: usare direttamente <Badge>.
 // =============================================================================
 
-type BadgeVariant =
+import { Badge, type BadgeVariant } from './Badge';
+
+type LegacyVariant =
   | 'gray'
   | 'blue'
   | 'indigo'
@@ -14,16 +17,16 @@ type BadgeVariant =
   | 'navy'
   | 'teal';
 
-const VARIANTS: Record<BadgeVariant, string> = {
-  gray:   'bg-gray-100 text-gray-600',
-  blue:   'bg-blue-100 text-blue-700',
-  indigo: 'bg-indigo-100 text-indigo-700',
-  green:  'bg-[#27AE60]/12 text-[#1E7E45]',
-  red:    'bg-[#C0392B]/12 text-[#C0392B]',
-  amber:  'bg-amber-100 text-amber-700',
-  gold:   'bg-[#C9962A]/15 text-[#8A6418]',
-  navy:   'bg-[#1A2B4A] text-white',
-  teal:   'bg-[#2A7D6B]/12 text-[#2A7D6B]',
+const MAP: Record<LegacyVariant, BadgeVariant> = {
+  gray:   'neutral',
+  blue:   'info',
+  indigo: 'info',
+  green:  'success',
+  red:    'danger',
+  amber:  'warning',
+  gold:   'warning',
+  navy:   'primary',
+  teal:   'primary',
 };
 
 export function StatusBadge({
@@ -32,14 +35,12 @@ export function StatusBadge({
   className = '',
 }: {
   label: string;
-  variant?: BadgeVariant;
+  variant?: LegacyVariant;
   className?: string;
 }) {
   return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${VARIANTS[variant]} ${className}`}
-    >
+    <Badge variant={MAP[variant]} className={className}>
       {label}
-    </span>
+    </Badge>
   );
 }

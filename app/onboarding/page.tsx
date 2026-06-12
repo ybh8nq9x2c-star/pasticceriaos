@@ -15,9 +15,10 @@ import { useState } from 'react';
 import { useFormState } from 'react-dom';
 import { IDLE_STATE } from '@/lib/utils';
 import { createOrganizationAction } from '@/modules/identity/actions';
+import { Logo } from '@/components/shared/Logo';
 
-const fieldClass = 'w-full rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30 focus:border-[#C9962A] bg-white';
-const labelClass = 'block text-sm font-medium text-[#1A2B4A] mb-1.5';
+const fieldClass = 'w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary bg-surface-2';
+const labelClass = 'block text-sm font-medium text-ink mb-1.5';
 
 // Copy coerente col tipo di organizzazione scelto (pasticceria vs fornitore).
 const COPY = {
@@ -45,34 +46,31 @@ export default function OnboardingPage() {
   const copy = COPY[accountType];
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       <div className="w-full max-w-md">
 
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="font-playfair text-3xl font-black mb-2">
-            <span className="text-[#1A2B4A]">Pasticceria</span>
-            <span className="text-[#C9962A]">OS</span>
-          </div>
-          <h1 className="font-playfair text-xl font-bold text-[#1A2B4A]">
+          <Logo size={30} className="justify-center" />
+          <h1 className="text-xl font-bold text-ink">
             {copy.title}
           </h1>
-          <p className="mt-1.5 text-sm text-[#6B7280]">
+          <p className="mt-1.5 text-sm text-ink-muted">
             {copy.subtitle}
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-8">
+        <div className="bg-surface-2 rounded-2xl border border-border p-8">
           <form action={formAction} className="space-y-5">
             {state.status === 'error' && (
-              <div className="rounded-xl bg-[#C0392B]/[0.06] border border-[#C0392B]/30 p-3 text-sm text-[#C0392B]">
+              <div className="rounded-xl bg-danger-light border border-danger-soft p-3 text-sm text-danger">
                 {state.error}
               </div>
             )}
 
             <div>
               <label className={labelClass}>
-                Tipo di account <span className="text-[#C0392B]">*</span>
+                Tipo di account <span className="text-danger">*</span>
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="cursor-pointer">
@@ -84,10 +82,10 @@ export default function OnboardingPage() {
                     onChange={() => setAccountType('customer')}
                     className="peer sr-only"
                   />
-                  <div className="rounded-xl border-2 border-[#E5DDD0] p-3 text-center text-sm transition-colors peer-checked:border-[#C9962A] peer-checked:bg-[#C9962A]/[0.06]">
+                  <div className="rounded-xl border-2 border-border p-3 text-center text-sm transition-colors peer-checked:border-primary-soft peer-checked:bg-primary-light">
                     <div className="text-xl">🥐</div>
-                    <div className="font-semibold text-[#1A2B4A]">Pasticceria</div>
-                    <div className="text-xs text-[#6B7280]">Acquisto dai fornitori</div>
+                    <div className="font-semibold text-ink">Pasticceria</div>
+                    <div className="text-xs text-ink-muted">Acquisto dai fornitori</div>
                   </div>
                 </label>
                 <label className="cursor-pointer">
@@ -99,10 +97,10 @@ export default function OnboardingPage() {
                     onChange={() => setAccountType('supplier')}
                     className="peer sr-only"
                   />
-                  <div className="rounded-xl border-2 border-[#E5DDD0] p-3 text-center text-sm transition-colors peer-checked:border-[#14B8A6] peer-checked:bg-[#14B8A6]/[0.06]">
+                  <div className="rounded-xl border-2 border-border p-3 text-center text-sm transition-colors peer-checked:border-primary peer-checked:bg-primary-light">
                     <div className="text-xl">🚚</div>
-                    <div className="font-semibold text-[#1A2B4A]">Fornitore</div>
-                    <div className="text-xs text-[#6B7280]">Vendo alle pasticcerie</div>
+                    <div className="font-semibold text-ink">Fornitore</div>
+                    <div className="text-xs text-ink-muted">Vendo alle pasticcerie</div>
                   </div>
                 </label>
               </div>
@@ -110,7 +108,7 @@ export default function OnboardingPage() {
 
             <div>
               <label className={labelClass}>
-                Nome della tua attività <span className="text-[#C0392B]">*</span>
+                Nome della tua attività <span className="text-danger">*</span>
               </label>
               <input
                 name="orgName"
@@ -125,7 +123,7 @@ export default function OnboardingPage() {
 
             <div>
               <label className={labelClass}>
-                Città <span className="text-[#6B7280] font-normal text-xs">(opz.)</span>
+                Città <span className="text-ink-muted font-normal text-xs">(opz.)</span>
               </label>
               <input
                 name="city"
@@ -138,7 +136,7 @@ export default function OnboardingPage() {
 
             <div>
               <label className={labelClass}>
-                {copy.emailLabel} <span className="text-[#6B7280] font-normal text-xs">(opz.)</span>
+                {copy.emailLabel} <span className="text-ink-muted font-normal text-xs">(opz.)</span>
               </label>
               <input
                 name="email"
@@ -152,14 +150,14 @@ export default function OnboardingPage() {
             <button
               type="submit"
               disabled={pending}
-              className="w-full py-3 bg-[#1A2B4A] hover:bg-[#243660] text-white rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 mt-2"
+              className="w-full py-3 bg-primary hover:bg-primary-hover text-primary-fg rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 mt-2"
             >
               {pending ? 'Creazione in corso…' : copy.cta}
             </button>
           </form>
         </div>
 
-        <p className="text-xs text-center text-[#6B7280] mt-4">
+        <p className="text-xs text-center text-ink-muted mt-4">
           Potrai aggiungere altri membri del team dalle impostazioni.
         </p>
       </div>

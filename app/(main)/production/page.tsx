@@ -10,6 +10,7 @@ import type { PlanStatus } from '@/modules/production/types';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { ChefHat } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Produzione' };
 
@@ -44,7 +45,7 @@ export default async function ProductionPage() {
         action={
           <Link
             href="/production/new"
-            className="px-4 py-2.5 bg-[#1A2B4A] text-white rounded-xl text-sm font-semibold hover:bg-[#243660] transition-colors"
+            className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
             + Nuovo piano
           </Link>
@@ -53,7 +54,7 @@ export default async function ProductionPage() {
 
       {plans.length === 0 ? (
         <EmptyState
-          emoji="🧮"
+          icon={ChefHat}
           title="Nessun piano di produzione"
           description="Pianifica le produzioni giornaliere con ricette e batch."
           ctaHref="/production/new"
@@ -65,28 +66,28 @@ export default async function ProductionPage() {
             <Link
               key={plan.id}
               href={`/production/${plan.id}`}
-              className="flex items-center gap-4 bg-white rounded-2xl border border-[#E5DDD0] p-5 hover:border-[#C9962A]/50 hover:shadow-[0_4px_24px_rgba(26,43,74,0.08)] transition-all group"
+              className="flex items-center gap-4 bg-surface-2 rounded-2xl border border-border p-5 hover:border-primary-soft hover:shadow-[0_4px_24px_rgba(26,43,74,0.08)] transition-all group"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3">
-                  <p className="font-semibold text-[#1A2B4A] group-hover:text-[#C9962A]">
+                  <p className="font-semibold text-ink group-hover:text-primary">
                     📅 {formatDate(plan.planDate)}
                   </p>
                   <StatusBadge label={STATUS_LABELS[plan.status]} variant={STATUS_VARIANT[plan.status]} />
                 </div>
                 {plan.notes && (
-                  <p className="text-xs text-[#6B7280] mt-1 truncate">{plan.notes}</p>
+                  <p className="text-xs text-ink-muted mt-1 truncate">{plan.notes}</p>
                 )}
               </div>
               <div className="text-right text-sm shrink-0">
-                <p className="font-medium text-[#1A2B4A] font-mono">{plan.itemsCount} ricette</p>
+                <p className="font-medium text-ink font-mono">{plan.itemsCount} ricette</p>
                 {plan.completedAt && (
-                  <p className="text-xs text-[#27AE60] mt-0.5">
+                  <p className="text-xs text-success-strong mt-0.5">
                     ✓ {formatDate(plan.completedAt.slice(0, 10))}
                   </p>
                 )}
               </div>
-              <span className="text-[#E5DDD0] group-hover:text-[#C9962A] text-lg">›</span>
+              <span className="text-ink-faint group-hover:text-primary text-lg">›</span>
             </Link>
           ))}
         </div>

@@ -78,15 +78,15 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
 
       {/* Breadcrumb + header */}
       <div>
-        <Link href="/production" className="text-sm text-[#6B7280] hover:text-[#1A2B4A] transition-colors">
+        <Link href="/production" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Produzione
         </Link>
         <div className="flex items-start justify-between gap-4 mt-3">
           <div>
-            <h1 className="font-playfair text-3xl font-bold text-[#1A2B4A] capitalize leading-tight">
+            <h1 className="text-3xl font-bold text-ink capitalize leading-tight">
               {formatDate(plan.planDate)}
             </h1>
-            <p className="text-xs text-[#6B7280] font-mono mt-1.5">
+            <p className="text-xs text-ink-muted font-mono mt-1.5">
               {plan.items.length} ricette · {totalPortions} porzioni tot.
             </p>
           </div>
@@ -104,32 +104,32 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
         <div className="lg:col-span-2 space-y-6">
 
           {/* Ricette nel piano */}
-          <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#F0EBE1]">
-              <h2 className="font-semibold text-[15px] text-[#1A2B4A]">Ricette</h2>
+          <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+            <div className="px-6 py-4 border-b border-divider">
+              <h2 className="font-semibold text-[15px] text-ink">Ricette</h2>
             </div>
             {plan.items.length === 0 ? (
-              <div className="px-6 py-8 text-center text-sm text-[#6B7280]">
+              <div className="px-6 py-8 text-center text-sm text-ink-muted">
                 Nessuna ricetta in questo piano.
               </div>
             ) : (
-              <div className="divide-y divide-[#F0EBE1]">
+              <div className="divide-y divide-divider">
                 {plan.items.map((item) => (
                   <div key={item.id} className="flex items-center gap-4 px-6 py-4">
                     <span className="text-2xl leading-none shrink-0">{item.recipeEmoji ?? '📖'}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[#1A2B4A]">{item.recipeName}</p>
-                      <p className="text-xs text-[#6B7280] mt-0.5">
+                      <p className="font-semibold text-ink">{item.recipeName}</p>
+                      <p className="text-xs text-ink-muted mt-0.5">
                         {item.batchCount} batch × {item.basePortions} porz.
                         {' = '}
-                        <span className="font-mono font-medium text-[#1A2B4A]">{item.totalPortions} porzioni</span>
+                        <span className="font-mono font-medium text-ink">{item.totalPortions} porzioni</span>
                       </p>
                       {item.notes && (
-                        <p className="text-xs text-[#6B7280] mt-1 italic">{item.notes}</p>
+                        <p className="text-xs text-ink-muted mt-1 italic">{item.notes}</p>
                       )}
                     </div>
                     <div className="shrink-0 text-right">
-                      <span className="font-playfair text-2xl font-bold text-[#C9962A]">
+                      <span className="text-2xl font-bold text-primary">
                         {item.batchCount}×
                       </span>
                     </div>
@@ -141,43 +141,43 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
 
           {/* Fabbisogno ingredienti */}
           {requirements.length > 0 && (
-            <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0EBE1]">
-                <h2 className="font-semibold text-[15px] text-[#1A2B4A]">
+            <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-divider">
+                <h2 className="font-semibold text-[15px] text-ink">
                   Fabbisogno ingredienti
                 </h2>
                 {shortageItems.length > 0 && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#C0392B]/10 text-[#C0392B]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#C0392B]" />
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-danger-light text-danger">
+                    <span className="w-1.5 h-1.5 rounded-full bg-danger" />
                     {shortageItems.length} shortage
                   </span>
                 )}
               </div>
 
               <table className="w-full text-sm">
-                <thead className="bg-[#FAF7F2] border-b border-[#E5DDD0]">
+                <thead className="bg-bg border-b border-border">
                   <tr>
-                    <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Ingrediente</th>
-                    <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Necessario</th>
-                    <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Disponibile</th>
-                    <th className="text-center px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Stato</th>
+                    <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Ingrediente</th>
+                    <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Necessario</th>
+                    <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Disponibile</th>
+                    <th className="text-center px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Stato</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#F0EBE1]">
+                <tbody className="divide-y divide-divider">
                   {/* Shortage items prima */}
                   {shortageItems.map((req) => (
-                    <tr key={req.ingredientProductId} className="bg-[#C0392B]/[0.03]">
-                      <td className="px-6 py-3 font-medium text-[#1A2B4A]">{req.ingredientName}</td>
-                      <td className="px-6 py-3 text-right font-mono text-[#1A2B4A]">
+                    <tr key={req.ingredientProductId} className="bg-danger-light">
+                      <td className="px-6 py-3 font-medium text-ink">{req.ingredientName}</td>
+                      <td className="px-6 py-3 text-right font-mono text-ink">
                         {formatQty(req.totalRequired)}{' '}
-                        <span className="text-xs text-[#6B7280] font-sans">{UNIT_LABELS[req.unit]}</span>
+                        <span className="text-xs text-ink-muted font-sans">{UNIT_LABELS[req.unit]}</span>
                       </td>
-                      <td className="px-6 py-3 text-right font-mono text-[#C0392B]">
+                      <td className="px-6 py-3 text-right font-mono text-danger">
                         {formatQty(req.currentStock)}{' '}
                         <span className="text-xs font-sans">{UNIT_LABELS[req.unit]}</span>
                       </td>
                       <td className="px-6 py-3 text-center">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#C0392B]/10 text-[#C0392B]">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-danger-light text-danger">
                           −{formatQty(req.estimatedShortage)} {UNIT_LABELS[req.unit]}
                         </span>
                       </td>
@@ -185,18 +185,18 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
                   ))}
                   {/* OK items */}
                   {okItems.map((req) => (
-                    <tr key={req.ingredientProductId} className="hover:bg-[#FAF7F2] transition-colors">
-                      <td className="px-6 py-3 font-medium text-[#1A2B4A]">{req.ingredientName}</td>
-                      <td className="px-6 py-3 text-right font-mono text-[#1A2B4A]">
+                    <tr key={req.ingredientProductId} className="hover:bg-surface-offset transition-colors">
+                      <td className="px-6 py-3 font-medium text-ink">{req.ingredientName}</td>
+                      <td className="px-6 py-3 text-right font-mono text-ink">
                         {formatQty(req.totalRequired)}{' '}
-                        <span className="text-xs text-[#6B7280] font-sans">{UNIT_LABELS[req.unit]}</span>
+                        <span className="text-xs text-ink-muted font-sans">{UNIT_LABELS[req.unit]}</span>
                       </td>
-                      <td className="px-6 py-3 text-right font-mono text-[#27AE60]">
+                      <td className="px-6 py-3 text-right font-mono text-success-strong">
                         {formatQty(req.currentStock)}{' '}
                         <span className="text-xs font-sans">{UNIT_LABELS[req.unit]}</span>
                       </td>
                       <td className="px-6 py-3 text-center">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#27AE60]/10 text-[#1E7E45]">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-success-light text-success-strong">
                           OK
                         </span>
                       </td>
@@ -206,12 +206,12 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
               </table>
 
               {shortageItems.length > 0 && (
-                <div className="px-6 py-4 border-t border-[#F0EBE1] bg-[#FAF7F2] flex items-center justify-between gap-3">
-                  <p className="text-xs text-[#6B7280]">
+                <div className="px-6 py-4 border-t border-divider bg-bg flex items-center justify-between gap-3">
+                  <p className="text-xs text-ink-muted">
                     {shortageItems.length} ingrediente/i non sufficienti per completare il piano.
                     {shortageItems.some((s) => s.estimatedShortageCost !== null) && (
                       <> Costo riordino stimato:{' '}
-                        <span className="font-mono font-semibold text-[#1A2B4A]">
+                        <span className="font-mono font-semibold text-ink">
                           €{shortageItems.reduce((sum, s) => sum + (s.estimatedShortageCost ?? 0), 0).toFixed(2)}
                         </span>
                       </>
@@ -229,24 +229,24 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
         <div className="space-y-4">
 
           {plan.notes && (
-            <div className="bg-white rounded-2xl border border-[#E5DDD0] p-5">
-              <h2 className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide mb-2">Note</h2>
-              <p className="text-sm text-[#1A1A2E] whitespace-pre-wrap">{plan.notes}</p>
+            <div className="bg-surface-2 rounded-2xl border border-border p-5">
+              <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Note</h2>
+              <p className="text-sm text-ink whitespace-pre-wrap">{plan.notes}</p>
             </div>
           )}
 
           {plan.status === 'completed' && plan.completedAt && (
-            <div className="bg-[#27AE60]/[0.07] rounded-2xl border border-[#27AE60]/25 p-5 text-center">
-              <div className="w-10 h-10 rounded-full bg-[#27AE60]/15 flex items-center justify-center mx-auto mb-2">
-                <span className="text-[#27AE60] font-bold text-lg">✓</span>
+            <div className="bg-success-light rounded-2xl border border-success-soft p-5 text-center">
+              <div className="w-10 h-10 rounded-full bg-success-light flex items-center justify-center mx-auto mb-2">
+                <span className="text-success-strong font-bold text-lg">✓</span>
               </div>
-              <p className="text-sm text-[#1E7E45] font-semibold">Produzione completata</p>
-              <p className="text-xs text-[#27AE60] font-mono mt-1">
+              <p className="text-sm text-success-strong font-semibold">Produzione completata</p>
+              <p className="text-xs text-success-strong font-mono mt-1">
                 {new Date(plan.completedAt).toLocaleDateString('it-IT', {
                   day: '2-digit', month: 'short', year: 'numeric',
                 })}
               </p>
-              <p className="text-xs text-[#6B7280] mt-2">
+              <p className="text-xs text-ink-muted mt-2">
                 Stock magazzino aggiornato.
               </p>
             </div>
@@ -256,7 +256,7 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
             <form action={handleComplete}>
               <button
                 type="submit"
-                className="w-full py-3 bg-[#2A7D6B] text-white rounded-xl text-sm font-semibold hover:bg-[#236457] transition-colors"
+                className="w-full py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
               >
                 ✓ Segna come completato
               </button>
@@ -267,7 +267,7 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
             <form action={handleCancel}>
               <button
                 type="submit"
-                className="w-full py-3 border border-[#C0392B]/40 text-[#C0392B] rounded-xl text-sm font-semibold hover:bg-[#C0392B]/[0.06] transition-colors"
+                className="w-full py-3 border border-danger-soft text-danger rounded-xl text-sm font-semibold hover:bg-danger-light transition-colors"
               >
                 Annulla piano
               </button>

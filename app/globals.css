@@ -1,54 +1,176 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* =============================================================================
+   BakeryOs — Design tokens
+   Unica fonte di verità per colori, ombre, raggi e transizioni.
+   Light di default, dark via [data-theme="dark"] sull'elemento <html>.
+   ========================================================================== */
+
 :root {
-  --navy:        #1A2B4A;
-  --navy-light:  #243660;
-  --gold:        #C9962A;
-  --gold-light:  #F5C842;
-  --cream:       #FAF7F2;
-  --cream-dark:  #F0EBE1;
-  --accent:      #D4512A;
-  --text:        #1A1A2E;
-  --text-muted:  #6B7280;
-  --teal:        #2A7D6B;
-  --red:         #C0392B;
-  --orange:      #E67E22;
-  --green:       #27AE60;
-  --border-warm: #E5DDD0;
-  --white:       #FFFFFF;
-  --shadow:      0 4px 24px rgba(26,43,74,.10);
-  --shadow-lg:   0 12px 48px rgba(26,43,74,.16);
+  /* Superfici */
+  --color-bg:              #F7F5F0;   /* warm off-white, carta forno */
+  --color-surface:         #FAFAF7;
+  --color-surface-2:       #FFFFFF;
+  --color-surface-offset:  #F0EDE6;
+  --color-border:          rgba(40, 30, 10, 0.10);
+  --color-divider:         rgba(40, 30, 10, 0.06);
+
+  /* Testo */
+  --color-text:            #1A1710;
+  --color-text-muted:      #6B6355;
+  --color-text-faint:      #B5AFA4;
+  --color-text-inverse:    #FAFAF7;
+
+  /* Accent primario — verde bosco professionale */
+  --color-primary:         #2D6A4F;
+  --color-primary-hover:   #1B4332;
+  --color-primary-light:   #D8F3DC;
+  --color-primary-fg:      #FFFFFF;
+
+  /* Stato danger */
+  --color-danger:          #C0392B;
+  --color-danger-light:    #FDECEA;
+  --color-danger-fg:       #FFFFFF;
+
+  /* Stato warning */
+  --color-warning:         #E67E22;
+  --color-warning-light:   #FEF3E2;
+  --color-warning-fg:      #FFFFFF;
+
+  /* Stato success */
+  --color-success:         #27AE60;
+  --color-success-light:   #E8F8EF;
+  --color-success-fg:      #FFFFFF;
+
+  /* Stato info */
+  --color-info:            #2980B9;
+  --color-info-light:      #EBF5FB;
+  --color-info-fg:         #FFFFFF;
+
+  /* Derivati: testo accessibile su tinte chiare, hover, bordi soft, ring */
+  --color-success-strong:  #1E7E45;
+  --color-warning-strong:  #8A5A14;
+  --color-info-strong:     #1F618D;
+  --color-danger-hover:    #A93226;
+  --color-primary-ring:    rgba(45, 106, 79, 0.30);
+  --color-primary-soft:    rgba(45, 106, 79, 0.35);
+  --color-danger-soft:     rgba(192, 57, 43, 0.35);
+  --color-success-soft:    rgba(39, 174, 96, 0.35);
+  --color-warning-soft:    rgba(230, 126, 34, 0.35);
+  --color-neutral-light:   rgba(40, 30, 10, 0.07);
+  --color-bg-glass:        rgba(247, 245, 240, 0.95);
+
+  /* Ombre */
+  --shadow-sm: 0 1px 2px rgba(26, 23, 16, 0.06);
+  --shadow-md: 0 4px 12px rgba(26, 23, 16, 0.08);
+  --shadow-lg: 0 12px 32px rgba(26, 23, 16, 0.12);
+
+  /* Raggi */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Transizioni */
+  --transition: 160ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Font fallback (sovrascritti da next/font su <html>) */
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+[data-theme="dark"] {
+  --color-bg:              #131210;
+  --color-surface:         #1A1916;
+  --color-surface-2:       #201F1C;
+  --color-surface-offset:  #171614;
+  --color-border:          rgba(255, 255, 255, 0.08);
+  --color-divider:         rgba(255, 255, 255, 0.04);
+
+  --color-text:            #E8E3DA;
+  --color-text-muted:      #7A746A;
+  --color-text-faint:      #4A4640;
+  --color-text-inverse:    #131210;
+
+  --color-primary:         #52B788;
+  --color-primary-hover:   #74C69D;
+  --color-primary-light:   #1B3A2E;
+  --color-primary-fg:      #131210;
+
+  --color-danger:          #E74C3C;
+  --color-danger-light:    #2D1512;
+
+  --color-warning:         #F39C12;
+  --color-warning-light:   #2D2010;
+
+  --color-success:         #2ECC71;
+  --color-success-light:   #122D1E;
+
+  --color-info:            #3498DB;
+  --color-info-light:      #102030;
+
+  --color-success-strong:  #6FDFA0;
+  --color-warning-strong:  #F0B254;
+  --color-info-strong:     #7FC0F0;
+  --color-danger-hover:    #FF6B5B;
+  --color-primary-ring:    rgba(82, 183, 136, 0.35);
+  --color-primary-soft:    rgba(82, 183, 136, 0.40);
+  --color-danger-soft:     rgba(231, 76, 60, 0.45);
+  --color-success-soft:    rgba(46, 204, 113, 0.40);
+  --color-warning-soft:    rgba(243, 156, 18, 0.40);
+  --color-neutral-light:   rgba(255, 255, 255, 0.07);
+  --color-bg-glass:        rgba(19, 18, 16, 0.92);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+
+html {
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
-  font-family: 'DM Sans', system-ui, sans-serif;
-  background: var(--cream);
-  color: var(--text);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  font-feature-settings: "cv11" 1, "ss01" 1;
+  background: var(--color-bg);
+  color: var(--color-text);
+  transition: background-color var(--transition), color var(--transition);
 }
 
-/* Utility classes matching the HTML prototype */
-.font-display { font-family: 'Playfair Display', Georgia, serif; }
-.font-mono { font-family: 'DM Mono', ui-monospace, monospace; }
+.font-mono,
+code,
+kbd {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+}
 
-/* ── Mobile / accessibility baseline ───────────────────────────────────────
-   Visible keyboard focus on every interactive element (a11y), and a guard
-   against iOS auto-zooming form fields whose font-size is < 16px. Inputs that
-   opt into a smaller desktop size do so from the `sm` breakpoint up. */
+/* Numeri tabellari nelle celle numeriche */
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ── Accessibilità: focus ring visibile ovunque ───────────────────────────── */
+
 a:focus-visible,
 button:focus-visible,
 [role='button']:focus-visible,
+[tabindex]:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
+/* Guardia anti auto-zoom iOS sui campi < 16px */
 @media (max-width: 767px) {
   input:not([type='checkbox']):not([type='radio']),
   select,
@@ -57,30 +179,78 @@ textarea:focus-visible {
   }
 }
 
-/* ── Safe area (notch) e touch polish ──────────────────────────────────────── */
-.safe-area-pb { padding-bottom: env(safe-area-inset-bottom); }
-.safe-area-pt { padding-top: env(safe-area-inset-top); }
+/* ── Safe area (notch iOS) ────────────────────────────────────────────────── */
 
-/* Niente flash grigio al tap su iOS; lo stato attivo è gestito da Tailwind */
+.pb-safe       { padding-bottom: env(safe-area-inset-bottom); }
+.safe-area-pb  { padding-bottom: env(safe-area-inset-bottom); }
+.safe-area-pt  { padding-top: env(safe-area-inset-top); }
+
+/* Niente flash grigio al tap su iOS */
 * { -webkit-tap-highlight-color: transparent; }
 
-/* Scroll fluido su iOS senza bloccare lo scroll del documento
-   (overflow:hidden su html romperebbe position:sticky e lo scroll naturale) */
 body { -webkit-overflow-scrolling: touch; }
 
-/* Evita scroll orizzontale accidentale da contenuti larghi su mobile */
 @media (max-width: 767px) {
   html, body { overflow-x: hidden; }
 }
 
-/* Badge utilities */
-.badge {
-  @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+/* ── Animazioni di sistema ────────────────────────────────────────────────── */
+
+/* Shimmer per <Skeleton> */
+@keyframes bk-shimmer {
+  0%   { background-position: -468px 0; }
+  100% { background-position: 468px 0; }
 }
-.badge-green  { @apply bg-green-100 text-green-800; }
-.badge-red    { @apply bg-red-100 text-red-800; }
-.badge-orange { @apply bg-amber-100 text-amber-800; }
-.badge-blue   { @apply bg-sky-100 text-sky-800; }
-.badge-gray   { @apply bg-gray-100 text-gray-600; }
-.badge-navy   { @apply bg-[#1A2B4A] text-white; }
-.badge-teal   { @apply bg-teal-100 text-teal-800; }
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-offset) 8%,
+    var(--color-surface) 18%,
+    var(--color-surface-offset) 33%
+  );
+  background-size: 936px 100%;
+  animation: bk-shimmer 1.4s linear infinite;
+}
+
+/* Toast: slide-in da destra (desktop) e dall'alto (mobile) */
+@keyframes bk-toast-in-right {
+  from { transform: translateX(16px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes bk-toast-in-top {
+  from { transform: translateY(-12px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+@keyframes bk-toast-progress {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+/* Fade per transizioni di stato (badge, status) */
+@keyframes bk-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-state-fade { animation: bk-fade-in var(--transition) both; }
+
+/* Modal / bottom sheet */
+@keyframes bk-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes bk-modal-in {
+  from { transform: translateY(8px) scale(0.98); opacity: 0; }
+  to   { transform: translateY(0)   scale(1);    opacity: 1; }
+}
+@keyframes bk-sheet-in {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

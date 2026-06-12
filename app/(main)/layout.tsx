@@ -29,7 +29,7 @@ export default async function MainLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-[#FAF7F2]">
+    <div className="flex min-h-screen bg-bg">
       <AppSidebar
         orgName={session.organizationName}
         userEmail={session.email}

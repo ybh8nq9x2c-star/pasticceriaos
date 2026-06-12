@@ -11,6 +11,7 @@ import { UNIT_LABELS, formatCurrency } from '@/lib/utils';
 import type { InventoryStockFull } from '@/modules/reporting/types';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Warehouse } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Magazzino' };
 
@@ -20,26 +21,26 @@ export const metadata: Metadata = { title: 'Magazzino' };
 
 const STATUS_CFG = {
   out_of_stock: {
-    bar:   'bg-[#C0392B]',
-    badge: 'bg-[#C0392B]/10 text-[#C0392B]',
+    bar:   'bg-danger',
+    badge: 'bg-danger-light text-danger',
     label: 'Esaurito',
-    rowBg: 'bg-[#C0392B]/[0.03]',
+    rowBg: 'bg-danger-light',
   },
   critical: {
-    bar:   'bg-[#E67E22]',
+    bar:   'bg-warning',
     badge: 'bg-amber-100 text-amber-700',
     label: 'Critico',
     rowBg: 'bg-amber-50/50',
   },
   low: {
-    bar:   'bg-[#C9962A]',
-    badge: 'bg-[#C9962A]/15 text-[#8A6418]',
+    bar:   'bg-primary',
+    badge: 'bg-primary-light text-primary-hover',
     label: 'Basso',
-    rowBg: 'bg-[#C9962A]/[0.03]',
+    rowBg: 'bg-primary-light',
   },
   ok: {
-    bar:   'bg-[#27AE60]',
-    badge: 'bg-[#27AE60]/10 text-[#1E7E45]',
+    bar:   'bg-success',
+    badge: 'bg-success-light text-success-strong',
     label: 'OK',
     rowBg: '',
   },
@@ -65,13 +66,13 @@ function StockBar({
 
   return (
     <div className="flex items-center gap-2.5">
-      <div className="w-20 h-1.5 bg-[#F0EBE1] rounded-full overflow-hidden shrink-0">
+      <div className="w-20 h-1.5 bg-surface-offset rounded-full overflow-hidden shrink-0">
         <div
           className={`h-full rounded-full transition-all ${cfg.bar}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-xs font-mono text-[#6B7280]">{pct.toFixed(0)}%</span>
+      <span className="text-xs font-mono text-ink-muted">{pct.toFixed(0)}%</span>
     </div>
   );
 }
@@ -101,7 +102,7 @@ export default async function InventoryPage() {
         action={
           <Link
             href="/inventory/movement"
-            className="px-4 py-2.5 bg-[#1A2B4A] text-white rounded-xl text-sm font-semibold hover:bg-[#243660] transition-colors"
+            className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
             + Registra movimento
           </Link>
@@ -114,26 +115,26 @@ export default async function InventoryPage() {
           {
             label: 'Ingredienti',
             value: levels.length,
-            color: 'text-[#1A2B4A]',
+            color: 'text-ink',
           },
           {
             label: 'Alert attivi',
             value: alertItems.length,
-            color: alertItems.length > 0 ? 'text-[#C0392B]' : 'text-[#27AE60]',
+            color: alertItems.length > 0 ? 'text-danger' : 'text-success-strong',
           },
           {
             label: 'Esauriti',
             value: levels.filter((l) => l.stockStatus === 'out_of_stock').length,
-            color: levels.some((l) => l.stockStatus === 'out_of_stock') ? 'text-[#C0392B]' : 'text-[#1A2B4A]',
+            color: levels.some((l) => l.stockStatus === 'out_of_stock') ? 'text-danger' : 'text-ink',
           },
           {
             label: 'Valore stimato',
             value: stockValue > 0 ? formatCurrency(stockValue) : '—',
-            color: 'text-[#1A2B4A]',
+            color: 'text-ink',
           },
         ].map(({ label, value, color }) => (
-          <div key={label} className="rounded-2xl border border-[#E5DDD0] bg-white px-5 py-4">
-            <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide">{label}</p>
+          <div key={label} className="rounded-2xl border border-border bg-surface-2 px-5 py-4">
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">{label}</p>
             <p className={`text-2xl font-mono font-semibold mt-1.5 ${color}`}>{value}</p>
           </div>
         ))}
@@ -142,7 +143,7 @@ export default async function InventoryPage() {
       {/* Empty state globale */}
       {levels.length === 0 && (
         <EmptyState
-          emoji="📦"
+          icon={Warehouse}
           title="Nessun livello scorta"
           description="I livelli vengono creati automaticamente aggiungendo un ingrediente."
           ctaHref="/ingredients/new"
@@ -153,37 +154,37 @@ export default async function InventoryPage() {
       {/* ── Sezione alert ─────────────────────────────────────────────── */}
       {alertItems.length > 0 && (
         <div>
-          <h2 className="font-semibold text-sm text-[#6B7280] uppercase tracking-wide mb-3">
+          <h2 className="font-semibold text-sm text-ink-muted uppercase tracking-wide mb-3">
             Sotto soglia ({alertItems.length})
           </h2>
-          <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+          <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-[#FAF7F2] border-b border-[#E5DDD0]">
+              <thead className="bg-bg border-b border-border">
                 <tr>
-                  <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Ingrediente</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Scorta</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Soglia</th>
-                  <th className="px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Livello</th>
-                  <th className="text-center px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Stato</th>
+                  <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Ingrediente</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Scorta</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Soglia</th>
+                  <th className="px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Livello</th>
+                  <th className="text-center px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Stato</th>
                   <th className="px-6 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F0EBE1]">
+              <tbody className="divide-y divide-divider">
                 {alertItems.map((lv) => {
                   const cfg = STATUS_CFG[lv.stockStatus];
                   return (
                     <tr key={lv.ingredientProductId} className={cfg.rowBg}>
                       <td className="px-6 py-3.5">
-                        <p className="font-medium text-[#1A2B4A]">{lv.ingredientName}</p>
+                        <p className="font-medium text-ink">{lv.ingredientName}</p>
                         {lv.supplierName && (
-                          <p className="text-xs text-[#6B7280] mt-0.5">{lv.supplierName}</p>
+                          <p className="text-xs text-ink-muted mt-0.5">{lv.supplierName}</p>
                         )}
                       </td>
-                      <td className="px-6 py-3.5 text-right font-mono text-[#1A2B4A] font-medium">
+                      <td className="px-6 py-3.5 text-right font-mono text-ink font-medium">
                         {formatQty(lv.currentQuantity)}{' '}
-                        <span className="text-xs text-[#6B7280] font-sans">{UNIT_LABELS[lv.unit]}</span>
+                        <span className="text-xs text-ink-muted font-sans">{UNIT_LABELS[lv.unit]}</span>
                       </td>
-                      <td className="px-6 py-3.5 text-right font-mono text-[#6B7280]">
+                      <td className="px-6 py-3.5 text-right font-mono text-ink-muted">
                         {formatQty(lv.minThreshold)}{' '}
                         <span className="text-xs font-sans">{UNIT_LABELS[lv.unit]}</span>
                       </td>
@@ -198,7 +199,7 @@ export default async function InventoryPage() {
                       <td className="px-6 py-3.5 text-right">
                         <Link
                           href="/orders/new"
-                          className="text-xs font-semibold text-[#C9962A] hover:underline"
+                          className="text-xs font-semibold text-primary hover:underline"
                         >
                           Ordina
                         </Link>
@@ -215,41 +216,41 @@ export default async function InventoryPage() {
       {/* ── Sezione OK ────────────────────────────────────────────────── */}
       {okItems.length > 0 && (
         <div>
-          <h2 className="font-semibold text-sm text-[#6B7280] uppercase tracking-wide mb-3">
+          <h2 className="font-semibold text-sm text-ink-muted uppercase tracking-wide mb-3">
             Scorte OK ({okItems.length})
           </h2>
-          <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+          <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-[#FAF7F2] border-b border-[#E5DDD0]">
+              <thead className="bg-bg border-b border-border">
                 <tr>
-                  <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Ingrediente</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Scorta</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Soglia</th>
-                  <th className="px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Livello</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Valore</th>
+                  <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Ingrediente</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Scorta</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Soglia</th>
+                  <th className="px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Livello</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Valore</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F0EBE1]">
+              <tbody className="divide-y divide-divider">
                 {okItems.map((lv) => (
-                  <tr key={lv.ingredientProductId} className="hover:bg-[#FAF7F2] transition-colors">
+                  <tr key={lv.ingredientProductId} className="hover:bg-surface-offset transition-colors">
                     <td className="px-6 py-3.5">
-                      <p className="font-medium text-[#1A2B4A]">{lv.ingredientName}</p>
+                      <p className="font-medium text-ink">{lv.ingredientName}</p>
                       {lv.supplierName && (
-                        <p className="text-xs text-[#6B7280] mt-0.5">{lv.supplierName}</p>
+                        <p className="text-xs text-ink-muted mt-0.5">{lv.supplierName}</p>
                       )}
                     </td>
-                    <td className="px-6 py-3.5 text-right font-mono text-[#1A2B4A] font-medium">
+                    <td className="px-6 py-3.5 text-right font-mono text-ink font-medium">
                       {formatQty(lv.currentQuantity)}{' '}
-                      <span className="text-xs text-[#6B7280] font-sans">{UNIT_LABELS[lv.unit]}</span>
+                      <span className="text-xs text-ink-muted font-sans">{UNIT_LABELS[lv.unit]}</span>
                     </td>
-                    <td className="px-6 py-3.5 text-right font-mono text-[#6B7280]">
+                    <td className="px-6 py-3.5 text-right font-mono text-ink-muted">
                       {formatQty(lv.minThreshold)}{' '}
                       <span className="text-xs font-sans">{UNIT_LABELS[lv.unit]}</span>
                     </td>
                     <td className="px-6 py-3.5">
                       <StockBar current={lv.currentQuantity} threshold={lv.minThreshold} status="ok" />
                     </td>
-                    <td className="px-6 py-3.5 text-right font-mono text-[#6B7280] text-xs">
+                    <td className="px-6 py-3.5 text-right font-mono text-ink-muted text-xs">
                       {lv.stockValue !== null ? formatCurrency(lv.stockValue) : '—'}
                     </td>
                   </tr>
@@ -265,7 +266,7 @@ export default async function InventoryPage() {
         <div className="flex justify-end">
           <Link
             href="/inventory/movements"
-            className="text-sm font-medium text-[#C9962A] hover:underline"
+            className="text-sm font-medium text-primary hover:underline"
           >
             Storico movimenti →
           </Link>

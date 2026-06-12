@@ -23,7 +23,7 @@ export function RegisterBatchForm({
   const [state, formAction, pending] = useFormState(recordBatchAction, IDLE_STATE);
 
   if (state.status === 'success') {
-    return <p className="text-xs font-semibold text-[#1E7E45]">✓ Lotto registrato</p>;
+    return <p className="text-xs font-semibold text-success-strong">✓ Lotto registrato</p>;
   }
 
   return (
@@ -36,13 +36,13 @@ export function RegisterBatchForm({
         type="text"
         placeholder="N° lotto"
         maxLength={100}
-        className="w-24 rounded-lg border border-[#E5DDD0] px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30"
+        className="w-24 rounded-lg border border-border px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
       />
       <input
         name="expiryDate"
         type="date"
         required
-        className="rounded-lg border border-[#E5DDD0] px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30"
+        className="rounded-lg border border-border px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary-ring"
       />
       <input
         name="quantity"
@@ -51,17 +51,17 @@ export function RegisterBatchForm({
         min="0.001"
         required
         defaultValue={defaultQuantity}
-        className="w-20 rounded-lg border border-[#E5DDD0] px-2 py-1.5 text-xs text-center font-mono focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30"
+        className="w-20 rounded-lg border border-border px-2 py-1.5 text-xs text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
       />
       <button
         type="submit"
         disabled={pending}
-        className="px-3 py-1.5 bg-[#2A7D6B] text-white rounded-lg text-xs font-semibold hover:bg-[#236457] disabled:opacity-60"
+        className="px-3 py-1.5 bg-primary text-primary-fg rounded-lg text-xs font-semibold hover:bg-primary-hover disabled:opacity-60"
       >
         {pending ? '…' : 'Registra'}
       </button>
       {state.status === 'error' && (
-        <span className="text-xs text-[#C0392B] basis-full">{state.error}</span>
+        <span className="text-xs text-danger basis-full">{state.error}</span>
       )}
     </form>
   );

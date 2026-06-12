@@ -10,6 +10,7 @@ import { useFormState } from 'react-dom';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { signUpAction } from '@/modules/identity/actions';
+import { Logo } from '@/components/shared/Logo';
 
 export default function SignupPage() {
   const [state, formAction, pending] = useFormState(signUpAction, IDLE_STATE);
@@ -17,14 +18,11 @@ export default function SignupPage() {
   return (
     <div className="space-y-8">
       <div>
-        <div className="font-playfair text-3xl font-black mb-2">
-          <span className="text-[#1A2B4A]">Pasticceria</span>
-          <span className="text-[#C9962A]">OS</span>
-        </div>
-        <h1 className="font-playfair text-xl font-bold text-[#1A2B4A]">Crea il tuo account</h1>
-        <p className="mt-1 text-sm text-[#6B7280]">
+        <Logo size={30} />
+        <h1 className="text-xl font-bold text-ink">Crea il tuo account</h1>
+        <p className="mt-1 text-sm text-ink-muted">
           Hai già un account?{' '}
-          <Link href="/login" className="text-[#C9962A] font-semibold hover:underline">
+          <Link href="/login" className="text-primary font-semibold hover:underline">
             Accedi
           </Link>
         </p>
@@ -32,31 +30,31 @@ export default function SignupPage() {
 
       <form action={formAction} className="space-y-4">
         {state.status === 'error' && (
-          <div className="rounded-xl bg-[#C0392B]/[0.06] border border-[#C0392B]/30 p-3 text-sm text-[#C0392B]">
+          <div className="rounded-xl bg-danger-light border border-danger-soft p-3 text-sm text-danger">
             {state.error}
           </div>
         )}
 
         {state.status === 'success' && (
-          <div className="rounded-xl bg-[#27AE60]/[0.08] border border-[#27AE60]/30 p-3 text-sm text-[#1E7E45]">
+          <div className="rounded-xl bg-success-light border border-success-soft p-3 text-sm text-success-strong">
             Account creato! Controlla la tua email per confermare, poi accedi.
           </div>
         )}
 
         <div>
-          <label className="block text-sm font-medium text-[#1A2B4A] mb-1.5">Email</label>
+          <label className="block text-sm font-medium text-ink mb-1.5">Email</label>
           <input
             name="email"
             type="email"
             required
             autoComplete="email"
             placeholder="marco@pasticceria.it"
-            className="w-full rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30 focus:border-[#C9962A]"
+            className="w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-[#1A2B4A] mb-1.5">Password</label>
+          <label className="block text-sm font-medium text-ink mb-1.5">Password</label>
           <input
             name="password"
             type="password"
@@ -64,20 +62,20 @@ export default function SignupPage() {
             autoComplete="new-password"
             minLength={8}
             placeholder="Minimo 8 caratteri"
-            className="w-full rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30 focus:border-[#C9962A]"
+            className="w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary"
           />
         </div>
 
         <button
           type="submit"
           disabled={pending}
-          className="w-full py-3 bg-[#1A2B4A] hover:bg-[#243660] text-white rounded-xl font-semibold text-sm transition-all disabled:opacity-60"
+          className="w-full py-3 bg-primary hover:bg-primary-hover text-primary-fg rounded-xl font-semibold text-sm transition-all disabled:opacity-60"
         >
           {pending ? 'Creazione account…' : 'Crea account'}
         </button>
       </form>
 
-      <p className="text-xs text-center text-[#6B7280]">
+      <p className="text-xs text-center text-ink-muted">
         Dopo la registrazione configurerai la tua pasticceria nell&apos;onboarding.
       </p>
     </div>

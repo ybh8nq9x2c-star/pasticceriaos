@@ -21,8 +21,8 @@ export function DraftOrdersButton({ planId }: { planId: string }) {
   if (state.status === 'success') {
     return (
       <div className="text-right">
-        <p className="text-xs font-semibold text-[#1E7E45]">✓ {state.message}</p>
-        <Link href="/orders" className="text-xs font-semibold text-[#C9962A] hover:underline">
+        <p className="text-xs font-semibold text-success-strong">✓ {state.message}</p>
+        <Link href="/orders" className="text-xs font-semibold text-primary hover:underline">
           Rivedi le bozze →
         </Link>
       </div>
@@ -33,12 +33,12 @@ export function DraftOrdersButton({ planId }: { planId: string }) {
     <div className="text-right shrink-0">
       {state.status === 'error' && (
         <div className="mb-1">
-          <p className="text-xs text-[#C0392B]">{state.error}</p>
+          <p className="text-xs text-danger">{state.error}</p>
           {/* CTA: il caso più comune è "ingredienti senza fornitore" (BUG-05) */}
           {/fornitore/i.test(state.error) && (
             <Link
               href="/ingredients"
-              className="inline-block mt-0.5 text-xs font-semibold text-[#C9962A] hover:underline"
+              className="inline-block mt-0.5 text-xs font-semibold text-primary hover:underline"
             >
               Assegna fornitori →
             </Link>
@@ -49,14 +49,14 @@ export function DraftOrdersButton({ planId }: { planId: string }) {
         <button
           type="submit"
           disabled={pending}
-          className="px-3 py-2 bg-[#1A2B4A] text-white rounded-xl text-xs font-semibold hover:bg-[#243660] disabled:opacity-60"
+          className="px-3 py-2 bg-primary text-primary-fg rounded-xl text-xs font-semibold hover:bg-primary-hover disabled:opacity-60"
         >
           {pending ? 'Generazione…' : '🛒 Genera bozze per fornitore'}
         </button>
       </form>
       <Link
         href={`/orders/new?plan=${planId}`}
-        className="inline-block mt-1.5 text-[11px] font-semibold text-[#6B7280] hover:text-[#C9962A]"
+        className="inline-block mt-1.5 text-xs font-semibold text-ink-muted hover:text-primary"
       >
         oppure componi a mano →
       </Link>

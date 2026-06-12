@@ -17,11 +17,11 @@ export const metadata: Metadata = { title: 'Impostazioni fornitore' };
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
-      <div className="px-6 py-4 border-b border-[#F0EBE1] bg-[#FAF7F2]">
-        <h2 className="font-playfair text-base font-bold text-[#1A2B4A]">{title}</h2>
+    <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+      <div className="px-6 py-4 border-b border-divider bg-bg">
+        <h2 className="text-base font-bold text-ink">{title}</h2>
       </div>
-      <div className="px-6 py-1 divide-y divide-[#F0EBE1]">{children}</div>
+      <div className="px-6 py-1 divide-y divide-divider">{children}</div>
     </div>
   );
 }
@@ -39,11 +39,11 @@ function Row({
 }) {
   return (
     <div className="flex items-center justify-between py-3.5 gap-3">
-      <span className="text-sm text-[#6B7280]">{label}</span>
+      <span className="text-sm text-ink-muted">{label}</span>
       <div className="flex items-center gap-3">
-        <span className="text-sm font-medium text-[#1A2B4A]">{value}</span>
+        <span className="text-sm font-medium text-ink">{value}</span>
         {href && (
-          <Link href={href} className="text-xs font-semibold text-[#14B8A6] hover:underline shrink-0">
+          <Link href={href} className="text-xs font-semibold text-primary hover:underline shrink-0">
             {hrefLabel ?? 'Gestisci →'}
           </Link>
         )}
@@ -68,8 +68,8 @@ export default async function SupplierSettingsPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="font-playfair text-2xl sm:text-3xl font-bold text-[#1A2B4A]">Impostazioni</h1>
-        <p className="text-sm text-[#6B7280] mt-1">Account e workspace fornitore</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-ink">Impostazioni</h1>
+        <p className="text-sm text-ink-muted mt-1">Account e workspace fornitore</p>
       </div>
 
       <SectionCard title="Account">
@@ -107,7 +107,7 @@ export default async function SupplierSettingsPage() {
       </SectionCard>
 
       {activeCatalog.length === 0 && (
-        <div className="rounded-2xl border border-[#C9962A]/30 bg-[#C9962A]/[0.06] p-5 text-sm text-[#8A6418]">
+        <div className="rounded-2xl border border-primary-soft bg-primary-light p-5 text-sm text-primary-hover">
           Il catalogo è vuoto: i clienti collegati non possono ancora ordinare.{' '}
           <Link href="/supplier/catalog" className="underline font-semibold">
             Aggiungi i tuoi prodotti

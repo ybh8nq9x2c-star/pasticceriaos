@@ -46,8 +46,8 @@ export default async function SupplierOrdersPage({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
-      <h1 className="font-playfair text-2xl sm:text-3xl font-bold mb-1">Ordini clienti</h1>
-      <p className="text-sm text-[#6B7280] mb-5">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-1">Ordini clienti</h1>
+      <p className="text-sm text-ink-muted mb-5">
         {orders.length} ordini ricevuti dai clienti collegati
       </p>
 
@@ -59,8 +59,8 @@ export default async function SupplierOrdersPage({
             href={f.key === 'tutti' ? '/supplier/orders' : `/supplier/orders?stato=${f.key}`}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
               activeFilter.key === f.key
-                ? 'bg-[#14B8A6] text-white border-[#14B8A6]'
-                : 'bg-white text-[#6B7280] border-[#E5DDD0] hover:border-[#14B8A6]'
+                ? 'bg-primary text-primary-fg border-primary'
+                : 'bg-surface-2 text-ink-muted border-border hover:border-primary'
             }`}
           >
             {f.label} ({countFor(f)})
@@ -69,13 +69,13 @@ export default async function SupplierOrdersPage({
       </div>
 
       {orders.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-8 sm:p-10 text-center text-[#6B7280]">
+        <div className="bg-surface-2 rounded-2xl border border-border p-8 sm:p-10 text-center text-ink-muted">
           Nessun ordine ricevuto. Genera una chiave in{' '}
-          <Link href="/supplier/keys" className="text-[#14B8A6] underline">Chiavi di accesso</Link>{' '}
+          <Link href="/supplier/keys" className="text-primary underline">Chiavi di accesso</Link>{' '}
           e condividila con i tuoi clienti.
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-8 text-center text-[#6B7280]">
+        <div className="bg-surface-2 rounded-2xl border border-border p-8 text-center text-ink-muted">
           Nessun ordine con questo stato.
         </div>
       ) : (
@@ -86,15 +86,15 @@ export default async function SupplierOrdersPage({
               <li key={o.orderId}>
                 <Link
                   href={`/supplier/orders/${o.orderId}`}
-                  className="block bg-white rounded-2xl border border-[#E5DDD0] p-4 active:bg-[#FAF7F2]"
+                  className="block bg-surface-2 rounded-2xl border border-border p-4 active:bg-surface-offset"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <span className="font-semibold leading-tight">{o.customerName ?? '—'}</span>
                     <StatusBadge status={o.status} />
                   </div>
-                  <div className="mt-3 flex items-center justify-between text-sm text-[#6B7280]">
+                  <div className="mt-3 flex items-center justify-between text-sm text-ink-muted">
                     <span>{formatDateTime(o.submittedAt ?? o.createdAt)} · {o.lineCount} {o.lineCount === 1 ? 'riga' : 'righe'}</span>
-                    <span className="font-mono font-semibold text-[#1A2B4A]">€{formatCurrency(o.totalValue)}</span>
+                    <span className="font-mono font-semibold text-ink">€{formatCurrency(o.totalValue)}</span>
                   </div>
                 </Link>
               </li>
@@ -102,9 +102,9 @@ export default async function SupplierOrdersPage({
           </ul>
 
           {/* Tablet/desktop: table */}
-          <div className="hidden md:block bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+          <div className="hidden md:block bg-surface-2 rounded-2xl border border-border overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-[#FAF7F2] text-[#6B7280] text-xs uppercase">
+              <thead className="bg-bg text-ink-muted text-xs uppercase">
                 <tr>
                   <th className="text-left px-4 py-3">Cliente</th>
                   <th className="text-left px-4 py-3">Ricevuto</th>
@@ -116,16 +116,16 @@ export default async function SupplierOrdersPage({
               </thead>
               <tbody>
                 {filtered.map((o) => (
-                  <tr key={o.orderId} className="border-t border-[#F0EAE0]">
+                  <tr key={o.orderId} className="border-t border-divider">
                     <td className="px-4 py-3 font-medium">{o.customerName ?? '—'}</td>
-                    <td className="px-4 py-3 text-xs font-mono text-[#6B7280]">
+                    <td className="px-4 py-3 text-xs font-mono text-ink-muted">
                       {formatDateTime(o.submittedAt ?? o.createdAt)}
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
                     <td className="px-4 py-3 text-right">{o.lineCount}</td>
                     <td className="px-4 py-3 text-right font-mono">€{formatCurrency(o.totalValue)}</td>
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/supplier/orders/${o.orderId}`} className="text-[#14B8A6] font-semibold hover:underline">Apri →</Link>
+                      <Link href={`/supplier/orders/${o.orderId}`} className="text-primary font-semibold hover:underline">Apri →</Link>
                     </td>
                   </tr>
                 ))}

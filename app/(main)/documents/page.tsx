@@ -14,10 +14,10 @@ import type { DocumentStatus } from '@/lib/database.types';
 export const metadata: Metadata = { title: 'Documenti' };
 
 const STATUS_BADGE: Record<DocumentStatus, string> = {
-  received: 'bg-[#C9962A]/15 text-[#8A6418]',
-  matched:  'bg-[#27AE60]/10 text-[#1E7E45]',
-  anomaly:  'bg-[#C0392B]/10 text-[#C0392B]',
-  archived: 'bg-[#6B7280]/10 text-[#6B7280]',
+  received: 'bg-primary-light text-primary-hover',
+  matched:  'bg-success-light text-success-strong',
+  anomaly:  'bg-danger-light text-danger',
+  archived: 'bg-neutral-light text-ink-muted',
 };
 
 function fmtDate(iso: string) {
@@ -46,7 +46,7 @@ export default async function DocumentsPage({
         action={
           <Link
             href="/documents/new"
-            className="px-4 py-2.5 bg-[#1A2B4A] text-white rounded-xl text-sm font-semibold hover:bg-[#243660] transition-colors"
+            className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
             + Registra documento
           </Link>
@@ -67,8 +67,8 @@ export default async function DocumentsPage({
             href={f.key ? `/documents?stato=${f.key}` : '/documents'}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
               filter === f.key
-                ? 'bg-[#1A2B4A] text-white border-[#1A2B4A]'
-                : 'bg-white text-[#6B7280] border-[#E5DDD0] hover:border-[#C9962A]'
+                ? 'bg-primary text-primary-fg border-primary'
+                : 'bg-surface-2 text-ink-muted border-border hover:border-primary-soft'
             }`}
           >
             {f.label}
@@ -77,14 +77,14 @@ export default async function DocumentsPage({
       </div>
 
       {filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-10 text-center">
+        <div className="bg-surface-2 rounded-2xl border border-border p-10 text-center">
           <p className="text-4xl mb-3">🧾</p>
-          <p className="font-playfair text-lg font-bold text-[#1A2B4A]">Nessun documento</p>
-          <p className="text-sm text-[#6B7280] mt-1 max-w-md mx-auto">
+          <p className="text-lg font-bold text-ink">Nessun documento</p>
+          <p className="text-sm text-ink-muted mt-1 max-w-md mx-auto">
             Registra DDT e fatture dei fornitori: il sistema li confronta con gli
             ordini e segnala automaticamente differenze di quantità e prezzo.
           </p>
-          <Link href="/documents/new" className="inline-block mt-4 text-sm font-semibold text-[#C9962A] hover:underline">
+          <Link href="/documents/new" className="inline-block mt-4 text-sm font-semibold text-primary hover:underline">
             Registra il primo documento →
           </Link>
         </div>
@@ -96,21 +96,21 @@ export default async function DocumentsPage({
             <Link
               key={d.id}
               href={`/documents/${d.id}`}
-              className="block bg-white rounded-xl border border-[#E5DDD0] p-4 active:bg-[#FAF7F2]"
+              className="block bg-surface-2 rounded-xl border border-border p-4 active:bg-surface-offset"
             >
               <div className="flex justify-between items-start gap-3 mb-1.5">
-                <span className="text-sm font-semibold text-[#1A2B4A]">
+                <span className="text-sm font-semibold text-ink">
                   {DOCUMENT_TYPE_LABELS[d.documentType]}
-                  {d.documentNumber && <span className="font-mono font-normal text-[#6B7280]"> {d.documentNumber}</span>}
+                  {d.documentNumber && <span className="font-mono font-normal text-ink-muted"> {d.documentNumber}</span>}
                 </span>
-                <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${STATUS_BADGE[d.documentStatus]}`}>
+                <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[d.documentStatus]}`}>
                   {DOCUMENT_STATUS_LABELS[d.documentStatus]}{d.openAnomalies > 0 && ` (${d.openAnomalies})`}
                 </span>
               </div>
-              <p className="text-xs text-[#6B7280]">{d.supplierName ?? '—'}</p>
+              <p className="text-xs text-ink-muted">{d.supplierName ?? '—'}</p>
               <div className="mt-2 flex justify-between items-center text-xs">
-                <span className="font-mono text-[#6B7280]">{fmtDate(d.documentDate)}</span>
-                <span className="font-mono font-semibold text-[#1A2B4A]">
+                <span className="font-mono text-ink-muted">{fmtDate(d.documentDate)}</span>
+                <span className="font-mono font-semibold text-ink">
                   {d.totalAmount !== null ? `€${formatCurrency(d.totalAmount)}` : `${d.linesCount} righe`}
                 </span>
               </div>
@@ -119,38 +119,38 @@ export default async function DocumentsPage({
         </div>
 
         {/* Desktop: tabella */}
-        <div className="hidden md:block bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+        <div className="hidden md:block bg-surface-2 rounded-2xl border border-border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-[#FAF7F2] border-b border-[#E5DDD0]">
+            <thead className="bg-bg border-b border-border">
               <tr>
-                <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Documento</th>
-                <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Fornitore</th>
-                <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Data</th>
-                <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Stato</th>
-                <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Totale</th>
+                <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Documento</th>
+                <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Fornitore</th>
+                <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Data</th>
+                <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Stato</th>
+                <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Totale</th>
                 <th className="px-6 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F0EBE1]">
+            <tbody className="divide-y divide-divider">
               {filtered.map((d) => (
-                <tr key={d.id} className="hover:bg-[#FAF7F2] transition-colors">
+                <tr key={d.id} className="hover:bg-surface-offset transition-colors">
                   <td className="px-6 py-3.5">
-                    <p className="font-medium text-[#1A2B4A]">{DOCUMENT_TYPE_LABELS[d.documentType]}</p>
-                    <p className="text-xs text-[#6B7280] font-mono">{d.documentNumber ?? `${d.linesCount} righe`}</p>
+                    <p className="font-medium text-ink">{DOCUMENT_TYPE_LABELS[d.documentType]}</p>
+                    <p className="text-xs text-ink-muted font-mono">{d.documentNumber ?? `${d.linesCount} righe`}</p>
                   </td>
-                  <td className="px-6 py-3.5 text-[#1A1A2E]">{d.supplierName ?? '—'}</td>
-                  <td className="px-6 py-3.5 text-xs font-mono text-[#6B7280] whitespace-nowrap">{fmtDate(d.documentDate)}</td>
+                  <td className="px-6 py-3.5 text-ink">{d.supplierName ?? '—'}</td>
+                  <td className="px-6 py-3.5 text-xs font-mono text-ink-muted whitespace-nowrap">{fmtDate(d.documentDate)}</td>
                   <td className="px-6 py-3.5">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_BADGE[d.documentStatus]}`}>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[d.documentStatus]}`}>
                       {DOCUMENT_STATUS_LABELS[d.documentStatus]}
                       {d.openAnomalies > 0 && ` (${d.openAnomalies})`}
                     </span>
                   </td>
-                  <td className="px-6 py-3.5 text-right font-mono font-medium text-[#1A2B4A]">
+                  <td className="px-6 py-3.5 text-right font-mono font-medium text-ink">
                     {d.totalAmount !== null ? `€${formatCurrency(d.totalAmount)}` : '—'}
                   </td>
                   <td className="px-6 py-3.5 text-right">
-                    <Link href={`/documents/${d.id}`} className="text-xs font-semibold text-[#C9962A] hover:underline">
+                    <Link href={`/documents/${d.id}`} className="text-xs font-semibold text-primary hover:underline">
                       Apri →
                     </Link>
                   </td>

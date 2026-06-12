@@ -37,26 +37,26 @@ export function PortalLinkPanel({ supplierId }: { supplierId: string }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E5DDD0] p-5">
-      <h2 className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide mb-2">
+    <div className="bg-surface-2 rounded-2xl border border-border p-5">
+      <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">
         Portale fornitore
       </h2>
-      <p className="text-xs text-[#6B7280] mb-3">
+      <p className="text-xs text-ink-muted mb-3">
         Invia al fornitore un link per vedere e confermare i tuoi ordini e
         caricarti DDT/fatture — senza registrazione.
       </p>
 
-      {error && <p className="text-xs text-[#C0392B] mb-2">{error}</p>}
+      {error && <p className="text-xs text-danger mb-2">{error}</p>}
 
       {url ? (
         <div className="space-y-2">
-          <div className="rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] p-2.5 break-all text-[11px] font-mono text-[#1A2B4A]">
+          <div className="rounded-xl bg-bg border border-border p-2.5 break-all text-xs font-mono text-ink">
             {url}
           </div>
           <div className="flex gap-2">
             <button
               onClick={handleCopy}
-              className="flex-1 min-h-[44px] bg-[#1A2B4A] text-white rounded-xl text-sm font-semibold hover:bg-[#243660]"
+              className="flex-1 min-h-[44px] bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover"
             >
               {copied ? '✓ Copiato' : 'Copia link'}
             </button>
@@ -64,12 +64,12 @@ export function PortalLinkPanel({ supplierId }: { supplierId: string }) {
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="min-h-[44px] px-4 inline-flex items-center border border-[#E5DDD0] rounded-xl text-sm font-semibold text-[#1A2B4A] hover:bg-[#FAF7F2]"
+              className="min-h-[44px] px-4 inline-flex items-center border border-border rounded-xl text-sm font-semibold text-ink hover:bg-surface-offset"
             >
               Apri ↗
             </a>
           </div>
-          <p className="text-[11px] text-[#6B7280]">
+          <p className="text-xs text-ink-muted">
             Valido 1 anno, nessuna registrazione richiesta. Rigenerarlo revoca i link precedenti.
           </p>
         </div>
@@ -77,7 +77,7 @@ export function PortalLinkPanel({ supplierId }: { supplierId: string }) {
         <button
           onClick={handleGenerate}
           disabled={pending}
-          className="w-full min-h-[44px] bg-[#14B8A6] text-white rounded-xl text-sm font-semibold hover:bg-[#0F9488] disabled:opacity-60"
+          className="w-full min-h-[44px] bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60"
         >
           {pending ? 'Generazione…' : '🔗 Genera link portale'}
         </button>

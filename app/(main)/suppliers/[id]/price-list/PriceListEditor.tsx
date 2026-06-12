@@ -78,24 +78,24 @@ export function PriceListEditor({
   return (
     <div className="space-y-5">
       {feedback.status === 'error' && (
-        <div className="rounded-xl bg-[#C0392B]/[0.06] border border-[#C0392B]/30 p-3 text-sm text-[#C0392B]">
+        <div className="rounded-xl bg-danger-light border border-danger-soft p-3 text-sm text-danger">
           {feedback.error}
         </div>
       )}
       {feedback.status === 'success' && (
-        <div className="rounded-xl bg-[#27AE60]/[0.07] border border-[#27AE60]/25 p-3 text-sm text-[#1E7E45]">
+        <div className="rounded-xl bg-success-light border border-success-soft p-3 text-sm text-success-strong">
           ✓ {feedback.message}
         </div>
       )}
 
       {/* Aggiungi prodotto */}
-      <div className="bg-white rounded-2xl border border-[#E5DDD0] p-5">
-        <h2 className="text-sm font-semibold text-[#1A2B4A] mb-3">Aggiungi prodotto al listino</h2>
+      <div className="bg-surface-2 rounded-2xl border border-border p-5">
+        <h2 className="text-sm font-semibold text-ink mb-3">Aggiungi prodotto al listino</h2>
         <div className="flex flex-col sm:flex-row gap-2">
           <select
             value={newIngredientId}
             onChange={(e) => setNewIngredientId(e.target.value)}
-            className="flex-1 rounded-xl border border-[#E5DDD0] px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30"
+            className="flex-1 rounded-xl border border-border px-3 py-2.5 bg-surface-2 focus:outline-none focus:ring-2 focus:ring-primary-ring"
           >
             <option value="">Seleziona ingrediente…</option>
             {unpricedIngredients.map((i) => (
@@ -112,7 +112,7 @@ export function PriceListEditor({
             placeholder={selectedNew ? `€/${UNIT_SHORT[selectedNew.unit]}` : '€/unità'}
             value={newPrice}
             onChange={(e) => setNewPrice(e.target.value)}
-            className="w-full sm:w-32 rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-center font-mono focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30"
+            className="w-full sm:w-32 rounded-xl border border-border px-3 py-2.5 text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
           />
           <button
             disabled={!newIngredientId || !newPrice || isPending}
@@ -123,13 +123,13 @@ export function PriceListEditor({
                 setNewPrice('');
               }
             }}
-            className="min-h-[44px] px-5 bg-[#1A2B4A] text-white rounded-xl text-sm font-semibold hover:bg-[#243660] disabled:opacity-50"
+            className="min-h-[44px] px-5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-50"
           >
             Aggiungi
           </button>
         </div>
         {unpricedIngredients.length > 0 && (
-          <p className="text-xs text-[#6B7280] mt-2">
+          <p className="text-xs text-ink-muted mt-2">
             Prodotti senza prezzo concordato: {unpricedIngredients.length}
           </p>
         )}
@@ -137,10 +137,10 @@ export function PriceListEditor({
 
       {/* Listino */}
       {entries.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-10 text-center">
+        <div className="bg-surface-2 rounded-2xl border border-border p-10 text-center">
           <p className="text-4xl mb-3">💶</p>
-          <p className="font-playfair text-lg font-bold text-[#1A2B4A]">Listino vuoto</p>
-          <p className="text-sm text-[#6B7280] mt-1 max-w-md mx-auto">
+          <p className="text-lg font-bold text-ink">Listino vuoto</p>
+          <p className="text-sm text-ink-muted mt-1 max-w-md mx-auto">
             Aggiungi i prezzi concordati a mano, oppure importali dall'ultimo
             ordine ricevuto da questo fornitore.
           </p>
@@ -150,11 +150,11 @@ export function PriceListEditor({
           {/* Mobile: cards */}
           <div className="md:hidden space-y-2">
             {entries.map((e) => (
-              <div key={e.id} className="bg-white rounded-xl border border-[#E5DDD0] p-4">
+              <div key={e.id} className="bg-surface-2 rounded-xl border border-border p-4">
                 <div className="flex justify-between items-start gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-[#1A2B4A] truncate">{e.ingredientName}</p>
-                    <p className="text-[11px] text-[#6B7280] font-mono">dal {fmtDate(e.validFrom)}</p>
+                    <p className="text-sm font-medium text-ink truncate">{e.ingredientName}</p>
+                    <p className="text-xs text-ink-muted font-mono">dal {fmtDate(e.validFrom)}</p>
                   </div>
                   <PriceCell
                     entry={e}
@@ -172,21 +172,21 @@ export function PriceListEditor({
           </div>
 
           {/* Desktop: tabella */}
-          <div className="hidden md:block bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+          <div className="hidden md:block bg-surface-2 rounded-2xl border border-border overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-[#FAF7F2] border-b border-[#E5DDD0]">
+              <thead className="bg-bg border-b border-border">
                 <tr>
-                  <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Prodotto</th>
-                  <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">SKU</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Prezzo</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Dal</th>
+                  <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Prodotto</th>
+                  <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">SKU</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Prezzo</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Dal</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F0EBE1]">
+              <tbody className="divide-y divide-divider">
                 {entries.map((e) => (
-                  <tr key={e.id} className="hover:bg-[#FAF7F2] transition-colors">
-                    <td className="px-6 py-3 font-medium text-[#1A2B4A]">{e.ingredientName}</td>
-                    <td className="px-6 py-3 font-mono text-xs text-[#6B7280]">{e.ingredientSku ?? '—'}</td>
+                  <tr key={e.id} className="hover:bg-surface-offset transition-colors">
+                    <td className="px-6 py-3 font-medium text-ink">{e.ingredientName}</td>
+                    <td className="px-6 py-3 font-mono text-xs text-ink-muted">{e.ingredientSku ?? '—'}</td>
                     <td className="px-6 py-3 text-right">
                       <PriceCell
                         entry={e}
@@ -199,7 +199,7 @@ export function PriceListEditor({
                         onCancel={() => setEditingId(null)}
                       />
                     </td>
-                    <td className="px-6 py-3 text-right font-mono text-xs text-[#6B7280]">{fmtDate(e.validFrom)}</td>
+                    <td className="px-6 py-3 text-right font-mono text-xs text-ink-muted">{fmtDate(e.validFrom)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -212,7 +212,7 @@ export function PriceListEditor({
       <button
         onClick={handleImport}
         disabled={isPending}
-        className="w-full min-h-[48px] border border-[#1A2B4A]/30 text-[#1A2B4A] rounded-xl text-sm font-semibold hover:bg-[#1A2B4A]/[0.04] disabled:opacity-60 transition-colors"
+        className="w-full min-h-[48px] border border-border text-ink rounded-xl text-sm font-semibold hover:bg-surface-offset disabled:opacity-60 transition-colors"
       >
         {isPending ? 'Operazione in corso…' : '⬇️ Importa prezzi dall\'ultimo ordine ricevuto'}
       </button>
@@ -237,7 +237,7 @@ function PriceCell({
       <button
         onClick={onStart}
         title="Clicca per modificare"
-        className="font-mono font-semibold text-[#1A2B4A] hover:text-[#C9962A] underline decoration-dotted underline-offset-4 min-h-[44px] px-1"
+        className="font-mono font-semibold text-ink hover:text-primary underline decoration-dotted underline-offset-4 min-h-[44px] px-1"
       >
         €{formatCurrency(entry.unitPrice)}/{UNIT_SHORT[entry.unit as UnitOfMeasure] ?? entry.unit}
       </button>
@@ -258,10 +258,10 @@ function PriceCell({
           if (e.key === 'Enter') { e.preventDefault(); onSubmit(); }
           if (e.key === 'Escape') onCancel();
         }}
-        className="w-24 rounded-lg border border-[#C9962A] px-2 py-2 text-right font-mono focus:outline-none"
+        className="w-24 rounded-lg border border-primary-soft px-2 py-2 text-right font-mono focus:outline-none"
       />
-      <button onClick={onSubmit} disabled={pending} className="text-[#27AE60] font-bold px-2 min-h-[44px]">✓</button>
-      <button onClick={onCancel} disabled={pending} className="text-[#6B7280] px-1 min-h-[44px]">×</button>
+      <button onClick={onSubmit} disabled={pending} className="text-success-strong font-bold px-2 min-h-[44px]">✓</button>
+      <button onClick={onCancel} disabled={pending} className="text-ink-muted px-1 min-h-[44px]">×</button>
     </span>
   );
 }

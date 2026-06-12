@@ -1,9 +1,10 @@
 // =============================================================================
-// components/ui/PageHeader.tsx
-// Intestazione pagina coerente: titolo Playfair + sottotitolo + azione.
+// <PageHeader> — intestazione pagina: titolo (unico h1), sottotitolo, azioni.
 // =============================================================================
 
 import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export function PageHeader({
   title,
@@ -11,32 +12,38 @@ export function PageHeader({
   backHref,
   backLabel,
   action,
+  actions,
+  className,
 }: {
   title: string;
   subtitle?: string;
   backHref?: string;
   backLabel?: string;
+  /** Slot azioni a destra (alias storico). */
   action?: React.ReactNode;
+  /** Slot azioni a destra. */
+  actions?: React.ReactNode;
+  className?: string;
 }) {
+  const right = actions ?? action;
   return (
-    <div className="mb-8">
+    <header className={cn('border-b border-divider pb-4 mb-6', className)}>
       {backHref && (
         <Link
           href={backHref}
-          className="text-sm text-[#6B7280] hover:text-[#1A2B4A] transition-colors"
+          className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink transition-colors mb-2"
         >
-          ← {backLabel ?? 'Indietro'}
+          <ArrowLeft size={14} aria-hidden="true" />
+          {backLabel ?? 'Indietro'}
         </Link>
       )}
-      <div className="flex items-start justify-between gap-4 mt-3">
-        <div>
-          <h1 className="font-playfair text-3xl font-bold text-[#1A2B4A] leading-tight">
-            {title}
-          </h1>
-          {subtitle && <p className="text-sm text-[#6B7280] mt-1.5">{subtitle}</p>}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-ink leading-tight truncate">{title}</h1>
+          {subtitle && <p className="text-sm text-ink-muted mt-1">{subtitle}</p>}
         </div>
-        {action && <div className="shrink-0">{action}</div>}
+        {right && <div className="shrink-0 flex items-center gap-2">{right}</div>}
       </div>
-    </div>
+    </header>
   );
 }

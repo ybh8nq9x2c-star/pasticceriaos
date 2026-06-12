@@ -1,51 +1,31 @@
 'use client';
 
 // =============================================================================
-// components/layout/MobileChrome.tsx
-// Mobile-only navigation chrome (shown < lg, hidden on desktop where the
-// sidebar takes over). One component renders all three mobile surfaces:
-//   • a compact sticky top app bar (menu button · title · contextual action)
-//   • a slide-in drawer with the full navigation (overlay, focus-trappable)
-//   • a fixed bottom tab bar with the primary destinations
-// Themed by `variant` so the customer (warm/navy) and supplier (slate/teal)
-// workspaces stay visually consistent with their desktop shells.
-// No business logic — pure presentation over the shared navConfig.
+// <MobileChrome> — chrome di navigazione mobile (< lg), tre superfici:
+//   • top bar 52px: logo · titolo pagina · notifiche
+//   • bottom tab bar 56px: 4 destinazioni primarie + "Altro" (drawer)
+//   • drawer "Altro": navigazione completa + org + esci
+// Stessa estetica chiara del desktop (superfici, token, Lucide). Nessun dato
+// inventato: i badge mostrano solo conteggi reali ricevuti via props.
 // =============================================================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Menu, X, LogOut } from 'lucide-react';
 import { signOutAction } from '@/modules/identity/actions';
+import { LogoMark } from '@/components/shared/Logo';
+import { NotificationBell } from '@/components/shared/NotificationBell';
+import { ThemeToggle } from '@/components/shared/ThemeToggle';
+import { Badge } from '@/components/ui/Badge';
 import {
   CUSTOMER_NAV, CUSTOMER_BOTTOM, SUPPLIER_NAV, SUPPLIER_BOTTOM,
-  isActivePath, type NavItem, type NavSection,
+  isActivePath, activeNavItem, type NavItem, type NavSection,
 } from './navConfig';
-
-type Variant = 'customer' | 'supplier';
-
-const THEME = {
-  customer: {
-    bar: 'bg-[#1A2B4A] text-white',
-    drawer: 'bg-[#1A2B4A] text-white',
-    accent: '#C9962A',
-    bottomBar: 'bg-white border-t border-[#E5DDD0]',
-    bottomActive: 'text-[#1A2B4A]',
-    bottomIdle: 'text-[#6B7280]',
-    activeChip: 'bg-[#C9962A] text-[#1A2B4A]',
-  },
-  supplier: {
-    bar: 'bg-[#0B131C] text-white',
-    drawer: 'bg-[#0B131C] text-white',
-    accent: '#14B8A6',
-    bottomBar: 'bg-[#0B131C] border-t border-white/10',
-    bottomActive: 'text-[#14B8A6]',
-    bottomIdle: 'text-white/55',
-    activeChip: 'bg-[#14B8A6] text-[#0B131C]',
-  },
-} as const;
+import { cn } from '@/lib/utils';
 
 interface MobileChromeProps {
-  variant: Variant;
+  variant: 'customer' | 'supplier';
   orgName: string;
   userEmail: string;
   lowStockCount?: number;
@@ -54,143 +34,147 @@ interface MobileChromeProps {
 export function MobileChrome({ variant, orgName, userEmail, lowStockCount = 0 }: MobileChromeProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const t = THEME[variant];
+  const closeRef = useRef<HTMLButtonElement>(null);
 
-  const sections: NavSection[] = variant === 'customer'
-    ? CUSTOMER_NAV
-    : [{ title: 'Fornitore', items: SUPPLIER_NAV }];
+  const sections: NavSection[] = variant === 'customer' ? CUSTOMER_NAV : SUPPLIER_NAV;
   const bottom: NavItem[] = variant === 'customer' ? CUSTOMER_BOTTOM : SUPPLIER_BOTTOM;
+  const title = activeNavItem(pathname, sections)?.label
+    ?? (pathname.startsWith('/marketplace') ? 'Marketplace' : 'BakeryOs');
 
-  // Close the drawer whenever the route changes (i.e. after a nav tap).
+  // Chiudi il drawer al cambio rotta (dopo un tap di navigazione).
   useEffect(() => { setOpen(false); }, [pathname]);
 
-  // Esc closes the drawer; lock body scroll while it is open.
+  // Esc chiude; scroll body bloccato; focus iniziale sul bottone di chiusura.
   useEffect(() => {
+    if (!open) return;
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setOpen(false); }
-    if (open) {
-      document.addEventListener('keydown', onKey);
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
-    }
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeRef.current?.focus();
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
   }, [open]);
-
-  const title = currentTitle(pathname, variant);
 
   return (
     <>
-      {/* ── Top app bar (mobile only) ─────────────────────────────────────── */}
-      <header
-        className={`lg:hidden sticky top-0 z-40 flex items-center gap-2 h-14 px-2 ${t.bar}`}
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-      >
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Apri il menu"
-          aria-expanded={open}
-          aria-controls="mobile-drawer"
-          className="grid place-items-center w-11 h-11 rounded-lg hover:bg-white/10 active:bg-white/15 shrink-0"
-        >
-          <span aria-hidden className="text-xl leading-none">☰</span>
-        </button>
-        <span className="font-playfair text-[17px] font-bold truncate flex-1 leading-none">{title}</span>
-        {variant === 'customer' && lowStockCount > 0 && (
+      {/* ── Top bar mobile ─────────────────────────────────────────────────── */}
+      <header className="lg:hidden sticky top-0 z-40 bg-surface border-b border-border safe-area-pt">
+        <div className="flex items-center gap-2 h-[52px] px-3">
           <Link
-            href="/inventory"
-            aria-label={`${lowStockCount} ingredienti sotto soglia`}
-            className="shrink-0 mr-1 inline-flex items-center gap-1.5 h-9 px-2.5 rounded-lg bg-white/10 text-xs font-semibold"
+            href={variant === 'customer' ? '/dashboard' : '/supplier'}
+            aria-label="BakeryOs — vai alla dashboard"
+            className="inline-flex items-center justify-center w-10 h-10 rounded-md text-ink shrink-0"
           >
-            <span aria-hidden className="w-2 h-2 rounded-full bg-[#D4512A]" />
-            {lowStockCount}
+            <LogoMark size={24} />
           </Link>
-        )}
+          <h2 className="flex-1 min-w-0 truncate text-md font-semibold text-ink">{title}</h2>
+          <NotificationBell
+            count={variant === 'customer' ? lowStockCount : 0}
+            href={variant === 'customer' ? '/inventory' : '/supplier/orders'}
+            label={`${lowStockCount} ingredienti sotto soglia`}
+            className="w-10 h-10"
+          />
+        </div>
       </header>
 
-      {/* ── Drawer + overlay ──────────────────────────────────────────────── */}
+      {/* ── Drawer "Altro" ─────────────────────────────────────────────────── */}
       {open && (
         <div className="lg:hidden fixed inset-0 z-50">
           <button
             type="button"
             aria-label="Chiudi il menu"
             onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/40"
           />
           <nav
             id="mobile-drawer"
-            aria-label="Menu principale"
-            className={`absolute inset-y-0 left-0 w-[82%] max-w-[320px] flex flex-col ${t.drawer} shadow-2xl`}
-            style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+            aria-label="Menu completo"
+            className="absolute inset-x-0 bottom-0 max-h-[85dvh] flex flex-col rounded-t-xl bg-surface border-t border-border shadow-lg pb-safe"
+            style={{ animation: 'bk-sheet-in 220ms cubic-bezier(0.16,1,0.3,1) both' }}
           >
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/10">
-              <div className="font-playfair text-lg font-black leading-none">
-                Pasticceria<span style={{ color: t.accent }}>OS</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Chiudi"
-                className="grid place-items-center w-10 h-10 rounded-lg hover:bg-white/10 text-xl"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mx-4 mt-4 mb-1 bg-white/[0.07] rounded-xl px-3.5 py-3 flex items-center gap-3">
-              <div
-                className="w-9 h-9 rounded-lg grid place-items-center text-sm font-bold shrink-0"
-                style={{ background: t.accent, color: '#0B131C' }}
-              >
-                {orgName.charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0">
-                <div className="text-sm font-semibold truncate">{orgName}</div>
-                <div className="text-[11px] text-white/50">
-                  {variant === 'supplier' ? 'Workspace fornitore' : 'Workspace'}
-                </div>
+            <div className="flex items-center justify-between pl-4 pr-2 pt-3 pb-2">
+              <span className="inline-flex items-center gap-2 text-ink">
+                <LogoMark size={20} />
+                <span className="text-md font-semibold">BakeryOs</span>
+              </span>
+              <div className="flex items-center gap-1">
+                <ThemeToggle className="w-10 h-10" />
+                <button
+                  ref={closeRef}
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Chiudi il menu"
+                  className="inline-flex items-center justify-center w-10 h-10 rounded-md text-ink-muted hover:bg-surface-offset"
+                >
+                  <X size={18} aria-hidden="true" />
+                </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-3 py-2">
+            <div className="flex-1 overflow-y-auto px-3 pb-2">
               {sections.map((section) => (
-                <div key={section.title} className="mb-1">
-                  <p className="text-[9px] font-semibold uppercase tracking-[2px] text-white/40 px-3 pt-3 pb-1.5">
+                <div key={section.title} className="mb-2">
+                  <p className="px-3 pt-2 pb-1 text-xs font-medium uppercase tracking-wide text-ink-faint">
                     {section.title}
                   </p>
-                  {section.items.map((item) => {
-                    const active = isActivePath(pathname, item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`flex items-center gap-3 px-3 rounded-[10px] text-[15px] font-medium mb-0.5 min-h-[46px] ${
-                          active ? `${t.activeChip} font-semibold` : 'text-white/70 hover:bg-white/10 hover:text-white'
-                        }`}
-                      >
-                        <span aria-hidden className="text-[18px] w-6 text-center">{item.emoji}</span>
-                        <span className="truncate">{item.label}</span>
-                        {item.href === '/inventory' && lowStockCount > 0 && (
-                          <span className="ml-auto bg-[#D4512A] text-white text-[10px] font-bold rounded-full px-1.5 py-px min-w-[18px] text-center">
-                            {lowStockCount > 99 ? '99+' : lowStockCount}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
+                  <ul>
+                    {section.items.map((item) => {
+                      const active = isActivePath(pathname, item.href);
+                      const Icon = item.icon;
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            aria-current={active ? 'page' : undefined}
+                            className={cn(
+                              'flex items-center gap-3 min-h-[44px] px-3 rounded-md text-md',
+                              active
+                                ? 'bg-primary-light text-primary font-medium'
+                                : 'text-ink hover:bg-surface-offset',
+                            )}
+                          >
+                            <Icon size={18} aria-hidden="true" className="shrink-0" />
+                            <span className="truncate">{item.label}</span>
+                            {item.href === '/inventory' && lowStockCount > 0 && (
+                              <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-danger text-danger-fg text-xs font-semibold">
+                                {lowStockCount > 99 ? '99+' : lowStockCount}
+                              </span>
+                            )}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               ))}
             </div>
 
-            <div className="px-4 py-3 border-t border-white/10 flex items-center gap-3">
-              <div
-                className="w-8 h-8 rounded-full grid place-items-center text-xs font-bold shrink-0"
-                style={{ background: t.accent, color: '#0B131C' }}
+            <div className="flex items-center gap-3 px-4 py-3 border-t border-divider">
+              <span
+                aria-hidden="true"
+                className="flex items-center justify-center w-9 h-9 rounded-md bg-primary-light text-primary text-sm font-semibold shrink-0"
               >
-                {userEmail.charAt(0).toUpperCase()}
-              </div>
-              <span className="flex-1 truncate text-white/60 text-xs">{userEmail}</span>
+                {(orgName.trim().charAt(0) || '?').toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-ink truncate">{orgName}</span>
+                <span className="flex items-center gap-2 mt-0.5">
+                  <Badge variant="primary" size="sm">
+                    {variant === 'customer' ? 'Pasticceria' : 'Fornitore'}
+                  </Badge>
+                  <span className="text-xs text-ink-faint truncate">{userEmail}</span>
+                </span>
+              </span>
               <form action={signOutAction}>
-                <button type="submit" className="h-9 px-3 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-semibold">
+                <button
+                  type="submit"
+                  aria-label="Esci dall'account"
+                  className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-md border border-border text-sm font-medium text-ink-muted hover:text-danger hover:bg-danger-light transition-colors"
+                >
+                  <LogOut size={14} aria-hidden="true" />
                   Esci
                 </button>
               </form>
@@ -199,57 +183,60 @@ export function MobileChrome({ variant, orgName, userEmail, lowStockCount = 0 }:
         </div>
       )}
 
-      {/* ── Bottom tab bar ────────────────────────────────────────────────── */}
+      {/* ── Bottom tab bar ─────────────────────────────────────────────────── */}
       <nav
         aria-label="Navigazione rapida"
-        className={`lg:hidden fixed bottom-0 inset-x-0 z-40 grid ${t.bottomBar}`}
-        style={{
-          gridTemplateColumns: `repeat(${bottom.length + (variant === 'customer' ? 1 : 0)}, minmax(0, 1fr))`,
-          paddingBottom: 'env(safe-area-inset-bottom)',
-        }}
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-border pb-safe"
       >
-        {bottom.map((item) => {
-          const active = isActivePath(pathname, item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? 'page' : undefined}
-              className={`flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[10px] font-medium ${
-                active ? t.bottomActive : t.bottomIdle
-              }`}
-            >
-              <span aria-hidden className="text-[19px] leading-none">{item.emoji}</span>
-              <span className="leading-none">{item.label}</span>
-            </Link>
-          );
-        })}
-        {variant === 'customer' && (
+        <div
+          className="grid"
+          style={{ gridTemplateColumns: `repeat(${bottom.length + 1}, minmax(0, 1fr))` }}
+        >
+          {bottom.map((item) => {
+            const active = isActivePath(pathname, item.href);
+            const Icon = item.icon;
+            const showBadge = item.href === '/inventory' && lowStockCount > 0;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'relative flex flex-col items-center justify-center gap-1 min-h-[56px] text-xs font-medium',
+                  active ? 'text-primary' : 'text-ink-faint',
+                )}
+              >
+                <span className="relative inline-flex">
+                  <Icon size={22} aria-hidden="true" />
+                  {showBadge && (
+                    <span
+                      aria-label={`${lowStockCount} alert`}
+                      className="absolute -top-1 -right-2 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-danger text-danger-fg text-xs font-semibold leading-none"
+                    >
+                      {lowStockCount > 9 ? '9+' : lowStockCount}
+                    </span>
+                  )}
+                </span>
+                <span className="leading-none">{item.label}</span>
+                {active && (
+                  <span aria-hidden="true" className="absolute bottom-1 w-1 h-1 rounded-full bg-primary" />
+                )}
+              </Link>
+            );
+          })}
           <button
             type="button"
             onClick={() => setOpen(true)}
-            aria-label="Apri il menu"
-            className={`flex flex-col items-center justify-center gap-0.5 min-h-[56px] text-[10px] font-medium ${t.bottomIdle}`}
+            aria-label="Apri il menu completo"
+            aria-expanded={open}
+            aria-controls="mobile-drawer"
+            className="flex flex-col items-center justify-center gap-1 min-h-[56px] text-xs font-medium text-ink-faint"
           >
-            <span aria-hidden className="text-[19px] leading-none">☰</span>
-            <span className="leading-none">Menu</span>
+            <Menu size={22} aria-hidden="true" />
+            <span className="leading-none">Altro</span>
           </button>
-        )}
+        </div>
       </nav>
     </>
   );
-}
-
-// Best-effort section title for the top bar, from the active nav entry.
-function currentTitle(pathname: string, variant: Variant): string {
-  const all: NavItem[] = variant === 'customer'
-    ? CUSTOMER_NAV.flatMap((s) => s.items)
-    : SUPPLIER_NAV;
-  const match = all
-    .filter((i) => isActivePath(pathname, i.href))
-    .sort((a, b) => b.href.length - a.href.length)[0];
-  if (match) return match.label;
-  if (pathname.startsWith('/marketplace')) return 'Marketplace';
-  if (pathname.startsWith('/supplier')) return 'Fornitore';
-  return 'PasticceriaOS';
 }

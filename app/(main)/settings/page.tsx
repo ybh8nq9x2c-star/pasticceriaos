@@ -11,11 +11,11 @@ export const metadata: Metadata = { title: 'Impostazioni' };
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
-      <div className="px-6 py-4 border-b border-[#F0EBE1] bg-[#FAF7F2]">
-        <h2 className="font-playfair text-base font-bold text-[#1A2B4A]">{title}</h2>
+    <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+      <div className="px-6 py-4 border-b border-divider bg-bg">
+        <h2 className="text-base font-bold text-ink">{title}</h2>
       </div>
-      <div className="px-6 py-1 divide-y divide-[#F0EBE1]">{children}</div>
+      <div className="px-6 py-1 divide-y divide-divider">{children}</div>
     </div>
   );
 }
@@ -23,14 +23,14 @@ function SectionCard({ title, children }: { title: string; children: React.React
 function Row({ label, value, badge }: { label: string; value: string; badge?: string }) {
   return (
     <div className="flex items-center justify-between py-3.5">
-      <span className="text-sm text-[#6B7280]">{label}</span>
+      <span className="text-sm text-ink-muted">{label}</span>
       <div className="flex items-center gap-2">
         {badge && (
-          <span className="px-2 py-0.5 rounded-full bg-[#27AE60]/10 text-[#1E7E45] text-xs font-semibold">
+          <span className="px-2 py-0.5 rounded-full bg-success-light text-success-strong text-xs font-semibold">
             {badge}
           </span>
         )}
-        <span className="text-sm font-medium text-[#1A2B4A]">{value}</span>
+        <span className="text-sm font-medium text-ink">{value}</span>
       </div>
     </div>
   );
@@ -66,13 +66,13 @@ export default async function SettingsPage() {
       {/* Soglie stock */}
       <SectionCard title="Soglie magazzino">
         <div className="py-4 space-y-2">
-          <p className="text-sm text-[#6B7280]">
+          <p className="text-sm text-ink-muted">
             Le soglie di allerta scorte sono configurate per ogni ingrediente dalla scheda ingrediente
-            (campo <span className="font-mono text-[#1A2B4A] text-xs bg-[#FAF7F2] px-1.5 py-0.5 rounded">Soglia minima</span>).
+            (campo <span className="font-mono text-ink text-xs bg-bg px-1.5 py-0.5 rounded">Soglia minima</span>).
           </p>
-          <p className="text-sm text-[#6B7280]">
+          <p className="text-sm text-ink-muted">
             Quando la quantità scende sotto la soglia, l'ingrediente appare nella sezione{' '}
-            <span className="text-[#C9962A] font-medium">Sotto soglia</span> del magazzino.
+            <span className="text-primary font-medium">Sotto soglia</span> del magazzino.
           </p>
         </div>
       </SectionCard>
@@ -80,13 +80,13 @@ export default async function SettingsPage() {
       {/* Canale invio ordini */}
       <SectionCard title="Invio ordini ai fornitori">
         <div className="py-4 space-y-2">
-          <p className="text-sm text-[#6B7280]">
-            <span className="font-medium text-[#1A2B4A]">Fornitori collegati (marketplace):</span>{' '}
+          <p className="text-sm text-ink-muted">
+            <span className="font-medium text-ink">Fornitori collegati (marketplace):</span>{' '}
             gli ordini creati dal Marketplace arrivano direttamente nel workspace del fornitore,
             che ne aggiorna lo stato fino alla consegna.
           </p>
-          <p className="text-sm text-[#6B7280]">
-            <span className="font-medium text-[#1A2B4A]">Fornitori solo-email:</span>{' '}
+          <p className="text-sm text-ink-muted">
+            <span className="font-medium text-ink">Fornitori solo-email:</span>{' '}
             {process.env.ORDER_DISPATCH_WEBHOOK_URL
               ? 'l\'invio email automatico è configurato; l\'esito viene registrato nello storico stato di ogni ordine.'
               : 'l\'invio email automatico non è configurato: segnando un ordine come "inviato" la trasmissione resta manuale e lo storico stato lo riporta esplicitamente.'}

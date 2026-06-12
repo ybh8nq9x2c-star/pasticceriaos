@@ -21,14 +21,14 @@ export function StatusActions({
   const [state, formAction] = useFormState(changeOrderStatusAction, IDLE_STATE);
   const nexts = ALL.filter((to) => canTransition(status, to, side));
   if (nexts.length === 0) {
-    return <p className="text-sm text-[#6B7280]">Nessuna azione disponibile in questo stato.</p>;
+    return <p className="text-sm text-ink-muted">Nessuna azione disponibile in questo stato.</p>;
   }
 
   return (
     <form action={formAction} className="space-y-2">
       <input type="hidden" name="orderId" value={orderId} />
       {state.status === 'error' && (
-        <p role="alert" className="text-sm text-[#C0392B]">{state.error}</p>
+        <p role="alert" className="text-sm text-danger">{state.error}</p>
       )}
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
         {nexts.map((to) => (
@@ -39,8 +39,8 @@ export function StatusActions({
             value={to}
             className={
               to === 'cancelled'
-                ? 'w-full sm:w-auto px-4 py-3 min-h-[48px] rounded-xl border border-[#C0392B]/40 text-[#C0392B] text-sm font-semibold hover:bg-[#C0392B]/5'
-                : 'w-full sm:w-auto px-4 py-3 min-h-[48px] rounded-xl bg-[#1A2B4A] text-white text-sm font-semibold hover:bg-[#243660]'
+                ? 'w-full sm:w-auto px-4 py-3 min-h-[48px] rounded-xl border border-danger-soft text-danger text-sm font-semibold hover:bg-danger-light'
+                : 'w-full sm:w-auto px-4 py-3 min-h-[48px] rounded-xl bg-primary text-primary-fg text-sm font-semibold hover:bg-primary-hover'
             }
           >
             → {ORDER_STATUS_LABELS[to]}

@@ -22,20 +22,20 @@ export function ReceiveIntoInventory({
 
   if (linkedPurchaseOrderId) {
     return (
-      <div className="bg-[#27AE60]/[0.07] rounded-2xl border border-[#27AE60]/25 p-4 sm:p-5">
+      <div className="bg-success-light rounded-2xl border border-success-soft p-4 sm:p-5">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#27AE60]/15 flex items-center justify-center shrink-0">
-            <span className="text-[#27AE60] font-bold">✓</span>
+          <div className="w-8 h-8 rounded-full bg-success-light flex items-center justify-center shrink-0">
+            <span className="text-success-strong font-bold">✓</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-[#1E7E45]">Carico registrato a magazzino</p>
-            <p className="text-xs text-[#6B7280] mt-0.5">
+            <p className="text-sm font-semibold text-success-strong">Carico registrato a magazzino</p>
+            <p className="text-xs text-ink-muted mt-0.5">
               Movimenti e prezzi ingredienti aggiornati dagli snapshot dell'ordine.
             </p>
           </div>
           <Link
             href={`/orders/${linkedPurchaseOrderId}`}
-            className="shrink-0 text-xs font-semibold text-[#1E7E45] hover:underline"
+            className="shrink-0 text-xs font-semibold text-success-strong hover:underline"
           >
             Vedi ricezione →
           </Link>
@@ -45,14 +45,14 @@ export function ReceiveIntoInventory({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E5DDD0] p-4 sm:p-5">
+    <div className="bg-surface-2 rounded-2xl border border-border p-4 sm:p-5">
       <h2 className="font-semibold mb-1">Ricezione merce</h2>
-      <p className="text-xs text-[#6B7280] mb-3">
+      <p className="text-xs text-ink-muted mb-3">
         L'ordine è stato consegnato. Registra il carico: crea i movimenti di
         magazzino e aggiorna i prezzi degli ingredienti con i prezzi reali dell'ordine.
       </p>
       {state.status === 'error' && (
-        <div className="mb-3 rounded-xl bg-[#C0392B]/[0.06] border border-[#C0392B]/30 p-3 text-sm text-[#C0392B]">
+        <div className="mb-3 rounded-xl bg-danger-light border border-danger-soft p-3 text-sm text-danger">
           {state.error}
         </div>
       )}
@@ -61,7 +61,7 @@ export function ReceiveIntoInventory({
         <button
           type="submit"
           disabled={pending}
-          className="w-full py-3 bg-[#2A7D6B] text-white rounded-xl text-sm font-semibold hover:bg-[#236457] disabled:opacity-60 transition-colors"
+          className="w-full py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
         >
           {pending ? 'Registrazione…' : '📦 Registra carico a magazzino'}
         </button>

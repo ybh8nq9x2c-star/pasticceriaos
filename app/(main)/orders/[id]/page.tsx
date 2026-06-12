@@ -96,15 +96,15 @@ export default async function OrderDetailPage({ params }: { params: { id: string
     <div className="p-8 max-w-4xl mx-auto">
       {/* Breadcrumb + header */}
       <div className="mb-6">
-        <Link href="/orders" className="text-sm text-[#6B7280] hover:text-[#1A2B4A] transition-colors">
+        <Link href="/orders" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Ordini
         </Link>
         <div className="flex items-start justify-between gap-4 mt-3">
           <div>
-            <h1 className="font-playfair text-3xl font-bold text-[#1A2B4A]">
+            <h1 className="text-3xl font-bold text-ink">
               {order.supplierName}
             </h1>
-            <p className="text-xs text-[#6B7280] font-mono mt-1.5">
+            <p className="text-xs text-ink-muted font-mono mt-1.5">
               {formatDate(order.orderDate)}
               {order.expectedDate && ` · consegna ${formatDate(order.expectedDate)}`}
             </p>
@@ -118,23 +118,23 @@ export default async function OrderDetailPage({ params }: { params: { id: string
       </div>
 
       {/* Stepper orizzontale */}
-      <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6 mb-6">
+      <div className="bg-surface-2 rounded-2xl border border-border p-6 mb-6">
         <div className="flex items-center">
           {PIPELINE.map((step, idx) => {
             const isDone    = !isCancelled && idx < currentIdx;
             const isCurrent = !isCancelled && idx === currentIdx;
             const dotClass = isCancelled
-              ? 'bg-[#E5DDD0] text-[#6B7280]'
+              ? 'bg-surface-offset text-ink-muted'
               : isCurrent
-              ? 'bg-[#C9962A] text-[#1A2B4A] ring-4 ring-[#C9962A]/20'
+              ? 'bg-primary text-ink ring-4 ring-primary-ring'
               : isDone
-              ? 'bg-[#27AE60] text-white'
-              : 'bg-[#F0EBE1] text-[#6B7280]';
+              ? 'bg-success text-white'
+              : 'bg-surface-offset text-ink-muted';
             const labelClass = isCurrent
-              ? 'text-[#1A2B4A] font-semibold'
+              ? 'text-ink font-semibold'
               : isDone
-              ? 'text-[#27AE60]'
-              : 'text-[#6B7280]';
+              ? 'text-success-strong'
+              : 'text-ink-muted';
             return (
               <div key={step} className="flex items-center flex-1 last:flex-none">
                 <div className="flex flex-col items-center gap-1.5">
@@ -144,14 +144,14 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                   <span className={`text-xs ${labelClass}`}>{STATUS_LABELS[step]}</span>
                 </div>
                 {idx < PIPELINE.length - 1 && (
-                  <div className={`flex-1 h-0.5 mx-2 -mt-5 ${!isCancelled && idx < currentIdx ? 'bg-[#27AE60]' : 'bg-[#F0EBE1]'}`} />
+                  <div className={`flex-1 h-0.5 mx-2 -mt-5 ${!isCancelled && idx < currentIdx ? 'bg-success' : 'bg-surface-offset'}`} />
                 )}
               </div>
             );
           })}
         </div>
         {isCancelled && (
-          <p className="text-center text-xs text-[#C0392B] font-semibold mt-4">
+          <p className="text-center text-xs text-danger font-semibold mt-4">
             Questo ordine è stato annullato.
           </p>
         )}
@@ -160,38 +160,38 @@ export default async function OrderDetailPage({ params }: { params: { id: string
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Righe ordine */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+          <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-[#FAF7F2] border-b border-[#E5DDD0]">
+              <thead className="bg-bg border-b border-border">
                 <tr>
-                  <th className="text-left px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Prodotto</th>
-                  <th className="text-right px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Qtà</th>
-                  <th className="text-left px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Unità</th>
-                  <th className="text-right px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">€/u</th>
-                  <th className="text-right px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Totale</th>
+                  <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Prodotto</th>
+                  <th className="text-right px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Qtà</th>
+                  <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Unità</th>
+                  <th className="text-right px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">€/u</th>
+                  <th className="text-right px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Totale</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F0EBE1]">
+              <tbody className="divide-y divide-divider">
                 {order.lineItems.map((li) => (
                   <tr key={li.id}>
-                    <td className="px-6 py-3.5 text-[#1A1A2E]">{li.ingredientName}</td>
-                    <td className="px-6 py-3.5 text-right font-mono text-[#1A2B4A]">{li.quantity}</td>
-                    <td className="px-6 py-3.5 text-[#6B7280]">{UNIT_LABELS[li.unitSnapshot]}</td>
-                    <td className="px-6 py-3.5 text-right font-mono text-[#6B7280]">
+                    <td className="px-6 py-3.5 text-ink">{li.ingredientName}</td>
+                    <td className="px-6 py-3.5 text-right font-mono text-ink">{li.quantity}</td>
+                    <td className="px-6 py-3.5 text-ink-muted">{UNIT_LABELS[li.unitSnapshot]}</td>
+                    <td className="px-6 py-3.5 text-right font-mono text-ink-muted">
                       {li.unitPriceSnapshot !== null ? formatCurrency(li.unitPriceSnapshot) : '—'}
                     </td>
-                    <td className="px-6 py-3.5 text-right font-mono font-medium text-[#1A2B4A]">
+                    <td className="px-6 py-3.5 text-right font-mono font-medium text-ink">
                       {formatCurrency(li.lineTotal)}
                     </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="border-t border-[#E5DDD0] bg-[#FAF7F2]">
+              <tfoot className="border-t border-border bg-bg">
                 <tr>
-                  <td colSpan={4} className="px-6 py-3.5 text-right text-sm font-medium text-[#6B7280]">
+                  <td colSpan={4} className="px-6 py-3.5 text-right text-sm font-medium text-ink-muted">
                     Totale ordine
                   </td>
-                  <td className="px-6 py-3.5 text-right font-mono font-bold text-[#1A2B4A]">
+                  <td className="px-6 py-3.5 text-right font-mono font-bold text-ink">
                     {formatCurrency(order.totalAmount)}
                   </td>
                 </tr>
@@ -201,28 +201,28 @@ export default async function OrderDetailPage({ params }: { params: { id: string
 
           {/* Lotti e scadenze (HACCP) — solo su ordini ricevuti */}
           {order.status === 'received' && (
-            <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">
+            <div className="bg-surface-2 rounded-2xl border border-border p-6">
               <div className="flex items-center justify-between mb-1">
-                <h2 className="font-playfair text-base font-bold text-[#1A2B4A]">Lotti e scadenze</h2>
-                <Link href="/inventory/batches" className="text-xs font-semibold text-[#C9962A] hover:underline">
+                <h2 className="text-base font-bold text-ink">Lotti e scadenze</h2>
+                <Link href="/inventory/batches" className="text-xs font-semibold text-primary hover:underline">
                   Tutte le scadenze →
                 </Link>
               </div>
-              <p className="text-xs text-[#6B7280] mb-4">
+              <p className="text-xs text-ink-muted mb-4">
                 Registra lotto e scadenza per gli ingredienti deperibili: abilita
                 alert scadenza, consumo FEFO e tracciabilità di produzione.
               </p>
 
               {batches.length > 0 && (
-                <div className="mb-4 divide-y divide-[#F0EBE1] border border-[#F0EBE1] rounded-xl overflow-hidden">
+                <div className="mb-4 divide-y divide-divider border border-divider rounded-xl overflow-hidden">
                   {batches.map((b) => (
                     <div key={b.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                      <span className="flex-1 text-[#1A2B4A]">{b.ingredientName}</span>
-                      <span className="font-mono text-xs text-[#6B7280]">{b.lotNumber ?? 'senza lotto'}</span>
-                      <span className="font-mono text-xs text-[#6B7280]">
+                      <span className="flex-1 text-ink">{b.ingredientName}</span>
+                      <span className="font-mono text-xs text-ink-muted">{b.lotNumber ?? 'senza lotto'}</span>
+                      <span className="font-mono text-xs text-ink-muted">
                         {b.quantityRemaining}/{b.quantityReceived} {UNIT_SHORT[b.unit]}
                       </span>
-                      <span className="font-mono text-xs font-semibold text-[#1A2B4A]">
+                      <span className="font-mono text-xs font-semibold text-ink">
                         scad. {new Date(b.expiryDate + 'T00:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: '2-digit' })}
                       </span>
                     </div>
@@ -237,7 +237,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                   if (remaining <= 0) return null;
                   return (
                     <div key={li.id} className="flex flex-wrap items-center gap-3 py-1">
-                      <span className="text-sm text-[#1A1A2E] w-44 truncate">{li.ingredientName}</span>
+                      <span className="text-sm text-ink w-44 truncate">{li.ingredientName}</span>
                       <RegisterBatchForm
                         orderId={order.id}
                         ingredientProductId={li.ingredientProductId}
@@ -250,7 +250,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                 {order.lineItems.every(
                   (li) => (batchedQtyByIngredient.get(li.ingredientProductId) ?? 0) >= li.quantity,
                 ) && (
-                  <p className="text-sm text-[#1E7E45] font-medium">✓ Tutte le righe hanno lotti registrati.</p>
+                  <p className="text-sm text-success-strong font-medium">✓ Tutte le righe hanno lotti registrati.</p>
                 )}
               </div>
             </div>
@@ -258,21 +258,21 @@ export default async function OrderDetailPage({ params }: { params: { id: string
 
           {/* Storico stati */}
           {history.length > 0 && (
-            <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">
-              <h2 className="font-playfair text-base font-bold text-[#1A2B4A] mb-4">Storico stato</h2>
+            <div className="bg-surface-2 rounded-2xl border border-border p-6">
+              <h2 className="text-base font-bold text-ink mb-4">Storico stato</h2>
               <ol className="space-y-4 relative">
                 {history.map((ev, idx) => (
                   <li key={ev.id} className="flex gap-3 items-start">
-                    <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${idx === history.length - 1 ? 'bg-[#C9962A]' : 'bg-[#E5DDD0]'}`} />
+                    <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${idx === history.length - 1 ? 'bg-primary' : 'bg-surface-offset'}`} />
                     <div>
-                      <p className="text-sm text-[#1A1A2E]">
+                      <p className="text-sm text-ink">
                         {ev.fromStatus
-                          ? <><span className="text-[#6B7280]">{STATUS_LABELS[ev.fromStatus]}</span> → <strong>{STATUS_LABELS[ev.toStatus]}</strong></>
+                          ? <><span className="text-ink-muted">{STATUS_LABELS[ev.fromStatus]}</span> → <strong>{STATUS_LABELS[ev.toStatus]}</strong></>
                           : <strong>Ordine creato ({STATUS_LABELS[ev.toStatus]})</strong>
                         }
                       </p>
-                      {ev.notes && <p className="text-xs text-[#6B7280] mt-0.5">{ev.notes}</p>}
-                      <p className="text-xs text-[#6B7280] font-mono mt-0.5">
+                      {ev.notes && <p className="text-xs text-ink-muted mt-0.5">{ev.notes}</p>}
+                      <p className="text-xs text-ink-muted font-mono mt-0.5">
                         {new Date(ev.createdAt).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
@@ -286,16 +286,16 @@ export default async function OrderDetailPage({ params }: { params: { id: string
         {/* Colonna azioni */}
         <div className="space-y-4">
           {/* Info fornitore */}
-          <div className="bg-white rounded-2xl border border-[#E5DDD0] p-5">
-            <h2 className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide mb-3">Fornitore</h2>
-            <p className="text-sm font-semibold text-[#1A2B4A]">{order.supplierName}</p>
-            <p className="text-sm text-[#6B7280] mt-0.5">{order.supplierEmail}</p>
+          <div className="bg-surface-2 rounded-2xl border border-border p-5">
+            <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-3">Fornitore</h2>
+            <p className="text-sm font-semibold text-ink">{order.supplierName}</p>
+            <p className="text-sm text-ink-muted mt-0.5">{order.supplierEmail}</p>
           </div>
 
           {order.notes && (
-            <div className="bg-white rounded-2xl border border-[#E5DDD0] p-5">
-              <h2 className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide mb-2">Note</h2>
-              <p className="text-sm text-[#1A1A2E] whitespace-pre-wrap">{order.notes}</p>
+            <div className="bg-surface-2 rounded-2xl border border-border p-5">
+              <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Note</h2>
+              <p className="text-sm text-ink whitespace-pre-wrap">{order.notes}</p>
             </div>
           )}
 
@@ -303,7 +303,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
           {(order.status === 'received' || order.status === 'confirmed') && (
             <Link
               href={`/documents/new?order=${order.id}`}
-              className="block w-full py-3 text-center border border-[#1A2B4A]/30 text-[#1A2B4A] rounded-xl text-sm font-semibold hover:bg-[#1A2B4A]/[0.04] transition-colors"
+              className="block w-full py-3 text-center border border-border text-ink rounded-xl text-sm font-semibold hover:bg-surface-offset transition-colors"
             >
               🧾 Registra DDT / fattura
             </Link>
@@ -315,7 +315,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
               <input type="hidden" name="status" value={nextAction.toStatus} />
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl text-sm font-semibold bg-[#1A2B4A] text-white hover:bg-[#243660] transition-colors"
+                className="w-full py-3 rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
               >
                 {nextAction.label}
               </button>
@@ -327,7 +327,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
             <form action={handleCancel}>
               <button
                 type="submit"
-                className="w-full py-3 border border-[#C0392B]/40 text-[#C0392B] rounded-xl text-sm font-semibold hover:bg-[#C0392B]/[0.06] transition-colors"
+                className="w-full py-3 border border-danger-soft text-danger rounded-xl text-sm font-semibold hover:bg-danger-light transition-colors"
               >
                 Annulla ordine
               </button>

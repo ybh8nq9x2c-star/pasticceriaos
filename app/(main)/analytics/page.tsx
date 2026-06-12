@@ -47,18 +47,19 @@ function KpiCard({
   sub?: string;
   accent?: 'red' | 'green' | 'gold' | 'navy';
 }) {
-  const accentClass = {
-    red:   'border-l-[#C0392B]',
-    green: 'border-l-[#27AE60]',
-    gold:  'border-l-[#C9962A]',
-    navy:  'border-l-[#1A2B4A]',
+  // Accento sobrio: StatusDot accanto alla label (mai border-left colorato).
+  const dotClass = {
+    red:   'bg-danger',
+    green: 'bg-success',
+    gold:  'bg-warning',
+    navy:  'bg-ink-faint',
   }[accent ?? 'navy'];
 
   return (
-    <div className={`bg-white rounded-2xl border border-[#E5DDD0] border-l-4 ${accentClass} px-5 py-4`}>
-      <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide">{label}</p>
-      <p className="font-playfair text-2xl font-bold text-[#1A2B4A] mt-1.5 leading-none">{value}</p>
-      {sub && <p className="text-xs text-[#6B7280] mt-1">{sub}</p>}
+    <div className="bg-surface-2 rounded-2xl border border-border px-5 py-4 shadow-sm">
+      <p className="flex items-center gap-1.5 text-xs font-semibold text-ink-muted uppercase tracking-wide"><span aria-hidden className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />{label}</p>
+      <p className="text-2xl font-bold text-ink mt-1.5 leading-none">{value}</p>
+      {sub && <p className="text-xs text-ink-muted mt-1">{sub}</p>}
     </div>
   );
 }
@@ -69,7 +70,7 @@ function KpiCard({
 
 function StatusBar({ items }: { items: { label: string; count: number; color: string }[] }) {
   const total = items.reduce((s, i) => s + i.count, 0);
-  if (total === 0) return <div className="h-3 rounded-full bg-[#F0EBE1]" />;
+  if (total === 0) return <div className="h-3 rounded-full bg-surface-offset" />;
 
   return (
     <div className="flex h-3 rounded-full overflow-hidden gap-px">
@@ -171,47 +172,47 @@ export default async function AnalyticsPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
         {/* Distribuzione scorte */}
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">
-          <h2 className="font-playfair text-base font-bold text-[#1A2B4A] mb-4">
+        <div className="bg-surface-2 rounded-2xl border border-border p-6">
+          <h2 className="text-base font-bold text-ink mb-4">
             Distribuzione scorte
           </h2>
 
           {total === 0 ? (
-            <p className="text-sm text-[#6B7280]">Nessun ingrediente tracciato.</p>
+            <p className="text-sm text-ink-muted">Nessun ingrediente tracciato.</p>
           ) : (
             <>
               <StatusBar
                 items={[
-                  { label: 'Esaurito', count: outOfStock, color: 'bg-[#C0392B]' },
-                  { label: 'Critico',  count: critical,   color: 'bg-[#E67E22]' },
-                  { label: 'Basso',    count: low,        color: 'bg-[#C9962A]' },
-                  { label: 'OK',       count: ok,         color: 'bg-[#27AE60]' },
+                  { label: 'Esaurito', count: outOfStock, color: 'bg-danger' },
+                  { label: 'Critico',  count: critical,   color: 'bg-warning' },
+                  { label: 'Basso',    count: low,        color: 'bg-primary' },
+                  { label: 'OK',       count: ok,         color: 'bg-success' },
                 ]}
               />
               <div className="mt-4 space-y-2.5">
                 {[
-                  { label: 'Esauriti',  count: outOfStock, badge: 'bg-[#C0392B]/10 text-[#C0392B]' },
+                  { label: 'Esauriti',  count: outOfStock, badge: 'bg-danger-light text-danger' },
                   { label: 'Critici',   count: critical,   badge: 'bg-amber-100 text-amber-700' },
-                  { label: 'Bassi',     count: low,        badge: 'bg-[#C9962A]/15 text-[#8A6418]' },
-                  { label: 'In norma',  count: ok,         badge: 'bg-[#27AE60]/10 text-[#1E7E45]' },
+                  { label: 'Bassi',     count: low,        badge: 'bg-primary-light text-primary-hover' },
+                  { label: 'In norma',  count: ok,         badge: 'bg-success-light text-success-strong' },
                 ].map(({ label, count, badge }) => (
                   <div key={label} className="flex items-center justify-between text-sm">
-                    <span className="text-[#6B7280]">{label}</span>
+                    <span className="text-ink-muted">{label}</span>
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badge}`}>
                         {count}
                       </span>
-                      <span className="text-xs text-[#6B7280] font-mono w-8 text-right">
+                      <span className="text-xs text-ink-muted font-mono w-8 text-right">
                         {pct(count, total)}%
                       </span>
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="mt-4 pt-3 border-t border-[#F0EBE1]">
+              <div className="mt-4 pt-3 border-t border-divider">
                 <Link
                   href="/inventory"
-                  className="text-xs font-semibold text-[#C9962A] hover:underline"
+                  className="text-xs font-semibold text-primary hover:underline"
                 >
                   Vai al magazzino →
                 </Link>
@@ -221,45 +222,45 @@ export default async function AnalyticsPage() {
         </div>
 
         {/* Ordini aperti */}
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">
-          <h2 className="font-playfair text-base font-bold text-[#1A2B4A] mb-4">
+        <div className="bg-surface-2 rounded-2xl border border-border p-6">
+          <h2 className="text-base font-bold text-ink mb-4">
             Stato ordini aperti
           </h2>
 
           {orders.length === 0 ? (
-            <p className="text-sm text-[#6B7280]">Nessun ordine aperto.</p>
+            <p className="text-sm text-ink-muted">Nessun ordine aperto.</p>
           ) : (
             <>
               <StatusBar
                 items={[
-                  { label: 'Bozza',      count: orders.filter((o) => o.status === 'draft').length,     color: 'bg-[#6B7280]' },
-                  { label: 'Inviato',    count: orders.filter((o) => o.status === 'sent').length,      color: 'bg-[#C9962A]' },
-                  { label: 'Confermato', count: orders.filter((o) => o.status === 'confirmed').length, color: 'bg-[#1A2B4A]' },
+                  { label: 'Bozza',      count: orders.filter((o) => o.status === 'draft').length,     color: 'bg-ink-faint' },
+                  { label: 'Inviato',    count: orders.filter((o) => o.status === 'sent').length,      color: 'bg-primary' },
+                  { label: 'Confermato', count: orders.filter((o) => o.status === 'confirmed').length, color: 'bg-primary' },
                 ]}
               />
               <div className="mt-4 space-y-2.5">
                 {[
-                  { label: 'Bozza',      count: orders.filter((o) => o.status === 'draft').length,     badge: 'bg-[#6B7280]/10 text-[#6B7280]' },
-                  { label: 'Inviato',    count: orders.filter((o) => o.status === 'sent').length,      badge: 'bg-[#C9962A]/15 text-[#8A6418]' },
-                  { label: 'Confermato', count: orders.filter((o) => o.status === 'confirmed').length, badge: 'bg-[#1A2B4A]/10 text-[#1A2B4A]' },
+                  { label: 'Bozza',      count: orders.filter((o) => o.status === 'draft').length,     badge: 'bg-neutral-light text-ink-muted' },
+                  { label: 'Inviato',    count: orders.filter((o) => o.status === 'sent').length,      badge: 'bg-primary-light text-primary-hover' },
+                  { label: 'Confermato', count: orders.filter((o) => o.status === 'confirmed').length, badge: 'bg-neutral-light text-ink' },
                 ].map(({ label, count, badge }) => (
                   <div key={label} className="flex items-center justify-between text-sm">
-                    <span className="text-[#6B7280]">{label}</span>
+                    <span className="text-ink-muted">{label}</span>
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badge}`}>
                         {count}
                       </span>
-                      <span className="text-xs text-[#6B7280] font-mono w-8 text-right">
+                      <span className="text-xs text-ink-muted font-mono w-8 text-right">
                         {pct(count, orders.length)}%
                       </span>
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="mt-4 pt-3 border-t border-[#F0EBE1]">
+              <div className="mt-4 pt-3 border-t border-divider">
                 <Link
                   href="/orders"
-                  className="text-xs font-semibold text-[#C9962A] hover:underline"
+                  className="text-xs font-semibold text-primary hover:underline"
                 >
                   Vai agli ordini →
                 </Link>
@@ -271,18 +272,18 @@ export default async function AnalyticsPage() {
 
       {/* ── Spesa mensile reale (ordini ricevuti) ────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">
-          <h2 className="font-playfair text-base font-bold text-[#1A2B4A] mb-1">
+        <div className="bg-surface-2 rounded-2xl border border-border p-6">
+          <h2 className="text-base font-bold text-ink mb-1">
             Spesa mensile
           </h2>
-          <p className="text-xs text-[#6B7280] mb-4">
+          <p className="text-xs text-ink-muted mb-4">
             Valore ordini ricevuti, da prezzi snapshot reali (ultimi 6 mesi)
           </p>
 
           {monthlySpend.length === 0 ? (
             <div className="py-8 text-center">
-              <p className="text-sm text-[#6B7280]">Nessun ordine ricevuto finora.</p>
-              <Link href="/orders" className="text-xs font-semibold text-[#C9962A] hover:underline mt-1 inline-block">
+              <p className="text-sm text-ink-muted">Nessun ordine ricevuto finora.</p>
+              <Link href="/orders" className="text-xs font-semibold text-primary hover:underline mt-1 inline-block">
                 Vai agli ordini →
               </Link>
             </div>
@@ -290,17 +291,17 @@ export default async function AnalyticsPage() {
             <div className="space-y-2.5">
               {monthlySpend.map((m) => (
                 <div key={m.month} className="flex items-center gap-3">
-                  <span className="text-xs font-mono text-[#6B7280] w-14 capitalize">{monthLabel(m.month)}</span>
-                  <div className="flex-1 h-5 bg-[#F0EBE1] rounded-md overflow-hidden">
+                  <span className="text-xs font-mono text-ink-muted w-14 capitalize">{monthLabel(m.month)}</span>
+                  <div className="flex-1 h-5 bg-surface-offset rounded-md overflow-hidden">
                     <div
-                      className="h-full bg-[#1A2B4A] rounded-md flex items-center"
+                      className="h-full bg-primary rounded-md flex items-center"
                       style={{ width: `${maxMonthSpend > 0 ? Math.max(3, Math.round((m.totalSpend / maxMonthSpend) * 100)) : 0}%` }}
                     />
                   </div>
-                  <span className="text-xs font-mono font-semibold text-[#1A2B4A] w-24 text-right">
+                  <span className="text-xs font-mono font-semibold text-ink w-24 text-right">
                     €{formatCurrency(m.totalSpend)}
                   </span>
-                  <span className="text-[10px] text-[#6B7280] w-12 text-right">{m.ordersReceived} ord.</span>
+                  <span className="text-xs text-ink-muted w-12 text-right">{m.ordersReceived} ord.</span>
                 </div>
               ))}
             </div>
@@ -308,23 +309,23 @@ export default async function AnalyticsPage() {
         </div>
 
         {/* Food cost per ricetta */}
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6">
-          <h2 className="font-playfair text-base font-bold text-[#1A2B4A] mb-1">
+        <div className="bg-surface-2 rounded-2xl border border-border p-6">
+          <h2 className="text-base font-bold text-ink mb-1">
             Food cost per ricetta
           </h2>
-          <p className="text-xs text-[#6B7280] mb-4">
+          <p className="text-xs text-ink-muted mb-4">
             Costo/porzione dai prezzi ingredienti correnti; margine se il prezzo di vendita è impostato
           </p>
 
           {activeRecipeCosts.length === 0 ? (
             <div className="py-8 text-center">
-              <p className="text-sm text-[#6B7280]">Nessuna ricetta attiva.</p>
-              <Link href="/recipes/new" className="text-xs font-semibold text-[#C9962A] hover:underline mt-1 inline-block">
+              <p className="text-sm text-ink-muted">Nessuna ricetta attiva.</p>
+              <Link href="/recipes/new" className="text-xs font-semibold text-primary hover:underline mt-1 inline-block">
                 Crea la prima ricetta →
               </Link>
             </div>
           ) : (
-            <div className="divide-y divide-[#F0EBE1]">
+            <div className="divide-y divide-divider">
               {activeRecipeCosts.slice(0, 6).map((r) => (
                 <Link
                   key={r.recipeId}
@@ -333,9 +334,9 @@ export default async function AnalyticsPage() {
                 >
                   <span className="text-lg leading-none">{r.emoji ?? '📖'}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[#1A2B4A] group-hover:text-[#C9962A] truncate">{r.name}</p>
+                    <p className="text-sm font-medium text-ink group-hover:text-primary truncate">{r.name}</p>
                     {r.costPerPortion === null && (
-                      <p className="text-[10px] text-[#E67E22]">
+                      <p className="text-xs text-warning-strong">
                         {r.ingredientCount === 0
                           ? 'nessun ingrediente'
                           : `${r.ingredientCount - r.pricedIngredientCount} ingredienti senza prezzo`}
@@ -343,11 +344,11 @@ export default async function AnalyticsPage() {
                     )}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-mono font-semibold text-[#1A2B4A]">
+                    <p className="text-sm font-mono font-semibold text-ink">
                       {r.costPerPortion !== null ? `€${formatCurrency(r.costPerPortion)}/porz.` : '—'}
                     </p>
                     {r.marginPct !== null && (
-                      <p className={`text-[10px] font-semibold ${r.marginPct >= 60 ? 'text-[#27AE60]' : r.marginPct >= 30 ? 'text-[#C9962A]' : 'text-[#C0392B]'}`}>
+                      <p className={`text-xs font-semibold ${r.marginPct >= 60 ? 'text-success-strong' : r.marginPct >= 30 ? 'text-primary' : 'text-danger'}`}>
                         margine {r.marginPct}%
                       </p>
                     )}
@@ -355,7 +356,7 @@ export default async function AnalyticsPage() {
                 </Link>
               ))}
               {activeRecipeCosts.length > 6 && (
-                <p className="text-xs text-[#6B7280] pt-2.5">+{activeRecipeCosts.length - 6} altre ricette</p>
+                <p className="text-xs text-ink-muted pt-2.5">+{activeRecipeCosts.length - 6} altre ricette</p>
               )}
             </div>
           )}
@@ -365,40 +366,40 @@ export default async function AnalyticsPage() {
       {/* ── Spesa per ingrediente + variazione prezzo fornitore ──────────── */}
       {ingredientStats.length > 0 && (
         <div>
-          <h2 className="font-semibold text-sm text-[#6B7280] uppercase tracking-wide mb-3">
+          <h2 className="font-semibold text-sm text-ink-muted uppercase tracking-wide mb-3">
             Top ingredienti per spesa (ordini ricevuti)
           </h2>
-          <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+          <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-[#FAF7F2] border-b border-[#E5DDD0]">
+              <thead className="bg-bg border-b border-border">
                 <tr>
-                  <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Ingrediente</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Qtà acquistata</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Spesa totale</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Ultimo prezzo</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Variazione</th>
+                  <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Ingrediente</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Qtà acquistata</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Spesa totale</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Ultimo prezzo</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Variazione</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F0EBE1]">
+              <tbody className="divide-y divide-divider">
                 {ingredientStats.map((item) => (
-                  <tr key={item.ingredientProductId} className="hover:bg-[#FAF7F2] transition-colors">
-                    <td className="px-6 py-3.5 font-medium text-[#1A2B4A]">{item.ingredientName}</td>
-                    <td className="px-6 py-3.5 text-right font-mono text-[#6B7280] text-xs">
+                  <tr key={item.ingredientProductId} className="hover:bg-surface-offset transition-colors">
+                    <td className="px-6 py-3.5 font-medium text-ink">{item.ingredientName}</td>
+                    <td className="px-6 py-3.5 text-right font-mono text-ink-muted text-xs">
                       {item.totalQuantity} {UNIT_SHORT[item.unit]}
                     </td>
-                    <td className="px-6 py-3.5 text-right font-mono font-semibold text-[#1A2B4A]">
+                    <td className="px-6 py-3.5 text-right font-mono font-semibold text-ink">
                       €{formatCurrency(item.totalSpend)}
                     </td>
-                    <td className="px-6 py-3.5 text-right font-mono text-[#6B7280] text-xs">
+                    <td className="px-6 py-3.5 text-right font-mono text-ink-muted text-xs">
                       {item.lastPrice !== null ? `€${formatCurrency(item.lastPrice)}/${UNIT_SHORT[item.unit]}` : '—'}
                     </td>
                     <td className="px-6 py-3.5 text-right">
                       {item.priceChangePct === null ? (
-                        <span className="text-xs text-[#6B7280]">—</span>
+                        <span className="text-xs text-ink-muted">—</span>
                       ) : item.priceChangePct === 0 ? (
-                        <span className="text-xs font-semibold text-[#6B7280]">stabile</span>
+                        <span className="text-xs font-semibold text-ink-muted">stabile</span>
                       ) : (
-                        <span className={`text-xs font-semibold ${item.priceChangePct > 0 ? 'text-[#C0392B]' : 'text-[#27AE60]'}`}>
+                        <span className={`text-xs font-semibold ${item.priceChangePct > 0 ? 'text-danger' : 'text-success-strong'}`}>
                           {item.priceChangePct > 0 ? '▲' : '▼'} {Math.abs(item.priceChangePct)}%
                         </span>
                       )}
@@ -414,45 +415,45 @@ export default async function AnalyticsPage() {
       {/* ── Top ingredienti per valore ───────────────────────────────────── */}
       {topByValue.length > 0 && (
         <div>
-          <h2 className="font-semibold text-sm text-[#6B7280] uppercase tracking-wide mb-3">
+          <h2 className="font-semibold text-sm text-ink-muted uppercase tracking-wide mb-3">
             Top ingredienti per valore in scorta
           </h2>
-          <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+          <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-[#FAF7F2] border-b border-[#E5DDD0]">
+              <thead className="bg-bg border-b border-border">
                 <tr>
-                  <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">#</th>
-                  <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Ingrediente</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Scorta</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Valore</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">% totale</th>
+                  <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">#</th>
+                  <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Ingrediente</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Scorta</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Valore</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">% totale</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F0EBE1]">
+              <tbody className="divide-y divide-divider">
                 {topByValue.map((item, idx) => (
-                  <tr key={item.ingredientProductId} className="hover:bg-[#FAF7F2] transition-colors">
-                    <td className="px-6 py-3.5 text-[#6B7280] font-mono text-xs">{idx + 1}</td>
+                  <tr key={item.ingredientProductId} className="hover:bg-surface-offset transition-colors">
+                    <td className="px-6 py-3.5 text-ink-muted font-mono text-xs">{idx + 1}</td>
                     <td className="px-6 py-3.5">
-                      <p className="font-medium text-[#1A2B4A]">{item.ingredientName}</p>
+                      <p className="font-medium text-ink">{item.ingredientName}</p>
                       {item.supplierName && (
-                        <p className="text-xs text-[#6B7280] mt-0.5">{item.supplierName}</p>
+                        <p className="text-xs text-ink-muted mt-0.5">{item.supplierName}</p>
                       )}
                     </td>
-                    <td className="px-6 py-3.5 text-right font-mono text-[#6B7280] text-xs">
+                    <td className="px-6 py-3.5 text-right font-mono text-ink-muted text-xs">
                       {item.currentQuantity} {UNIT_LABELS[item.unit]}
                     </td>
-                    <td className="px-6 py-3.5 text-right font-mono font-semibold text-[#1A2B4A]">
+                    <td className="px-6 py-3.5 text-right font-mono font-semibold text-ink">
                       {item.stockValue !== null ? formatCurrency(item.stockValue) : '—'}
                     </td>
                     <td className="px-6 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <div className="w-16 h-1.5 bg-[#F0EBE1] rounded-full overflow-hidden">
+                        <div className="w-16 h-1.5 bg-surface-offset rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-[#C9962A] rounded-full"
+                            className="h-full bg-primary rounded-full"
                             style={{ width: `${pct(item.stockValue ?? 0, stockValue)}%` }}
                           />
                         </div>
-                        <span className="font-mono text-xs text-[#6B7280]">
+                        <span className="font-mono text-xs text-ink-muted">
                           {pct(item.stockValue ?? 0, stockValue)}%
                         </span>
                       </div>
@@ -468,45 +469,45 @@ export default async function AnalyticsPage() {
       {/* ── Ordini recenti ──────────────────────────────────────────────── */}
       {orders.length > 0 && (
         <div>
-          <h2 className="font-semibold text-sm text-[#6B7280] uppercase tracking-wide mb-3">
+          <h2 className="font-semibold text-sm text-ink-muted uppercase tracking-wide mb-3">
             Ordini aperti recenti
           </h2>
-          <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+          <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-[#FAF7F2] border-b border-[#E5DDD0]">
+              <thead className="bg-bg border-b border-border">
                 <tr>
-                  <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Fornitore</th>
-                  <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Data</th>
-                  <th className="text-left px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Stato</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Articoli</th>
-                  <th className="text-right px-6 py-3 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Importo</th>
+                  <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Fornitore</th>
+                  <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Data</th>
+                  <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Stato</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Articoli</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Importo</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#F0EBE1]">
+              <tbody className="divide-y divide-divider">
                 {orders.slice(0, 5).map((order) => {
                   const STATUS_BADGE: Record<string, string> = {
-                    draft:     'bg-[#6B7280]/10 text-[#6B7280]',
-                    sent:      'bg-[#C9962A]/15 text-[#8A6418]',
-                    confirmed: 'bg-[#1A2B4A]/10 text-[#1A2B4A]',
+                    draft:     'bg-neutral-light text-ink-muted',
+                    sent:      'bg-primary-light text-primary-hover',
+                    confirmed: 'bg-neutral-light text-ink',
                   };
                   const STATUS_LABEL: Record<string, string> = {
                     draft: 'Bozza', sent: 'Inviato', confirmed: 'Confermato',
                   };
                   return (
-                    <tr key={order.orderId} className="hover:bg-[#FAF7F2] transition-colors">
-                      <td className="px-6 py-3.5 font-medium text-[#1A2B4A]">{order.supplierName}</td>
-                      <td className="px-6 py-3.5 text-[#6B7280] text-xs font-mono whitespace-nowrap">
+                    <tr key={order.orderId} className="hover:bg-surface-offset transition-colors">
+                      <td className="px-6 py-3.5 font-medium text-ink">{order.supplierName}</td>
+                      <td className="px-6 py-3.5 text-ink-muted text-xs font-mono whitespace-nowrap">
                         {formatDate(order.orderDate)}
                       </td>
                       <td className="px-6 py-3.5">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_BADGE[order.status] ?? 'bg-[#6B7280]/10 text-[#6B7280]'}`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[order.status] ?? 'bg-neutral-light text-ink-muted'}`}>
                           {STATUS_LABEL[order.status] ?? order.status}
                         </span>
                       </td>
-                      <td className="px-6 py-3.5 text-right font-mono text-[#6B7280] text-xs">
+                      <td className="px-6 py-3.5 text-right font-mono text-ink-muted text-xs">
                         {order.lineItemsCount}
                       </td>
-                      <td className="px-6 py-3.5 text-right font-mono font-medium text-[#1A2B4A]">
+                      <td className="px-6 py-3.5 text-right font-mono font-medium text-ink">
                         {order.totalAmount !== null ? formatCurrency(order.totalAmount) : '—'}
                       </td>
                     </tr>
@@ -516,7 +517,7 @@ export default async function AnalyticsPage() {
             </table>
           </div>
           <div className="flex justify-end mt-3">
-            <Link href="/orders" className="text-sm font-medium text-[#C9962A] hover:underline">
+            <Link href="/orders" className="text-sm font-medium text-primary hover:underline">
               Vedi tutti gli ordini →
             </Link>
           </div>
@@ -525,10 +526,10 @@ export default async function AnalyticsPage() {
 
       {/* Empty state */}
       {total === 0 && orders.length === 0 && monthlySpend.length === 0 && activeRecipeCosts.length === 0 && (
-        <div className="text-center py-20 bg-white rounded-2xl border border-[#E5DDD0]">
+        <div className="text-center py-20 bg-surface-2 rounded-2xl border border-border">
           <p className="text-4xl mb-3">📊</p>
-          <p className="font-playfair text-lg font-bold text-[#1A2B4A]">Nessun dato disponibile</p>
-          <p className="text-sm text-[#6B7280] mt-1">
+          <p className="text-lg font-bold text-ink">Nessun dato disponibile</p>
+          <p className="text-sm text-ink-muted mt-1">
             Aggiungi ingredienti e registra movimenti per vedere le analisi.
           </p>
         </div>

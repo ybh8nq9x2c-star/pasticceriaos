@@ -18,7 +18,7 @@ import {
 import type { OrderStatus } from '@/lib/database.types';
 
 const fieldClass =
-  'w-full rounded-xl border border-[#E5DDD0] px-3 py-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#14B8A6]/30';
+  'w-full rounded-xl border border-border px-3 py-3 bg-surface-2 focus:outline-none focus:ring-2 focus:ring-primary-ring';
 
 export function PortalOrderActions({
   token,
@@ -57,42 +57,42 @@ export function PortalOrderActions({
     <div className="space-y-4">
       {/* Conferma */}
       {status === 'sent' && (
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-4 space-y-3">
-          {confirmError && <p className="text-sm text-[#C0392B]">{confirmError}</p>}
+        <div className="bg-surface-2 rounded-2xl border border-border p-4 space-y-3">
+          {confirmError && <p className="text-sm text-danger">{confirmError}</p>}
           <button
             onClick={handleConfirm}
             disabled={confirming}
-            className="w-full min-h-[48px] bg-[#14B8A6] text-white rounded-xl text-base font-bold hover:bg-[#0F9488] disabled:opacity-60 transition-colors"
+            className="w-full min-h-[48px] bg-primary text-primary-fg rounded-xl text-base font-bold hover:bg-primary-hover disabled:opacity-60 transition-colors"
           >
             {confirming ? 'Conferma in corso…' : '✓ Conferma ordine'}
           </button>
           <button
             onClick={() => setShowIssue((v) => !v)}
-            className="w-full min-h-[48px] border border-[#C0392B]/40 text-[#C0392B] rounded-xl text-base font-semibold hover:bg-[#C0392B]/5 transition-colors"
+            className="w-full min-h-[48px] border border-danger-soft text-danger rounded-xl text-base font-semibold hover:bg-danger-light transition-colors"
           >
             Segnala un problema
           </button>
         </div>
       )}
       {status === 'confirmed' && (
-        <div className="bg-[#1A2B4A]/5 rounded-2xl border border-[#1A2B4A]/15 p-4 text-sm text-[#1A2B4A]">
+        <div className="bg-neutral-light rounded-2xl border border-border p-4 text-sm text-ink">
           ✓ Hai confermato questo ordine. Quando consegni, allega il DDT qui sotto.
         </div>
       )}
       {status === 'received' && (
-        <div className="bg-[#27AE60]/[0.07] rounded-2xl border border-[#27AE60]/25 p-4 text-sm text-[#1E7E45]">
+        <div className="bg-success-light rounded-2xl border border-success-soft p-4 text-sm text-success-strong">
           ✓ La pasticceria ha registrato la consegna. Puoi allegare la fattura qui sotto.
         </div>
       )}
 
       {/* Segnala problema */}
       {(showIssue || status !== 'sent') && status !== 'received' && (
-        <div className={`bg-white rounded-2xl border border-[#E5DDD0] p-4 ${!showIssue && status === 'sent' ? 'hidden' : ''}`}>
+        <div className={`bg-surface-2 rounded-2xl border border-border p-4 ${!showIssue && status === 'sent' ? 'hidden' : ''}`}>
           {issueState.status === 'success' ? (
-            <p className="text-sm font-semibold text-[#1E7E45]">✓ {issueState.message}</p>
+            <p className="text-sm font-semibold text-success-strong">✓ {issueState.message}</p>
           ) : (
             <form action={issueAction} className="space-y-3">
-              <label className="block text-sm font-medium text-[#1A2B4A]">
+              <label className="block text-sm font-medium text-ink">
                 {status === 'sent' ? 'Descrivi il problema' : 'Comunica qualcosa alla pasticceria'}
               </label>
               <textarea
@@ -104,12 +104,12 @@ export function PortalOrderActions({
                 className={`${fieldClass} resize-none`}
               />
               {issueState.status === 'error' && (
-                <p className="text-sm text-[#C0392B]">{issueState.error}</p>
+                <p className="text-sm text-danger">{issueState.error}</p>
               )}
               <button
                 type="submit"
                 disabled={issuePending}
-                className="w-full min-h-[48px] bg-[#1A2B4A] text-white rounded-xl text-base font-semibold hover:bg-[#243660] disabled:opacity-60"
+                className="w-full min-h-[48px] bg-primary text-primary-fg rounded-xl text-base font-semibold hover:bg-primary-hover disabled:opacity-60"
               >
                 {issuePending ? 'Invio…' : 'Invia segnalazione'}
               </button>
@@ -119,14 +119,14 @@ export function PortalOrderActions({
       )}
 
       {/* Upload documento */}
-      <div className="bg-white rounded-2xl border border-[#E5DDD0] p-4">
-        <p className="text-sm font-semibold text-[#1A2B4A] mb-1">Allega DDT o fattura</p>
-        <p className="text-xs text-[#6B7280] mb-3">
+      <div className="bg-surface-2 rounded-2xl border border-border p-4">
+        <p className="text-sm font-semibold text-ink mb-1">Allega DDT o fattura</p>
+        <p className="text-xs text-ink-muted mb-3">
           PDF o foto del documento (puoi fotografarlo direttamente). Le righe
           vengono precompilate dall'ordine.
         </p>
         {uploadState.status === 'success' ? (
-          <p className="text-sm font-semibold text-[#1E7E45]">✓ {uploadState.message}</p>
+          <p className="text-sm font-semibold text-success-strong">✓ {uploadState.message}</p>
         ) : (
           <form action={uploadAction} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -144,15 +144,15 @@ export function PortalOrderActions({
               name="file"
               type="file"
               accept=".pdf,image/*"
-              className="w-full text-sm text-[#6B7280] file:mr-3 file:min-h-[44px] file:px-4 file:rounded-xl file:border-0 file:bg-[#1A2B4A] file:text-white file:text-sm file:font-semibold"
+              className="w-full text-sm text-ink-muted file:mr-3 file:min-h-[44px] file:px-4 file:rounded-xl file:border-0 file:bg-primary file:text-primary-fg file:text-sm file:font-semibold"
             />
             {uploadState.status === 'error' && (
-              <p className="text-sm text-[#C0392B]">{uploadState.error}</p>
+              <p className="text-sm text-danger">{uploadState.error}</p>
             )}
             <button
               type="submit"
               disabled={uploadPending}
-              className="w-full min-h-[48px] bg-[#2A7D6B] text-white rounded-xl text-base font-bold hover:bg-[#236457] disabled:opacity-60"
+              className="w-full min-h-[48px] bg-primary text-primary-fg rounded-xl text-base font-bold hover:bg-primary-hover disabled:opacity-60"
             >
               {uploadPending ? 'Invio…' : '📎 Invia documento'}
             </button>

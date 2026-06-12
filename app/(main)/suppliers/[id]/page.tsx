@@ -14,9 +14,9 @@ import { updateSupplierAction, deactivateSupplierAction } from '@/modules/catalo
 import { PortalLinkPanel } from '@/components/suppliers/PortalLinkPanel';
 import type { Supplier } from '@/modules/catalog/types';
 
-const fieldClass = 'w-full rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9962A]/30 focus:border-[#C9962A] bg-white';
-const labelClass = 'block text-sm font-medium text-[#1A2B4A] mb-1.5';
-const optClass   = 'text-[#6B7280] font-normal text-xs';
+const fieldClass = 'w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary bg-surface-2';
+const labelClass = 'block text-sm font-medium text-ink mb-1.5';
+const optClass   = 'text-ink-muted font-normal text-xs';
 
 export default function SupplierDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -49,8 +49,8 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
   if (loading) {
     return (
       <div className="p-8 max-w-2xl mx-auto">
-        <div className="h-8 w-40 rounded-xl bg-[#E5DDD0] animate-pulse mb-3" />
-        <div className="h-56 rounded-2xl bg-[#E5DDD0] animate-pulse" />
+        <div className="h-8 w-40 rounded-xl bg-surface-offset animate-pulse mb-3" />
+        <div className="h-56 rounded-2xl bg-surface-offset animate-pulse" />
       </div>
     );
   }
@@ -58,9 +58,9 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
   if (!supplier) {
     return (
       <div className="p-8 max-w-2xl mx-auto">
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-8 text-center">
-          <p className="text-sm text-[#C0392B] mb-3">Fornitore non trovato.</p>
-          <Link href="/suppliers" className="text-sm font-semibold text-[#C9962A] hover:underline">
+        <div className="bg-surface-2 rounded-2xl border border-border p-8 text-center">
+          <p className="text-sm text-danger mb-3">Fornitore non trovato.</p>
+          <Link href="/suppliers" className="text-sm font-semibold text-primary hover:underline">
             ← Fornitori
           </Link>
         </div>
@@ -71,13 +71,13 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
   return (
     <div className="p-8 max-w-2xl mx-auto">
       <div className="mb-6">
-        <Link href="/suppliers" className="text-sm text-[#6B7280] hover:text-[#1A2B4A] transition-colors">
+        <Link href="/suppliers" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Fornitori
         </Link>
         <div className="flex items-center justify-between mt-3">
-          <h1 className="font-playfair text-3xl font-bold text-[#1A2B4A]">{supplier.name}</h1>
+          <h1 className="text-3xl font-bold text-ink">{supplier.name}</h1>
           {supplier.isActive && (
-            <span className="px-2.5 py-0.5 rounded-full bg-[#27AE60]/10 text-[#1E7E45] text-xs font-semibold">
+            <span className="px-2.5 py-0.5 rounded-full bg-success-light text-success-strong text-xs font-semibold">
               Attivo
             </span>
           )}
@@ -86,15 +86,15 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
 
       <form action={formAction} className="space-y-6">
         {state.status === 'error' && (
-          <div className="rounded-xl bg-[#C0392B]/[0.06] border border-[#C0392B]/30 p-3 text-sm text-[#C0392B]">
+          <div className="rounded-xl bg-danger-light border border-danger-soft p-3 text-sm text-danger">
             {state.error}
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-6 space-y-5">
+        <div className="bg-surface-2 rounded-2xl border border-border p-6 space-y-5">
           <div>
             <label className={labelClass}>
-              Nome <span className="text-[#C0392B]">*</span>
+              Nome <span className="text-danger">*</span>
             </label>
             <input
               name="name"
@@ -108,7 +108,7 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
 
           <div>
             <label className={labelClass}>
-              Email <span className="text-[#C0392B]">*</span>
+              Email <span className="text-danger">*</span>
             </label>
             <input
               name="email"
@@ -150,14 +150,14 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
         <div className="flex gap-3">
           <Link
             href="/suppliers"
-            className="flex-1 py-3 text-center rounded-xl border border-[#E5DDD0] text-sm font-semibold text-[#1A2B4A] hover:bg-[#FAF7F2] transition-colors"
+            className="flex-1 py-3 text-center rounded-xl border border-border text-sm font-semibold text-ink hover:bg-surface-offset transition-colors"
           >
             Annulla
           </Link>
           <button
             type="submit"
             disabled={pending}
-            className="flex-1 py-3 bg-[#1A2B4A] text-white rounded-xl text-sm font-semibold hover:bg-[#243660] disabled:opacity-60 transition-colors"
+            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
           >
             {pending ? 'Salvataggio…' : 'Salva modifiche'}
           </button>
@@ -169,32 +169,32 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
         <PortalLinkPanel supplierId={params.id} />
         <Link
           href={`/suppliers/${params.id}/price-list`}
-          className="bg-white rounded-2xl border border-[#E5DDD0] p-5 hover:border-[#C9962A] transition-colors flex flex-col justify-between"
+          className="bg-surface-2 rounded-2xl border border-border p-5 hover:border-primary-soft transition-colors flex flex-col justify-between"
         >
           <div>
-            <h2 className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide mb-2">
+            <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">
               Listino prezzi
             </h2>
-            <p className="text-xs text-[#6B7280]">
+            <p className="text-xs text-ink-muted">
               Prezzi concordati per ingrediente: alimentano le bozze d'ordine e
               il livello di connessione L3.
             </p>
           </div>
-          <span className="mt-3 text-sm font-semibold text-[#C9962A]">Gestisci listino →</span>
+          <span className="mt-3 text-sm font-semibold text-primary">Gestisci listino →</span>
         </Link>
       </div>
 
       {supplier.isActive && (
-        <div className="mt-8 border border-[#C0392B]/30 rounded-2xl p-5">
-          <h3 className="text-sm font-semibold text-[#C0392B] mb-1">Disattiva fornitore</h3>
-          <p className="text-xs text-[#6B7280] mb-4">
+        <div className="mt-8 border border-danger-soft rounded-2xl p-5">
+          <h3 className="text-sm font-semibold text-danger mb-1">Disattiva fornitore</h3>
+          <p className="text-xs text-ink-muted mb-4">
             Il fornitore verrà nascosto dai nuovi ordini. L&apos;operazione è reversibile.
           </p>
           {!confirming ? (
             <button
               type="button"
               onClick={() => setConfirming(true)}
-              className="px-4 py-2 text-sm font-semibold text-[#C0392B] border border-[#C0392B]/40 rounded-xl hover:bg-[#C0392B]/[0.06] transition-colors"
+              className="px-4 py-2 text-sm font-semibold text-danger border border-danger-soft rounded-xl hover:bg-danger-light transition-colors"
             >
               Disattiva
             </button>
@@ -203,14 +203,14 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
               <button
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="px-4 py-2 text-sm font-semibold text-[#1A2B4A] border border-[#E5DDD0] rounded-xl hover:bg-[#FAF7F2] transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-ink border border-border rounded-xl hover:bg-surface-offset transition-colors"
               >
                 Annulla
               </button>
               <button
                 type="button"
                 onClick={handleDeactivate}
-                className="px-4 py-2 text-sm font-semibold text-white bg-[#C0392B] rounded-xl hover:bg-[#A93226] transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-white bg-danger rounded-xl hover:bg-danger-hover transition-colors"
               >
                 Conferma disattivazione
               </button>

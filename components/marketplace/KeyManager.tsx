@@ -20,32 +20,32 @@ export function KeyManager({ keys }: { keys: ConnectionKeyView[] }) {
 
   return (
     <div className="space-y-6">
-      <form action={genAction} className="bg-white rounded-2xl border border-[#E5DDD0] p-5 space-y-3">
+      <form action={genAction} className="bg-surface-2 rounded-2xl border border-border p-5 space-y-3">
         <h2 className="font-semibold">Genera una nuova chiave</h2>
         <div className="flex flex-col sm:flex-row gap-2">
           <input name="label" placeholder="Etichetta (es. Bar Centrale)"
-            className="flex-1 rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-base sm:text-sm min-h-[44px]" />
-          <button type="submit" className="px-4 py-2.5 rounded-xl bg-[#14B8A6] text-white text-sm font-semibold hover:bg-teal-600 min-h-[44px]">
+            className="flex-1 rounded-xl border border-border px-3 py-2.5 text-base sm:text-sm min-h-[44px]" />
+          <button type="submit" className="px-4 py-2.5 rounded-xl bg-primary text-primary-fg text-sm font-semibold hover:bg-primary-hover min-h-[44px]">
             Genera
           </button>
         </div>
-        {genState.status === 'error' && <p className="text-sm text-[#C0392B]">{genState.error}</p>}
+        {genState.status === 'error' && <p className="text-sm text-danger">{genState.error}</p>}
         {newKey && (
-          <div className="rounded-xl bg-[#14B8A6]/[0.08] border border-[#14B8A6]/30 p-4">
-            <p className="text-xs text-[#6B7280] mb-1">Condividi questa chiave col cliente. Viene mostrata una sola volta:</p>
-            <code className="block break-all text-base sm:text-lg font-mono font-bold tracking-wider text-[#0F1923] select-all">{newKey}</code>
+          <div className="rounded-xl bg-primary-light border border-primary-soft p-4">
+            <p className="text-xs text-ink-muted mb-1">Condividi questa chiave col cliente. Viene mostrata una sola volta:</p>
+            <code className="block break-all text-base sm:text-lg font-mono font-bold tracking-wider text-ink select-all">{newKey}</code>
           </div>
         )}
       </form>
 
       {/* Mobile: card stack */}
       <ul className="md:hidden space-y-3">
-        {keys.length === 0 && <li className="bg-white rounded-2xl border border-[#E5DDD0] p-6 text-center text-[#6B7280]">Nessuna chiave generata.</li>}
+        {keys.length === 0 && <li className="bg-surface-2 rounded-2xl border border-border p-6 text-center text-ink-muted">Nessuna chiave generata.</li>}
         {keys.map((k) => (
-          <li key={k.id} className="bg-white rounded-2xl border border-[#E5DDD0] p-4 flex items-center justify-between gap-3">
+          <li key={k.id} className="bg-surface-2 rounded-2xl border border-border p-4 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="font-mono font-semibold truncate">{k.keyPrefix}…</p>
-              <p className="text-xs text-[#6B7280] truncate">{k.label ?? '—'}</p>
+              <p className="text-xs text-ink-muted truncate">{k.label ?? '—'}</p>
             </div>
             <div className="shrink-0 text-right">
               {k.isActive
@@ -54,7 +54,7 @@ export function KeyManager({ keys }: { keys: ConnectionKeyView[] }) {
               {k.isActive && (
                 <form action={revAction} className="mt-2">
                   <input type="hidden" name="keyId" value={k.id} />
-                  <button type="submit" className="text-[#C0392B] text-xs font-semibold hover:underline min-h-[36px]">Revoca</button>
+                  <button type="submit" className="text-danger text-xs font-semibold hover:underline min-h-[36px]">Revoca</button>
                 </form>
               )}
             </div>
@@ -63,23 +63,23 @@ export function KeyManager({ keys }: { keys: ConnectionKeyView[] }) {
       </ul>
 
       {/* Tablet/desktop: table */}
-      <div className="hidden md:block bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+      <div className="hidden md:block bg-surface-2 rounded-2xl border border-border overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-[#FAF7F2] text-[#6B7280] text-xs uppercase">
+          <thead className="bg-bg text-ink-muted text-xs uppercase">
             <tr><th className="text-left px-4 py-3">Prefisso</th><th className="text-left px-4 py-3">Etichetta</th><th className="text-left px-4 py-3">Stato</th><th className="px-4 py-3"></th></tr>
           </thead>
           <tbody>
-            {keys.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-[#6B7280]">Nessuna chiave generata.</td></tr>}
+            {keys.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-ink-muted">Nessuna chiave generata.</td></tr>}
             {keys.map((k) => (
-              <tr key={k.id} className="border-t border-[#F0EAE0]">
+              <tr key={k.id} className="border-t border-divider">
                 <td className="px-4 py-3 font-mono">{k.keyPrefix}…</td>
                 <td className="px-4 py-3">{k.label ?? '—'}</td>
-                <td className="px-4 py-3">{k.isActive ? <span className="text-green-700">Attiva</span> : <span className="text-[#6B7280]">Revocata</span>}</td>
+                <td className="px-4 py-3">{k.isActive ? <span className="text-green-700">Attiva</span> : <span className="text-ink-muted">Revocata</span>}</td>
                 <td className="px-4 py-3 text-right">
                   {k.isActive && (
                     <form action={revAction}>
                       <input type="hidden" name="keyId" value={k.id} />
-                      <button type="submit" className="text-[#C0392B] text-xs font-semibold hover:underline">Revoca</button>
+                      <button type="submit" className="text-danger text-xs font-semibold hover:underline">Revoca</button>
                     </form>
                   )}
                 </td>
@@ -87,7 +87,7 @@ export function KeyManager({ keys }: { keys: ConnectionKeyView[] }) {
             ))}
           </tbody>
         </table>
-        {revState.status === 'error' && <p className="text-sm text-[#C0392B] p-3">{revState.error}</p>}
+        {revState.status === 'error' && <p className="text-sm text-danger p-3">{revState.error}</p>}
       </div>
     </div>
   );

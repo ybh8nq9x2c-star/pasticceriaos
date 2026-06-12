@@ -1,37 +1,58 @@
 // =============================================================================
-// components/ui/EmptyState.tsx
-// Stato vuoto coerente con CTA opzionale.
+// <EmptyState> — nessun dato. Icona Lucide 40px, testo SPECIFICO al contesto
+// (mai "Nessun elemento trovato"), CTA opzionale.
 // =============================================================================
 
 import Link from 'next/link';
+import type { LucideIcon } from 'lucide-react';
+import { Inbox } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export function EmptyState({
-  emoji,
+  icon: Icon = Inbox,
   title,
   description,
   ctaHref,
   ctaLabel,
+  cta,
+  className,
+  bare = false,
 }: {
-  emoji: string;
+  icon?: LucideIcon;
   title: string;
   description?: string;
   ctaHref?: string;
   ctaLabel?: string;
+  /** CTA custom (es. <Button> con server action). */
+  cta?: React.ReactNode;
+  className?: string;
+  /** true: nessun contenitore card (per uso dentro Card/tabella). */
+  bare?: boolean;
 }) {
   return (
-    <div className="text-center py-20 bg-white rounded-2xl border border-[#E5DDD0]">
-      <p className="text-4xl mb-3">{emoji}</p>
-      <p className="font-playfair text-lg font-bold text-[#1A2B4A]">{title}</p>
-      {description && (
-        <p className="text-sm text-[#6B7280] mt-1 mb-6 max-w-sm mx-auto">{description}</p>
+    <div
+      className={cn(
+        'flex flex-col items-center text-center py-12 px-6',
+        !bare && 'bg-surface border border-border rounded-lg shadow-sm',
+        className,
       )}
-      {ctaHref && ctaLabel && (
-        <Link
-          href={ctaHref}
-          className="inline-flex items-center px-5 py-2.5 bg-[#1A2B4A] text-white rounded-xl text-sm font-semibold hover:bg-[#243660] transition-colors"
-        >
-          {ctaLabel}
-        </Link>
+    >
+      <Icon size={40} strokeWidth={1.5} className="text-ink-faint mb-3" aria-hidden="true" />
+      <h3 className="text-md font-semibold text-ink">{title}</h3>
+      {description && (
+        <p className="text-sm text-ink-muted mt-1 max-w-[36ch]">{description}</p>
+      )}
+      {(cta || (ctaHref && ctaLabel)) && (
+        <div className="mt-5">
+          {cta ?? (
+            <Link
+              href={ctaHref!}
+              className="inline-flex items-center h-10 px-4 rounded-md bg-primary text-primary-fg text-base font-medium hover:bg-primary-hover transition-colors"
+            >
+              {ctaLabel}
+            </Link>
+          )}
+        </div>
       )}
     </div>
   );

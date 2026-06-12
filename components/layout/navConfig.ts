@@ -1,72 +1,114 @@
 // =============================================================================
 // components/layout/navConfig.ts
-// Single source of truth for navigation, shared by the desktop sidebars and the
-// mobile chrome (drawer + bottom bar) so the two never drift. Pure data, no JSX.
+// Single source of truth for navigation, shared by sidebar, topbar (breadcrumb)
+// e bottom nav mobile. Icone: esclusivamente Lucide (design system).
 // =============================================================================
 
-export type NavItem = { href: string; label: string; emoji: string };
+import type { LucideIcon } from 'lucide-react';
+import {
+  Home,
+  ChefHat,
+  Cake,
+  BookOpen,
+  Truck,
+  ShoppingCart,
+  FileText,
+  Warehouse,
+  Wheat,
+  BarChart3,
+  Settings,
+  Inbox,
+  Package,
+  Users,
+  KeyRound,
+} from 'lucide-react';
+
+export type NavItem = { href: string; label: string; icon: LucideIcon };
 export type NavSection = { title: string; items: NavItem[] };
 
 // ── Customer workspace (route group `(main)`) ────────────────────────────────
-// Navigazione orientata ai FLUSSI: il marketplace non è più una sezione
-// separata — è assorbito nell'hub Fornitori.
 export const CUSTOMER_NAV: NavSection[] = [
   {
     title: 'Operativo',
     items: [
-      { href: '/dashboard',  label: 'Oggi',           emoji: '☀️' },
-      { href: '/production', label: 'Produzione',     emoji: '🧮' },
-      { href: '/customers',  label: 'Ordini clienti', emoji: '🎂' },
-      { href: '/recipes',    label: 'Ricette',        emoji: '📖' },
+      { href: '/dashboard',  label: 'Oggi',           icon: Home },
+      { href: '/production', label: 'Produzione',     icon: ChefHat },
+      { href: '/customers',  label: 'Ordini clienti', icon: Cake },
+      { href: '/recipes',    label: 'Ricette',        icon: BookOpen },
     ],
   },
   {
     title: 'Approvvigionamento',
     items: [
-      { href: '/suppliers',   label: 'Fornitori',   emoji: '🤝' },
-      { href: '/orders',      label: 'Ordini',      emoji: '🛒' },
-      { href: '/documents',   label: 'Documenti',   emoji: '🧾' },
-      { href: '/inventory',   label: 'Magazzino',   emoji: '📦' },
-      { href: '/ingredients', label: 'Ingredienti', emoji: '🧂' },
+      { href: '/suppliers',   label: 'Fornitori',   icon: Truck },
+      { href: '/orders',      label: 'Ordini',      icon: ShoppingCart },
+      { href: '/documents',   label: 'Documenti',   icon: FileText },
+      { href: '/inventory',   label: 'Magazzino',   icon: Warehouse },
+      { href: '/ingredients', label: 'Ingredienti', icon: Wheat },
     ],
   },
   {
     title: 'Sistema',
     items: [
-      { href: '/analytics', label: 'Analisi',      emoji: '📊' },
-      { href: '/settings',  label: 'Impostazioni', emoji: '⚙️' },
+      { href: '/analytics', label: 'Analytics',    icon: BarChart3 },
+      { href: '/settings',  label: 'Impostazioni', icon: Settings },
     ],
   },
 ];
 
-// 4 primary destinations for the mobile bottom bar; the 4th slot is the drawer.
+// Destinazioni primarie bottom nav mobile (la quinta è il drawer "Altro").
 export const CUSTOMER_BOTTOM: NavItem[] = [
-  { href: '/dashboard',  label: 'Oggi',       emoji: '☀️' },
-  { href: '/production', label: 'Produzione', emoji: '🧮' },
-  { href: '/inventory',  label: 'Magazzino',  emoji: '📦' },
+  { href: '/dashboard',  label: 'Oggi',       icon: Home },
+  { href: '/production', label: 'Produzione', icon: ChefHat },
+  { href: '/orders',     label: 'Ordini',     icon: ShoppingCart },
+  { href: '/inventory',  label: 'Magazzino',  icon: Warehouse },
 ];
 
 // ── Supplier workspace (`/supplier`) ─────────────────────────────────────────
-export const SUPPLIER_NAV: NavItem[] = [
-  { href: '/supplier',           label: 'Dashboard',         emoji: '🏠' },
-  { href: '/supplier/orders',    label: 'Ordini clienti',    emoji: '📥' },
-  { href: '/supplier/catalog',   label: 'Catalogo',          emoji: '📦' },
-  { href: '/supplier/customers', label: 'Clienti collegati', emoji: '🤝' },
-  { href: '/supplier/analytics', label: 'Analisi',           emoji: '📊' },
-  { href: '/supplier/keys',      label: 'Chiavi di accesso', emoji: '🔑' },
-  { href: '/supplier/settings',  label: 'Impostazioni',      emoji: '⚙️' },
+export const SUPPLIER_NAV: NavSection[] = [
+  {
+    title: 'Operativo',
+    items: [
+      { href: '/supplier',           label: 'Dashboard',         icon: Home },
+      { href: '/supplier/orders',    label: 'Ordini ricevuti',   icon: Inbox },
+      { href: '/supplier/catalog',   label: 'Catalogo & listino', icon: Package },
+      { href: '/supplier/customers', label: 'Clienti bakery',    icon: Users },
+      { href: '/supplier/analytics', label: 'Analytics',         icon: BarChart3 },
+    ],
+  },
+  {
+    title: 'Sistema',
+    items: [
+      { href: '/supplier/keys',     label: 'Chiavi di accesso', icon: KeyRound },
+      { href: '/supplier/settings', label: 'Impostazioni',      icon: Settings },
+    ],
+  },
 ];
 
-// Primary destinations for the mobile bottom bar.
 export const SUPPLIER_BOTTOM: NavItem[] = [
-  { href: '/supplier',           label: 'Home',     emoji: '🏠' },
-  { href: '/supplier/orders',    label: 'Ordini',   emoji: '📥' },
-  { href: '/supplier/catalog',   label: 'Catalogo', emoji: '📦' },
-  { href: '/supplier/analytics', label: 'Analisi',  emoji: '📊' },
+  { href: '/supplier',           label: 'Home',     icon: Home },
+  { href: '/supplier/orders',    label: 'Ordini',   icon: Inbox },
+  { href: '/supplier/catalog',   label: 'Catalogo', icon: Package },
+  { href: '/supplier/analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
 /** Longest-prefix active match (shared by every nav surface). */
 export function isActivePath(pathname: string, href: string): boolean {
   if (href === '/supplier') return pathname === href; // home: exact match only
   return pathname === href || pathname.startsWith(href + '/');
+}
+
+/** Voce nav attiva più specifica per il pathname corrente. */
+export function activeNavItem(pathname: string, sections: NavSection[]): NavItem | null {
+  const all = sections.flatMap((s) => s.items);
+  return (
+    all
+      .filter((i) => isActivePath(pathname, i.href))
+      .sort((a, b) => b.href.length - a.href.length)[0] ?? null
+  );
+}
+
+/** Sezione di appartenenza di una voce (per il breadcrumb). */
+export function sectionOf(item: NavItem, sections: NavSection[]): string | null {
+  return sections.find((s) => s.items.includes(item))?.title ?? null;
 }

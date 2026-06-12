@@ -21,11 +21,11 @@ const MOVEMENT_LABELS: Record<MovementType, string> = {
 };
 
 const MOVEMENT_BADGE: Record<MovementType, string> = {
-  purchase_receipt:   'bg-[#27AE60]/10 text-[#1E7E45]',
-  production_usage:   'bg-[#1A2B4A]/10 text-[#1A2B4A]',
-  waste:              'bg-[#C0392B]/10 text-[#C0392B]',
+  purchase_receipt:   'bg-success-light text-success-strong',
+  production_usage:   'bg-neutral-light text-ink',
+  waste:              'bg-danger-light text-danger',
   manual_adjustment:  'bg-amber-100 text-amber-700',
-  initial_stock:      'bg-[#2A7D6B]/10 text-[#2A7D6B]',
+  initial_stock:      'bg-primary-light text-primary',
   return_to_supplier: 'bg-indigo-100 text-indigo-700',
 };
 
@@ -42,63 +42,63 @@ export default async function MovementsPage() {
     <div className="p-8 max-w-5xl mx-auto">
       <div className="flex items-start justify-between mb-8">
         <div>
-          <Link href="/inventory" className="text-sm text-[#6B7280] hover:text-[#1A2B4A] transition-colors">
+          <Link href="/inventory" className="text-sm text-ink-muted hover:text-ink transition-colors">
             ← Magazzino
           </Link>
-          <h1 className="font-playfair text-3xl font-bold text-[#1A2B4A] mt-3 leading-tight">
+          <h1 className="text-3xl font-bold text-ink mt-3 leading-tight">
             Storico movimenti
           </h1>
-          <p className="text-sm text-[#6B7280] mt-1.5">
+          <p className="text-sm text-ink-muted mt-1.5">
             Ultimi {movements.length} movimenti registrati
           </p>
         </div>
         <Link
           href="/inventory/movement"
-          className="px-4 py-2.5 bg-[#1A2B4A] text-white rounded-xl text-sm font-semibold hover:bg-[#243660] transition-colors"
+          className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
         >
           + Registra movimento
         </Link>
       </div>
 
       {movements.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-2xl border border-[#E5DDD0]">
+        <div className="text-center py-20 bg-surface-2 rounded-2xl border border-border">
           <p className="text-4xl mb-3">📋</p>
-          <p className="font-playfair text-lg font-bold text-[#1A2B4A]">Nessun movimento</p>
-          <p className="text-sm text-[#6B7280] mt-1">I movimenti vengono registrati automaticamente dagli ordini e dalla produzione.</p>
+          <p className="text-lg font-bold text-ink">Nessun movimento</p>
+          <p className="text-sm text-ink-muted mt-1">I movimenti vengono registrati automaticamente dagli ordini e dalla produzione.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+        <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-[#FAF7F2] border-b border-[#E5DDD0]">
+            <thead className="bg-bg border-b border-border">
               <tr>
-                <th className="text-left px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Data</th>
-                <th className="text-left px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Tipo</th>
-                <th className="text-left px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Ingrediente</th>
-                <th className="text-right px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Δ Quantità</th>
-                <th className="text-left px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Note</th>
+                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Data</th>
+                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Tipo</th>
+                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Ingrediente</th>
+                <th className="text-right px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Δ Quantità</th>
+                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Note</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F0EBE1]">
+            <tbody className="divide-y divide-divider">
               {movements.map((mv) => (
-                <tr key={mv.id} className="hover:bg-[#FAF7F2] transition-colors">
-                  <td className="px-6 py-3.5 text-[#6B7280] text-xs font-mono whitespace-nowrap">
+                <tr key={mv.id} className="hover:bg-surface-offset transition-colors">
+                  <td className="px-6 py-3.5 text-ink-muted text-xs font-mono whitespace-nowrap">
                     {formatDate(mv.createdAt)}
                   </td>
                   <td className="px-6 py-3.5 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${MOVEMENT_BADGE[mv.movementType]}`}>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${MOVEMENT_BADGE[mv.movementType]}`}>
                       {MOVEMENT_LABELS[mv.movementType]}
                     </span>
                   </td>
-                  <td className="px-6 py-3.5 font-medium text-[#1A2B4A]">
+                  <td className="px-6 py-3.5 font-medium text-ink">
                     {mv.ingredientName}
                   </td>
                   <td className="px-6 py-3.5 text-right font-mono font-medium">
-                    <span className={mv.quantityDelta >= 0 ? 'text-[#27AE60]' : 'text-[#C0392B]'}>
+                    <span className={mv.quantityDelta >= 0 ? 'text-success-strong' : 'text-danger'}>
                       {mv.quantityDelta >= 0 ? '+' : ''}{mv.quantityDelta}
                     </span>
-                    <span className="text-xs text-[#6B7280] ml-1">{UNIT_LABELS[mv.unit]}</span>
+                    <span className="text-xs text-ink-muted ml-1">{UNIT_LABELS[mv.unit]}</span>
                   </td>
-                  <td className="px-6 py-3.5 text-[#6B7280] text-xs max-w-xs truncate">
+                  <td className="px-6 py-3.5 text-ink-muted text-xs max-w-xs truncate">
                     {mv.notes ?? '—'}
                   </td>
                 </tr>

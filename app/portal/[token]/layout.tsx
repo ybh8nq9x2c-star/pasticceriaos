@@ -6,6 +6,8 @@
 
 import { redirect } from 'next/navigation';
 import { getPortalContext } from '@/modules/portal/service';
+import { Logo } from '@/components/shared/Logo';
+import { Badge } from '@/components/ui/Badge';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,23 +26,24 @@ export default async function PortalLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2]">
-      <header className="sticky top-0 z-40 bg-[#0F1923] text-white px-4 py-3 safe-area-pt">
+    <div className="min-h-screen bg-bg flex flex-col">
+      <header className="sticky top-0 z-40 bg-surface border-b border-border px-4 py-3 safe-area-pt">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-bold leading-tight truncate">
-              <span className="text-[#14B8A6]">Pasticceria</span>OS
+            <Logo size={20} />
+            <p className="text-xs text-ink-muted truncate mt-0.5">
+              Ordini da {ctx.organizationName}
             </p>
-            <p className="text-[11px] text-white/60 truncate">{ctx.organizationName}</p>
           </div>
-          <span className="shrink-0 text-[10px] font-semibold bg-[#14B8A6] text-[#0F1923] px-2 py-1 rounded uppercase tracking-wider">
-            Portale fornitore
-          </span>
+          <Badge variant="primary">Portale fornitore</Badge>
         </div>
       </header>
-      <main className="max-w-2xl mx-auto px-4 py-5 pb-16">
+      <main className="w-full max-w-2xl mx-auto px-4 py-5 pb-16 flex-1">
         {children}
       </main>
+      <footer className="py-4 text-center text-xs text-ink-faint">
+        Powered by BakeryOs
+      </footer>
     </div>
   );
 }

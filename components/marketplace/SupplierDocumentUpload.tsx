@@ -11,23 +11,23 @@ import { useFormState } from 'react-dom';
 import { IDLE_STATE } from '@/lib/utils';
 import { supplierUploadDocumentAction } from '@/modules/documents/actions';
 
-const fieldClass = 'w-full rounded-xl border border-[#E5DDD0] px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#14B8A6]/30 focus:border-[#14B8A6]';
+const fieldClass = 'w-full rounded-xl border border-border px-3 py-2.5 text-sm bg-surface-2 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary';
 
 export function SupplierDocumentUpload({ orderId }: { orderId: string }) {
   const [state, formAction, pending] = useFormState(supplierUploadDocumentAction, IDLE_STATE);
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E5DDD0] p-4 sm:p-5">
+    <div className="bg-surface-2 rounded-2xl border border-border p-4 sm:p-5">
       <h2 className="font-semibold mb-1">Invia documento al cliente</h2>
-      <p className="text-xs text-[#6B7280] mb-3">
+      <p className="text-xs text-ink-muted mb-3">
         DDT o fattura per questo ordine: il cliente lo riceve nella sua sezione
         Documenti con le righe già precompilate.
       </p>
       {state.status === 'error' && (
-        <p className="mb-3 text-sm text-[#C0392B]">{state.error}</p>
+        <p className="mb-3 text-sm text-danger">{state.error}</p>
       )}
       {state.status === 'success' && (
-        <p className="mb-3 text-sm text-[#1E7E45]">✓ {state.message}</p>
+        <p className="mb-3 text-sm text-success-strong">✓ {state.message}</p>
       )}
       <form action={formAction} className="space-y-3">
         <input type="hidden" name="marketplaceOrderId" value={orderId} />
@@ -46,7 +46,7 @@ export function SupplierDocumentUpload({ orderId }: { orderId: string }) {
         <button
           type="submit"
           disabled={pending}
-          className="w-full py-2.5 bg-[#14B8A6] text-white rounded-xl text-sm font-semibold hover:bg-[#0F9488] disabled:opacity-60 transition-colors"
+          className="w-full py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
         >
           {pending ? 'Invio…' : '📎 Invia documento'}
         </button>

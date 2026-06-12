@@ -10,6 +10,7 @@ import type { OrderStatus } from '@/modules/ordering/types';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { ShoppingCart } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Ordini' };
 
@@ -51,7 +52,7 @@ export default async function OrdersPage() {
         action={
           <Link
             href="/orders/new"
-            className="px-4 py-2.5 bg-[#1A2B4A] text-white rounded-xl text-sm font-semibold hover:bg-[#243660] transition-colors"
+            className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
             + Nuovo ordine
           </Link>
@@ -60,42 +61,42 @@ export default async function OrdersPage() {
 
       {orders.length === 0 ? (
         <EmptyState
-          emoji="🛒"
+          icon={ShoppingCart}
           title="Nessun ordine d'acquisto"
           description="Crea ordini per rifornire il magazzino dagli ingredienti."
           ctaHref="/orders/new"
           ctaLabel="Crea ordine"
         />
       ) : (
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] overflow-hidden">
+        <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-[#FAF7F2] border-b border-[#E5DDD0]">
+            <thead className="bg-bg border-b border-border">
               <tr>
-                <th className="text-left px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Fornitore</th>
-                <th className="text-left px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Data ordine</th>
-                <th className="text-left px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Consegna prevista</th>
-                <th className="text-center px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Stato</th>
-                <th className="text-right px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Righe</th>
-                <th className="text-right px-6 py-3.5 font-semibold text-[#6B7280] text-xs uppercase tracking-wide">Totale</th>
+                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Fornitore</th>
+                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Data ordine</th>
+                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Consegna prevista</th>
+                <th className="text-center px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Stato</th>
+                <th className="text-right px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Righe</th>
+                <th className="text-right px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Totale</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F0EBE1]">
+            <tbody className="divide-y divide-divider">
               {orders.map((order) => (
-                <tr key={order.id} className="hover:bg-[#FAF7F2] transition-colors">
+                <tr key={order.id} className="hover:bg-surface-offset transition-colors">
                   <td className="px-6 py-4">
-                    <Link href={`/orders/${order.id}`} className="font-semibold text-[#1A2B4A] hover:text-[#C9962A]">
+                    <Link href={`/orders/${order.id}`} className="font-semibold text-ink hover:text-primary">
                       {order.supplierName}
                     </Link>
                   </td>
-                  <td className="px-6 py-4 text-[#6B7280] font-mono text-xs">{formatDate(order.orderDate)}</td>
-                  <td className="px-6 py-4 text-[#6B7280] font-mono text-xs">
+                  <td className="px-6 py-4 text-ink-muted font-mono text-xs">{formatDate(order.orderDate)}</td>
+                  <td className="px-6 py-4 text-ink-muted font-mono text-xs">
                     {order.expectedDate ? formatDate(order.expectedDate) : '—'}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <StatusBadge label={STATUS_LABELS[order.status]} variant={STATUS_VARIANT[order.status]} />
                   </td>
-                  <td className="px-6 py-4 text-right text-[#6B7280] font-mono">{order.lineItemsCount}</td>
-                  <td className="px-6 py-4 text-right font-mono font-medium text-[#1A2B4A]">
+                  <td className="px-6 py-4 text-right text-ink-muted font-mono">{order.lineItemsCount}</td>
+                  <td className="px-6 py-4 text-right font-mono font-medium text-ink">
                     {formatCurrency(order.totalAmount)}
                   </td>
                 </tr>

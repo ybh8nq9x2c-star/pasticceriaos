@@ -15,12 +15,12 @@ import type { CustomerOrderStatus } from '@/lib/database.types';
 export const metadata: Metadata = { title: 'Ordini clienti' };
 
 const STATUS_BADGE: Record<CustomerOrderStatus, string> = {
-  pending:       'bg-[#C9962A]/15 text-[#8A6418]',
-  confirmed:     'bg-[#1A2B4A]/10 text-[#1A2B4A]',
-  in_production: 'bg-[#2A7D6B]/10 text-[#2A7D6B]',
-  ready:         'bg-[#27AE60]/10 text-[#1E7E45]',
-  delivered:     'bg-[#6B7280]/10 text-[#6B7280]',
-  cancelled:     'bg-[#C0392B]/10 text-[#C0392B]',
+  pending:       'bg-primary-light text-primary-hover',
+  confirmed:     'bg-neutral-light text-ink',
+  in_production: 'bg-primary-light text-primary',
+  ready:         'bg-success-light text-success-strong',
+  delivered:     'bg-neutral-light text-ink-muted',
+  cancelled:     'bg-danger-light text-danger',
 };
 
 function fmtDate(iso: string) {
@@ -43,7 +43,7 @@ function AdvanceButton({ orderId, status }: { orderId: string; status: CustomerO
       <input type="hidden" name="status" value={next} />
       <button
         type="submit"
-        className="px-3 py-1.5 bg-[#1A2B4A] text-white rounded-lg text-xs font-semibold hover:bg-[#243660] whitespace-nowrap"
+        className="px-3 py-1.5 bg-primary text-primary-fg rounded-lg text-xs font-semibold hover:bg-primary-hover whitespace-nowrap"
       >
         → {CUSTOMER_ORDER_STATUS_LABELS[next]}
       </button>
@@ -79,7 +79,7 @@ export default async function CustomerOrdersPage({
         action={
           <Link
             href="/customers/new"
-            className="px-4 py-2.5 bg-[#1A2B4A] text-white rounded-xl text-sm font-semibold hover:bg-[#243660] transition-colors"
+            className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
             + Nuovo ordine cliente
           </Link>
@@ -89,30 +89,30 @@ export default async function CustomerOrdersPage({
       <div className="flex gap-2">
         <Link
           href="/customers"
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${!showClosed ? 'bg-[#1A2B4A] text-white border-[#1A2B4A]' : 'bg-white text-[#6B7280] border-[#E5DDD0]'}`}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${!showClosed ? 'bg-primary text-primary-fg border-primary' : 'bg-surface-2 text-ink-muted border-border'}`}
         >
           In corso
         </Link>
         <Link
           href="/customers?storico=1"
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${showClosed ? 'bg-[#1A2B4A] text-white border-[#1A2B4A]' : 'bg-white text-[#6B7280] border-[#E5DDD0]'}`}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${showClosed ? 'bg-primary text-primary-fg border-primary' : 'bg-surface-2 text-ink-muted border-border'}`}
         >
           Storico
         </Link>
       </div>
 
       {visible.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#E5DDD0] p-10 text-center">
+        <div className="bg-surface-2 rounded-2xl border border-border p-10 text-center">
           <p className="text-4xl mb-3">🎂</p>
-          <p className="font-playfair text-lg font-bold text-[#1A2B4A]">
+          <p className="text-lg font-bold text-ink">
             {showClosed ? 'Nessun ordine nello storico' : 'Nessun ordine cliente in corso'}
           </p>
-          <p className="text-sm text-[#6B7280] mt-1 max-w-md mx-auto">
+          <p className="text-sm text-ink-muted mt-1 max-w-md mx-auto">
             Registra le prenotazioni (torte, ritiri): compariranno nel piano di
             produzione del giorno giusto.
           </p>
           {!showClosed && (
-            <Link href="/customers/new" className="inline-block mt-4 text-sm font-semibold text-[#C9962A] hover:underline">
+            <Link href="/customers/new" className="inline-block mt-4 text-sm font-semibold text-primary hover:underline">
               Registra il primo ordine →
             </Link>
           )}
@@ -120,26 +120,26 @@ export default async function CustomerOrdersPage({
       ) : (
         [...byDate.entries()].map(([date, dateOrders]) => (
           <div key={date}>
-            <h2 className={`font-semibold text-sm uppercase tracking-wide mb-3 capitalize ${date === today ? 'text-[#C9962A]' : 'text-[#6B7280]'}`}>
+            <h2 className={`font-semibold text-sm uppercase tracking-wide mb-3 capitalize ${date === today ? 'text-primary' : 'text-ink-muted'}`}>
               {date === today ? '★ Oggi — ' : ''}{fmtDate(date)}
               <span className="ml-2 font-normal normal-case">
                 ({dateOrders.reduce((s, o) => s + o.piecesCount, 0)} pezzi)
               </span>
             </h2>
-            <div className="bg-white rounded-2xl border border-[#E5DDD0] divide-y divide-[#F0EBE1] overflow-hidden">
+            <div className="bg-surface-2 rounded-2xl border border-border divide-y divide-divider overflow-hidden">
               {dateOrders.map((o) => (
                 <div key={o.id} className="flex items-center gap-4 px-6 py-3.5">
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-[#1A2B4A] truncate">{o.customerName}</p>
-                    <p className="text-xs text-[#6B7280] mt-0.5">
+                    <p className="font-semibold text-ink truncate">{o.customerName}</p>
+                    <p className="text-xs text-ink-muted mt-0.5">
                       {o.piecesCount} {o.piecesCount === 1 ? 'pezzo' : 'pezzi'} · {o.itemsCount} {o.itemsCount === 1 ? 'articolo' : 'articoli'}
                       {o.pickupTime && ` · ritiro ${o.pickupTime.slice(0, 5)}`}
                     </p>
                   </div>
                   {o.totalAmount !== null && (
-                    <span className="text-sm font-mono font-medium text-[#1A2B4A]">€{formatCurrency(o.totalAmount)}</span>
+                    <span className="text-sm font-mono font-medium text-ink">€{formatCurrency(o.totalAmount)}</span>
                   )}
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${STATUS_BADGE[o.status]}`}>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[o.status]}`}>
                     {CUSTOMER_ORDER_STATUS_LABELS[o.status]}
                   </span>
                   {!showClosed && <AdvanceButton orderId={o.id} status={o.status} />}

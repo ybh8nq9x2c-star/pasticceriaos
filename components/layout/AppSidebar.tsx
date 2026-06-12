@@ -1,141 +1,121 @@
 'use client';
 
 // =============================================================================
-// components/layout/AppSidebar.tsx
-// Sidebar unificata per il workspace (main).
+// <AppSidebar> — navigazione desktop (≥lg) per entrambi i workspace.
+//   • lg (1024–1279px): rail compatta icone-only con tooltip nativo
+//   • xl (≥1280px):     sidebar completa 240px con label e sezioni
+// Voci e icone arrivano da navConfig (unica fonte di verità). Stato attivo:
+// bg-primary-light + testo primary (mai border-left colorato).
 // =============================================================================
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { signOutAction } from '@/modules/identity/actions';
-
-type NavItem = { href: string; label: string; emoji: string };
-
-const OPERATIVO: NavItem[] = [
-  { href: '/dashboard',   label: 'Dashboard',   emoji: '🏠' },
-  { href: '/ingredients', label: 'Ingredienti', emoji: '🧂' },
-  { href: '/suppliers',   label: 'Fornitori',   emoji: '🤝' },
-  { href: '/recipes',     label: 'Ricette',     emoji: '📖' },
-  { href: '/production',  label: 'Produzione',  emoji: '🧮' },
-];
-
-const GESTIONE: NavItem[] = [
-  { href: '/inventory',             label: 'Magazzino',   emoji: '📦' },
-  { href: '/orders',                label: 'Ordini',      emoji: '🛒' },
-  { href: '/marketplace/suppliers', label: 'Marketplace', emoji: '🔗' },
-  { href: '/analytics',             label: 'Analisi',     emoji: '📊' },
-];
-
-const SISTEMA: NavItem[] = [
-  { href: '/settings', label: 'Impostazioni', emoji: '⚙️' },
-];
+import { Logo, LogoMark } from '@/components/shared/Logo';
+import { OrgBadge } from '@/components/layout/OrgBadge';
+import {
+  CUSTOMER_NAV,
+  SUPPLIER_NAV,
+  isActivePath,
+  type NavSection,
+} from './navConfig';
+import { cn } from '@/lib/utils';
 
 interface AppSidebarProps {
+  variant?: 'customer' | 'supplier';
   orgName: string;
   userEmail: string;
+  /** Alert reali (scorte sotto soglia) mostrati come badge su Magazzino. */
   lowStockCount?: number;
 }
 
-export function AppSidebar({ orgName, userEmail, lowStockCount = 0 }: AppSidebarProps) {
+export function AppSidebar({
+  variant = 'customer',
+  orgName,
+  userEmail,
+  lowStockCount = 0,
+}: AppSidebarProps) {
   const pathname = usePathname();
-
-  function renderItem({ href, label, emoji }: NavItem) {
-    const isActive = pathname === href || pathname.startsWith(href + '/');
-    return (
-      <Link
-        key={href}
-        href={href}
-        className={`flex items-center gap-3 px-3 py-2.5 rounded-[9px] text-sm font-medium transition-colors relative mb-0.5 ${
-          isActive
-            ? 'bg-[#C9962A] text-[#1A2B4A] font-semibold'
-            : 'text-white/65 hover:bg-white/10 hover:text-white'
-        }`}
-      >
-        <span className="text-[17px] w-[22px] text-center leading-none">{emoji}</span>
-        <span>{label}</span>
-        {href === '/inventory' && lowStockCount > 0 && (
-          <span className="ml-auto bg-[#D4512A] text-white text-[10px] font-bold rounded-full px-1.5 py-px min-w-[18px] text-center">
-            {lowStockCount > 99 ? '99+' : lowStockCount}
-          </span>
-        )}
-      </Link>
-    );
-  }
+  const sections: NavSection[] = variant === 'customer' ? CUSTOMER_NAV : SUPPLIER_NAV;
+  const homeHref = variant === 'customer' ? '/dashboard' : '/supplier';
+  const workspaceLabel = variant === 'customer' ? 'Pasticceria' : 'Fornitore';
 
   return (
-    <aside className="hidden lg:flex w-60 bg-[#1A2B4A] text-white flex-col min-h-screen shrink-0">
+    <aside
+      aria-label="Navigazione principale"
+      className="hidden lg:flex sticky top-0 h-screen w-[68px] xl:w-60 shrink-0 flex-col bg-surface border-r border-border"
+    >
       {/* Logo */}
-      <div className="px-6 pt-7 pb-5 border-b border-white/[0.08]">
-        <div className="font-playfair text-xl font-black tracking-tight leading-none">
-          Pasticceria<span className="text-[#F5C842]">OS</span>
-        </div>
-        <div className="text-[10px] text-[#F5C842] uppercase tracking-[2px] mt-1">
-          Sistema Operativo
-        </div>
+      <div className="flex items-center px-3 xl:px-5 h-14 border-b border-divider shrink-0">
+        <Link
+          href={homeHref}
+          aria-label="BakeryOs — vai alla dashboard"
+          className="inline-flex items-center text-ink rounded-md"
+        >
+          <span className="xl:hidden"><LogoMark size={22} /></span>
+          <span className="hidden xl:inline-flex"><Logo size={22} /></span>
+        </Link>
       </div>
 
-      {/* Org badge */}
-      <div className="mx-4 mt-4 mb-2 bg-white/[0.07] rounded-xl px-3.5 py-3 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-[#C9962A] flex items-center justify-center text-sm font-bold text-[#1A2B4A] shrink-0">
-          {orgName.charAt(0).toUpperCase()}
-        </div>
-        <div className="min-w-0">
-          <div className="text-[13px] font-semibold text-white truncate">{orgName}</div>
-          <div className="text-[11px] text-white/50 truncate">Workspace</div>
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 px-3 py-2 overflow-y-auto">
-        <p className="text-[9px] font-semibold uppercase tracking-[2px] text-white/40 px-3 pt-3 pb-1.5">
-          Operativo
-        </p>
-        {OPERATIVO.map(renderItem)}
-
-        <p className="text-[9px] font-semibold uppercase tracking-[2px] text-white/40 px-3 pt-4 pb-1.5">
-          Gestione
-        </p>
-        {GESTIONE.map(renderItem)}
-
-        <p className="text-[9px] font-semibold uppercase tracking-[2px] text-white/40 px-3 pt-4 pb-1.5">
-          Sistema
-        </p>
-        {SISTEMA.map(renderItem)}
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-2 xl:px-3 py-3">
+        {sections.map((section, idx) => (
+          <div key={section.title} className={cn(idx > 0 && 'mt-5')}>
+            <p className="hidden xl:block px-3 pb-1.5 text-xs font-medium uppercase tracking-wide text-ink-faint">
+              {section.title}
+            </p>
+            <ul className="space-y-0.5">
+              {section.items.map((item) => {
+                const active = isActivePath(pathname, item.href);
+                const Icon = item.icon;
+                const showBadge = item.href === '/inventory' && lowStockCount > 0;
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      title={item.label}
+                      aria-current={active ? 'page' : undefined}
+                      className={cn(
+                        'flex items-center gap-2.5 h-9 px-3 rounded-md text-sm transition-colors',
+                        'justify-center xl:justify-start',
+                        active
+                          ? 'bg-primary-light text-primary font-medium'
+                          : 'text-ink-muted hover:bg-surface-offset hover:text-ink',
+                      )}
+                    >
+                      <span className="relative inline-flex shrink-0">
+                        <Icon size={16} aria-hidden="true" />
+                        {showBadge && (
+                          <span
+                            aria-hidden="true"
+                            className="xl:hidden absolute -top-1.5 -right-1.5 w-2 h-2 rounded-full bg-danger"
+                          />
+                        )}
+                      </span>
+                      <span className="hidden xl:inline truncate">{item.label}</span>
+                      {showBadge && (
+                        <span
+                          aria-label={`${lowStockCount} ingredienti sotto soglia`}
+                          className="hidden xl:inline-flex ml-auto items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-danger text-danger-fg text-xs font-semibold leading-none"
+                        >
+                          {lowStockCount > 99 ? '99+' : lowStockCount}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
-      {/* Alert strip */}
-      {lowStockCount > 0 && (
-        <div className="px-4 pb-1">
-          <Link
-            href="/inventory"
-            className="block rounded-[9px] border border-[#C9962A]/30 bg-[#C9962A]/15 px-3 py-2.5 transition-colors hover:bg-[#C9962A]/25"
-          >
-            <span className="block text-lg font-bold font-mono text-[#F5C842] leading-none">
-              {lowStockCount}
-            </span>
-            <span className="text-[11px] text-[#F5C842]/90">
-              ingredient{lowStockCount === 1 ? 'e' : 'i'} sotto soglia
-            </span>
-          </Link>
+      {/* Org badge */}
+      <div className="p-2 xl:p-3 border-t border-divider shrink-0">
+        <div className="xl:hidden">
+          <OrgBadge orgName={orgName} email={userEmail} workspaceLabel={workspaceLabel} collapsed />
         </div>
-      )}
-
-      {/* User / Sign out */}
-      <div className="px-4 py-4 border-t border-white/[0.08] mt-1">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-full bg-[#C9962A] flex items-center justify-center text-xs font-bold text-[#1A2B4A] shrink-0">
-            {userEmail.charAt(0).toUpperCase()}
-          </div>
-          <span className="flex-1 truncate text-white/60 text-xs">{userEmail}</span>
-          <form action={signOutAction}>
-            <button
-              type="submit"
-              title="Esci"
-              className="text-white/40 hover:text-white transition-colors"
-            >
-              ↩
-            </button>
-          </form>
+        <div className="hidden xl:block">
+          <OrgBadge orgName={orgName} email={userEmail} workspaceLabel={workspaceLabel} />
         </div>
       </div>
     </aside>
