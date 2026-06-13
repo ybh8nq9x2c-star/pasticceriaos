@@ -21,12 +21,20 @@ export default async function RecipesPage() {
         title="Ricette"
         subtitle={`${recipes.length} ricetta/e attive`}
         action={
-          <Link
-            href="/recipes/new"
-            className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
-          >
-            + Nuova ricetta
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/recipes/import"
+              className="px-4 py-2.5 border border-border text-ink rounded-xl text-sm font-semibold hover:bg-surface-offset transition-colors"
+            >
+              Importa
+            </Link>
+            <Link
+              href="/recipes/new"
+              className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
+            >
+              + Nuova ricetta
+            </Link>
+          </div>
         }
       />
 
