@@ -11,6 +11,7 @@ import { revalidatePath } from 'next/cache';
 import { getErrorMessage } from '@/lib/errors';
 import type { ActionState } from '@/lib/utils';
 import * as service from './service';
+import type { VerifyVatResult } from './service';
 
 // ---------------------------------------------------------------------------
 // Sign Up
@@ -81,6 +82,11 @@ export async function createOrganizationAction(
       city:        (formData.get('city') as string) || undefined,
       email:       (formData.get('email') as string) || undefined,
       accountType,
+      // Profilo fiscale (opzionale): salvato best-effort dal service.
+      vatNumber:  (formData.get('vatNumber') as string) || undefined,
+      vatCountry: (formData.get('vatCountry') as string) || undefined,
+      legalName:  (formData.get('legalName') as string) || undefined,
+      legalForm:  (formData.get('legalForm') as string) || undefined,
     });
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };
@@ -89,4 +95,23 @@ export async function createOrganizationAction(
   const home = accountType === 'supplier' ? '/supplier' : '/dashboard';
   revalidatePath(home);
   redirect(home);
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding: verifica P.IVA (checksum offline; lookup esterno futuro)
+// Input: FormData { vat }
+// ---------------------------------------------------------------------------
+export type VerifyVatState = ActionState & { vat?: VerifyVatResult };
+
+export async function verifyVatAction(
+  _prev: VerifyVatState,
+  formData: FormData,
+): Promise<VerifyVatState> {
+  try {
+    const vat = await service.verifyVat(String(formData.get('vat') ?? ''));
+    if (!vat.valid) return { status: 'error', error: vat.reason ?? 'P.IVA non valida.', vat };
+    return { status: 'success', vat };
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
 }

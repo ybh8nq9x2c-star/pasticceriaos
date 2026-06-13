@@ -46,6 +46,12 @@ export const onboardingSchema = z.object({
   accountType: z.enum(['customer', 'supplier'], {
     errorMap: () => ({ message: 'Seleziona il tipo di account' }),
   }),
+  // Profilo fiscale (opzionale in onboarding). In V1 denominazione/forma sono
+  // manuali; la P.IVA è validata via checksum nel service. Onboarding mai bloccato.
+  vatNumber:  z.string().trim().max(30).optional(),
+  vatCountry: z.string().trim().length(2).optional(),
+  legalName:  z.string().trim().max(200).optional(),
+  legalForm:  z.string().trim().max(40).optional(),
 });
 
 export type SignUpInput     = z.infer<typeof signUpSchema>;

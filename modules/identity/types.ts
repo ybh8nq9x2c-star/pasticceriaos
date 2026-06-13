@@ -4,6 +4,7 @@
 // =============================================================================
 
 import type { OrgRole } from '@/lib/database.types';
+import type { FiscalDataSource, LegalForm } from './vat';
 
 export interface Organization {
   id: string;
@@ -13,6 +14,18 @@ export interface Organization {
   email: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Profilo fiscale dell'organizzazione (colonne aggiunte da 038). */
+export interface FiscalProfile {
+  vatNumber: string | null;
+  vatCountry: string;
+  legalName: string | null;
+  legalForm: LegalForm | null;
+  fiscalDataSource: FiscalDataSource | null;
+  vatValidatedAt: string | null;
+  /** Idoneità alla fatturazione (P.IVA valida). NON attiva l'emissione. */
+  billingEligible: boolean;
 }
 
 export interface OrgMember {

@@ -8,8 +8,15 @@ import { createClient } from '@/lib/supabase/server';
 import { AuthError } from '@/lib/errors';
 import * as repo from './repository';
 import { onboardingSchema, signInSchema, signUpSchema } from './schemas';
-import type { UserSession, CreateOrganizationResult } from './types';
+import type { UserSession, CreateOrganizationResult, FiscalProfile } from './types';
 import type { SignInInput, SignUpInput, OnboardingInput } from './schemas';
+import {
+  getVatLookupProvider,
+  normalizeLegalForm,
+  validateVat,
+  type FiscalDataSource,
+  type LegalForm,
+} from './vat';
 
 // ---------------------------------------------------------------------------
 // Auth
@@ -111,5 +118,68 @@ export async function createOrganization(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new AuthError();
 
-  return repo.rpcCreateOrganization(validated);
+  const result = await repo.rpcCreateOrganization(validated);
+
+  // Profilo fiscale: BEST-EFFORT. Non deve MAI bloccare la creazione account
+  // (anche se 038 non fosse ancora applicata, l'onboarding deve riuscire).
+  const fiscal = buildFiscalProfile(validated);
+  if (fiscal) {
+    try {
+      await repo.setOrganizationFiscalProfile(result.organizationId, fiscal);
+    } catch (err) {
+      console.error('[identity] salvataggio profilo fiscale fallito (org creata comunque)', err);
+    }
+  }
+
+  return result;
+}
+
+/** Costruisce il profilo fiscale dai campi onboarding (null se nessun dato). */
+function buildFiscalProfile(input: OnboardingInput): FiscalProfile | null {
+  const hasAny = input.vatNumber || input.legalName || input.legalForm;
+  if (!hasAny) return null;
+
+  const v = input.vatNumber ? validateVat(input.vatNumber) : null;
+  const valid = v?.ok ?? false;
+  // In V1 i dati azienda sono manuali: source 'manual' solo se l'utente li ha messi.
+  const source: FiscalDataSource | null = input.legalName || input.legalForm ? 'manual' : null;
+
+  return {
+    vatNumber: v ? (v.country === 'IT' ? v.number : v.formatted) : null,
+    vatCountry: v?.country ?? input.vatCountry ?? 'IT',
+    legalName: input.legalName || null,
+    legalForm: normalizeLegalForm(input.legalForm),
+    fiscalDataSource: source,
+    vatValidatedAt: valid ? new Date().toISOString() : null,
+    // Idoneità (predisposizione), NON attivazione: solo se la P.IVA è valida.
+    billingEligible: valid,
+  };
+}
+
+export interface VerifyVatResult {
+  valid: boolean;
+  formatted: string;
+  reason?: string;
+  /** In V1 sempre null (lookup manuale); pronto per un provider futuro. */
+  company: { legalName: string | null; legalForm: LegalForm | null } | null;
+  source: FiscalDataSource;
+}
+
+/**
+ * Verifica una P.IVA durante l'onboarding: checksum offline + (se configurato in
+ * futuro) company-lookup via provider. Non tocca dati: richiede solo utente autenticato.
+ */
+export async function verifyVat(rawVat: string): Promise<VerifyVatResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new AuthError();
+
+  const v = validateVat(rawVat);
+  if (!v.ok) {
+    return { valid: false, formatted: v.formatted, reason: v.reason, company: null, source: 'manual' };
+  }
+
+  const provider = getVatLookupProvider();
+  const lookup = await provider.lookup(v.number, v.country); // V1: no-op → company null
+  return { valid: true, formatted: v.formatted, company: lookup.company, source: lookup.source };
 }

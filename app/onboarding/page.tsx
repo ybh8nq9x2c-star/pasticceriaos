@@ -2,25 +2,22 @@
 
 // =============================================================================
 // app/onboarding/page.tsx
-// Onboarding: crea organizzazione (nome pasticceria + città).
-// Usa createOrganizationAction dal modulo identity.
-//
-// NB: vive FUORI dal route group (main) di proposito. Il layout (main) richiede
-// un'organizzazione via requireSession(); l'onboarding è la pagina dove l'org
-// viene creata, quindi non deve passare per quel layout (altrimenti loop
-// /login ↔ /onboarding per gli utenti senza organizzazione).
+// Onboarding: crea organizzazione (tipo account + nome + città/email) e, in modo
+// OPZIONALE, il profilo fiscale (P.IVA + denominazione + forma giuridica).
+// La P.IVA è validata offline (checksum); denominazione/forma sono manuali in V1.
+// Onboarding mai bloccante: i dati fiscali sono facoltativi.
 // =============================================================================
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { useFormState } from 'react-dom';
 import { IDLE_STATE } from '@/lib/utils';
-import { createOrganizationAction } from '@/modules/identity/actions';
+import { createOrganizationAction, verifyVatAction } from '@/modules/identity/actions';
+import { LEGAL_FORMS, LEGAL_FORM_LABELS, guessLegalForm } from '@/modules/identity/vat';
 import { Logo } from '@/components/shared/Logo';
 
 const fieldClass = 'w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary bg-surface-2';
 const labelClass = 'block text-sm font-medium text-ink mb-1.5';
 
-// Copy coerente col tipo di organizzazione scelto (pasticceria vs fornitore).
 const COPY = {
   customer: {
     title: 'Configura la tua pasticceria',
@@ -45,19 +42,36 @@ export default function OnboardingPage() {
   const [accountType, setAccountType] = useState<'customer' | 'supplier'>('customer');
   const copy = COPY[accountType];
 
+  const [orgName, setOrgName] = useState('');
+  const [showFiscal, setShowFiscal] = useState(false);
+  const [vatNumber, setVatNumber] = useState('');
+  const [legalName, setLegalName] = useState('');
+  const [legalForm, setLegalForm] = useState('');
+  const [vatCheck, setVatCheck] = useState<{ state: 'idle' | 'valid' | 'invalid'; message?: string }>({ state: 'idle' });
+  const [verifying, startVerify] = useTransition();
+
+  function verifyVat() {
+    if (!vatNumber.trim()) return;
+    const fd = new FormData();
+    fd.set('vat', vatNumber);
+    startVerify(async () => {
+      const res = await verifyVatAction({ status: 'idle' }, fd);
+      if (res.status === 'success' && res.vat?.valid) {
+        setVatCheck({ state: 'valid', message: `P.IVA valida (${res.vat.formatted}).` });
+      } else {
+        const msg = res.status === 'error' ? res.error : res.vat?.reason ?? 'P.IVA non valida.';
+        setVatCheck({ state: 'invalid', message: msg });
+      }
+    });
+  }
+
   return (
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-
-        {/* Header */}
         <div className="text-center mb-8">
           <Logo size={30} className="justify-center" />
-          <h1 className="text-xl font-bold text-ink">
-            {copy.title}
-          </h1>
-          <p className="mt-1.5 text-sm text-ink-muted">
-            {copy.subtitle}
-          </p>
+          <h1 className="text-xl font-bold text-ink">{copy.title}</h1>
+          <p className="mt-1.5 text-sm text-ink-muted">{copy.subtitle}</p>
         </div>
 
         <div className="bg-surface-2 rounded-2xl border border-border p-8">
@@ -116,6 +130,8 @@ export default function OnboardingPage() {
                 required
                 minLength={2}
                 maxLength={200}
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
                 placeholder={copy.namePlaceholder}
                 className={fieldClass}
               />
@@ -125,26 +141,119 @@ export default function OnboardingPage() {
               <label className={labelClass}>
                 Città <span className="text-ink-muted font-normal text-xs">(opz.)</span>
               </label>
-              <input
-                name="city"
-                type="text"
-                maxLength={100}
-                placeholder="es. Milano"
-                className={fieldClass}
-              />
+              <input name="city" type="text" maxLength={100} placeholder="es. Milano" className={fieldClass} />
             </div>
 
             <div>
               <label className={labelClass}>
                 {copy.emailLabel} <span className="text-ink-muted font-normal text-xs">(opz.)</span>
               </label>
-              <input
-                name="email"
-                type="email"
-                maxLength={200}
-                placeholder={copy.emailPlaceholder}
-                className={fieldClass}
-              />
+              <input name="email" type="email" maxLength={200} placeholder={copy.emailPlaceholder} className={fieldClass} />
+            </div>
+
+            {/* ── Dati fiscali (opzionale) ─────────────────────────────────── */}
+            <div className="rounded-xl border border-border bg-bg/40">
+              <button
+                type="button"
+                onClick={() => setShowFiscal((v) => !v)}
+                className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium text-ink"
+                aria-expanded={showFiscal}
+              >
+                <span>🧾 Dati fiscali <span className="text-ink-muted font-normal">(opzionale)</span></span>
+                <span className="text-ink-muted">{showFiscal ? '−' : '+'}</span>
+              </button>
+
+              {showFiscal && (
+                <div className="space-y-4 px-3 pb-3">
+                  <p className="text-xs text-ink-muted">
+                    Inseriscili per predisporre la fatturazione. Niente viene fatturato in automatico: prepariamo solo il profilo.
+                  </p>
+
+                  <input type="hidden" name="vatCountry" value="IT" />
+
+                  <div>
+                    <label className={labelClass}>Partita IVA</label>
+                    <div className="flex gap-2">
+                      <input
+                        name="vatNumber"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={30}
+                        value={vatNumber}
+                        onChange={(e) => {
+                          setVatNumber(e.target.value);
+                          setVatCheck({ state: 'idle' });
+                        }}
+                        placeholder="es. 00743110157"
+                        className={fieldClass}
+                      />
+                      <button
+                        type="button"
+                        onClick={verifyVat}
+                        disabled={verifying || !vatNumber.trim()}
+                        className="shrink-0 rounded-xl border border-border px-3 text-sm font-semibold text-ink hover:bg-surface-offset disabled:opacity-50"
+                      >
+                        {verifying ? '…' : 'Verifica'}
+                      </button>
+                    </div>
+                    {vatCheck.state !== 'idle' && (
+                      <p className={`mt-1.5 text-xs ${vatCheck.state === 'valid' ? 'text-success-strong' : 'text-danger'}`}>
+                        {vatCheck.state === 'valid' ? '✓ ' : '⚠ '}
+                        {vatCheck.message}
+                        {vatCheck.state === 'invalid' && ' Puoi correggerla o proseguire senza.'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <label className={labelClass}>Denominazione / ragione sociale</label>
+                      {legalName.trim() && legalName.trim() !== orgName.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => setOrgName(legalName.trim())}
+                          className="text-xs font-semibold text-primary hover:underline mb-1.5"
+                        >
+                          ↑ Usa come nome attività
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      name="legalName"
+                      type="text"
+                      maxLength={200}
+                      value={legalName}
+                      onChange={(e) => {
+                        setLegalName(e.target.value);
+                        const guess = guessLegalForm(e.target.value);
+                        if (guess && !legalForm) setLegalForm(guess);
+                      }}
+                      placeholder="es. Molino Bianchi S.r.l."
+                      className={fieldClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Forma giuridica</label>
+                    <select
+                      name="legalForm"
+                      value={legalForm}
+                      onChange={(e) => setLegalForm(e.target.value)}
+                      className={fieldClass}
+                    >
+                      <option value="">— Seleziona (opz.) —</option>
+                      {LEGAL_FORMS.map((f) => (
+                        <option key={f} value={f}>
+                          {LEGAL_FORM_LABELS[f]}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1.5 text-xs text-ink-muted">
+                      Dati inseriti manualmente: li potrai verificare in automatico quando attiveremo il collegamento al Registro Imprese.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <button
@@ -158,7 +267,7 @@ export default function OnboardingPage() {
         </div>
 
         <p className="text-xs text-center text-ink-muted mt-4">
-          Potrai aggiungere altri membri del team dalle impostazioni.
+          Potrai aggiungere altri membri del team e completare i dati fiscali dalle impostazioni.
         </p>
       </div>
     </div>

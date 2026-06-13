@@ -7,7 +7,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createMarketplaceClient } from '@/modules/marketplace/db';
 import { mapSupabaseError, NotFoundError } from '@/lib/errors';
-import type { Organization, OrgMember, CreateOrganizationResult } from './types';
+import type { Organization, OrgMember, CreateOrganizationResult, FiscalProfile } from './types';
 import type { OnboardingInput } from './schemas';
 import { slugify } from '@/lib/utils';
 
@@ -63,6 +63,32 @@ export async function updateOrganization(
     createdAt: data.created_at,
     updatedAt: data.updated_at,
   };
+}
+
+/**
+ * Salva il profilo fiscale sull'organizzazione (colonne 038). UPDATE tipizzato:
+ * riusa il write-path esistente (policy organizations_update per l'owner), senza
+ * toccare la RPC SECURITY DEFINER di creazione.
+ */
+export async function setOrganizationFiscalProfile(
+  orgId: string,
+  fields: FiscalProfile,
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('organizations')
+    .update({
+      vat_number:         fields.vatNumber,
+      vat_country:        fields.vatCountry,
+      legal_name:         fields.legalName,
+      legal_form:         fields.legalForm,
+      fiscal_data_source: fields.fiscalDataSource,
+      vat_validated_at:   fields.vatValidatedAt,
+      billing_eligible:   fields.billingEligible,
+    })
+    .eq('id', orgId);
+
+  if (error) throw mapSupabaseError(error);
 }
 
 // ---------------------------------------------------------------------------
