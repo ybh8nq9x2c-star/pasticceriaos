@@ -171,12 +171,25 @@ export async function ReceiptsIndexView({
 
 // ── Nuovo ricevimento ─────────────────────────────────────────────────────────
 
-export async function ReceiptNewView({ mode }: { mode: ReceiptMode }) {
+export async function ReceiptNewView({
+  mode,
+  preselectedOrderId,
+}: {
+  mode: ReceiptMode;
+  preselectedOrderId?: string;
+}) {
   const [suppliers, orders] = await Promise.all([
     service.listSupplierOptions(),
     service.listReceivableOrders(),
   ]);
   const base = basePath(mode);
+
+  // Deep-link da un ordine (es. "Ricevi merce" dal dettaglio PO): precompila il
+  // form solo se l'ordine è ancora ricevibile (non già ricevuto/annullato/altra org).
+  const initialOrder = preselectedOrderId
+    ? orders.find((o) => o.id === preselectedOrderId) ?? null
+    : null;
+  const orderUnavailable = !!preselectedOrderId && !initialOrder;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
@@ -189,9 +202,26 @@ export async function ReceiptNewView({ mode }: { mode: ReceiptMode }) {
         title="Nuovo ricevimento"
         subtitle="Importa il DDT del fornitore oppure crea il ricevimento e scansiona la merce."
       />
+      {initialOrder && (
+        <p role="status" className="mb-4 rounded-md bg-info-light px-3 py-2 text-sm text-info-strong">
+          Ricevimento collegato all&apos;ordine di <strong>{initialOrder.supplierName}</strong>:
+          le righe e le quantità attese vengono precompilate. Potrai correggere il ricevuto reale prima di confermare.
+        </p>
+      )}
+      {orderUnavailable && (
+        <p role="status" className="mb-4 rounded-md bg-warning-light px-3 py-2 text-sm text-warning-strong">
+          L&apos;ordine indicato non è più ricevibile (già ricevuto o annullato).
+          Puoi creare un ricevimento libero qui sotto.
+        </p>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         <ImportDdtCard mode={mode} suppliers={suppliers} />
-        <NewReceiptForm mode={mode} suppliers={suppliers} orders={orders} />
+        <NewReceiptForm
+          mode={mode}
+          suppliers={suppliers}
+          orders={orders}
+          initialOrderId={initialOrder?.id}
+        />
       </div>
     </div>
   );

@@ -35,10 +35,12 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
 // Pipeline lineare per lo stepper
 const PIPELINE: OrderStatus[] = ['draft', 'sent', 'confirmed', 'received'];
 
+// La ricezione NON è più una transizione di stato diretta: la merce entra a
+// magazzino solo dal Goods Receipt Engine (preview editabile → conferma → stock).
+// Qui restano solo le transizioni che non toccano le giacenze.
 const NEXT_ACTIONS: Partial<Record<OrderStatus, { toStatus: OrderStatus; label: string }>> = {
   draft:     { toStatus: 'sent',      label: 'Segna come inviato' },
   sent:      { toStatus: 'confirmed', label: 'Segna come confermato' },
-  confirmed: { toStatus: 'received',  label: 'Segna come ricevuto' },
 };
 
 function formatDate(iso: string) {
@@ -74,6 +76,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
   }
 
   const nextAction = NEXT_ACTIONS[order.status];
+  const canReceive = order.status === 'sent' || order.status === 'confirmed';
   const canCancel  = order.status !== 'received' && order.status !== 'cancelled';
 
   const orderId = order.id;
@@ -309,13 +312,28 @@ export default async function OrderDetailPage({ params }: { params: { id: string
             </Link>
           )}
 
-          {/* Azione avanzamento stato */}
+          {/* Ricevi merce → Goods Receipt Engine (preview editabile, poi conferma).
+              Unica via di ingresso a magazzino: niente posting istantaneo. */}
+          {canReceive && (
+            <Link
+              href={`/receipts/new?order=${order.id}`}
+              className="block w-full py-3 text-center rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
+            >
+              📦 Ricevi merce
+            </Link>
+          )}
+
+          {/* Azione avanzamento stato (non tocca il magazzino) */}
           {nextAction && (
             <form action={handleAdvance}>
               <input type="hidden" name="status" value={nextAction.toStatus} />
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
+                className={
+                  canReceive
+                    ? 'w-full py-3 rounded-xl text-sm font-semibold border border-border text-ink hover:bg-surface-offset transition-colors'
+                    : 'w-full py-3 rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors'
+                }
               >
                 {nextAction.label}
               </button>

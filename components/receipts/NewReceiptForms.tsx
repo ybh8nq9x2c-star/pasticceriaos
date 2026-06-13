@@ -126,14 +126,19 @@ export function NewReceiptForm({
   mode,
   suppliers,
   orders,
+  initialOrderId,
 }: {
   mode: ReceiptMode;
   suppliers: SupplierOption[];
   orders: ReceivableOrder[];
+  initialOrderId?: string;
 }) {
   const [state, formAction] = useFormState(createReceiptAction, IDLE_STATE);
-  const [supplierId, setSupplierId] = useState('');
-  const [orderId, setOrderId] = useState('');
+  // Precompilazione da deep-link ordine: ordine + fornitore già selezionati.
+  const [supplierId, setSupplierId] = useState(
+    () => orders.find((o) => o.id === initialOrderId)?.supplierId ?? '',
+  );
+  const [orderId, setOrderId] = useState(initialOrderId ?? '');
 
   const filteredOrders = useMemo(
     () => (supplierId ? orders.filter((o) => o.supplierId === supplierId) : orders),
