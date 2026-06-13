@@ -6,6 +6,7 @@
 import { test, expect } from '@playwright/test';
 import { BAKERY_STATE } from '../helpers/accounts';
 import { gotoTimed, loadState, logFinding, note, saveState, snap } from '../helpers/audit';
+import { ensureIngredient } from '../helpers/flows';
 
 test.use({ storageState: BAKERY_STATE });
 test.describe.configure({ mode: 'serial' });
@@ -111,4 +112,82 @@ test('D22 · listino: importa prezzi dall\'ultimo ordine ricevuto (BUG-09 refres
     });
   }
   await snap(page, 'D-listino');
+});
+
+// ── D25-27 · Integrazione ordine interno → Goods Receipt Engine ──────────────
+// Nuovo flusso: dal dettaglio ordine "Ricevi merce" apre il receipt precompilato.
+// Valida: niente CTA legacy, deep-link prefill, NESSUN posting immediato al click
+// iniziale, preview editabile, correzione qty (parziale) e conferma esplicita.
+// Self-contained (crea il PO interno come fixture) e tollerante (skip se manca un
+// fornitore in anagrafica). Dati taggati "[E2E]" per la pulizia post-run.
+const E2E_ORDER_ING = {
+  name: 'E2E Farina test', unit: 'kg' as const, sku: 'E2E-FAR', unitPrice: '1,00',
+};
+
+test('D25-27 · ordine → Ricevi merce → preview editabile → conferma (no posting immediato)', async ({ page }) => {
+  test.setTimeout(180_000);
+
+  // Fixture self-contained: ingrediente E2E (idempotente via ensure-*).
+  await ensureIngredient(page, E2E_ORDER_ING);
+
+  // 1) Crea un PO interno ricevibile.
+  await page.goto('/orders/new');
+  const supplierSel = page.locator('select[name="supplierId"]');
+  if ((await supplierSel.locator('option').count()) <= 1) {
+    note('D25: nessun fornitore in anagrafica su questo ambiente → scenario saltato.');
+    return;
+  }
+  await supplierSel.selectOption({ index: 1 });
+  await page.getByLabel('Ingrediente riga 1').selectOption({ label: E2E_ORDER_ING.name });
+  await page.getByLabel('Quantità riga 1').fill('10');
+  await page.locator('textarea[name="notes"]').fill('[E2E] ordine test integrazione receipt');
+  await page.getByRole('button', { name: 'Crea ordine' }).click();
+  await page.waitForURL(/\/orders$/, { timeout: 30_000 });
+
+  // 2) Apri l'ordine appena creato e portalo a "Confermato"
+  //    (transizioni che NON toccano il magazzino).
+  await page.locator('a[href^="/orders/"]:not([href$="/new"])').first().click();
+  await page.waitForURL(/\/orders\/[0-9a-f-]+$/);
+  const orderUrl = page.url();
+  await page.getByRole('button', { name: 'Segna come inviato' }).click();
+  await expect(page.getByText('Inviato').first()).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Segna come confermato' }).click();
+  await expect(page.getByText('Confermato').first()).toBeVisible({ timeout: 30_000 });
+
+  // 3) La CTA legacy "Segna come ricevuto" NON deve più esistere; la nuova
+  //    "Ricevi merce" deve puntare al deep-link del goods receipt engine.
+  await expect(page.getByRole('button', { name: 'Segna come ricevuto' })).toHaveCount(0);
+  const cta = page.getByRole('link', { name: /Ricevi merce/ });
+  await expect(cta).toBeVisible();
+  expect(await cta.getAttribute('href')).toMatch(/\/receipts\/new\?order=[0-9a-f-]+/);
+  await cta.click();
+  await page.waitForURL(/\/receipts\/new\?order=/);
+  await expect(page.getByText(/Ricevimento collegato all'ordine/)).toBeVisible();
+
+  // 4) Crea il receipt: preview EDITABILE con righe precompilate dall'ordine.
+  await page.getByRole('button', { name: 'Crea ricevimento' }).click();
+  await page.waitForURL(/\/receipts\/[0-9a-f-]+/, { timeout: 45_000 });
+  await expect(page.getByText(/Atteso/).first()).toBeVisible();
+  const righe = page.locator('section[aria-label="Righe del ricevimento"] li');
+  expect(await righe.count()).toBeGreaterThan(0);
+  await snap(page, 'D25-receipt-da-ordine');
+
+  // 5) NESSUN posting immediato: l'ordine collegato è ancora "Confermato"
+  //    (lo stock non si muove finché non si completa il ricevimento).
+  await page.goto(orderUrl);
+  await expect(page.getByText('Confermato').first()).toBeVisible();
+  await page.goBack();
+
+  // 6) Correggi il ricevuto reale (7 < 10 atteso = collo mancante) → parziale.
+  await righe.first().getByLabel(/^Ricevuto/).fill('7');
+  await righe.first().getByRole('button', { name: 'Salva' }).click();
+  await page.waitForTimeout(2000);
+
+  // 7) Conferma esplicita: SOLO ORA si contabilizza (carico parziale).
+  await page.getByRole('button', { name: /Completa ricevimento/ }).click();
+  await page.getByRole('button', { name: 'Registra carico parziale' }).click();
+  await expect(
+    page.getByText(/Carico parziale registrato|magazzino aggiornato/),
+  ).toBeVisible({ timeout: 45_000 });
+  await snap(page, 'D25-carico-parziale-confermato');
 });

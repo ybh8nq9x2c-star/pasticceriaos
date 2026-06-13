@@ -213,6 +213,7 @@ export function NewOrderForm({
 
                 {/* Ingrediente */}
                 <select
+                  aria-label={`Ingrediente riga ${idx + 1}`}
                   value={row.ingredientProductId}
                   onChange={(e) => updateRow(row.key, 'ingredientProductId', e.target.value)}
                   className="col-span-5 rounded-xl border border-border px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring bg-surface-2"
@@ -229,6 +230,7 @@ export function NewOrderForm({
                   step="0.001"
                   min="0"
                   placeholder="Qtà"
+                  aria-label={`Quantità riga ${idx + 1}`}
                   value={row.quantity}
                   onChange={(e) => updateRow(row.key, 'quantity', e.target.value)}
                   className="col-span-2 rounded-xl border border-border px-2 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
