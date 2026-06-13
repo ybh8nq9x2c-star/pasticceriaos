@@ -19,6 +19,7 @@ import {
   Settings,
   Inbox,
   Package,
+  PackageCheck,
   Users,
   KeyRound,
 } from 'lucide-react';
@@ -42,6 +43,7 @@ export const CUSTOMER_NAV: NavSection[] = [
     items: [
       { href: '/suppliers',   label: 'Fornitori',   icon: Truck },
       { href: '/orders',      label: 'Ordini',      icon: ShoppingCart },
+      { href: '/receipts',    label: 'Ricevimenti', icon: PackageCheck },
       { href: '/documents',   label: 'Documenti',   icon: FileText },
       { href: '/inventory',   label: 'Magazzino',   icon: Warehouse },
       { href: '/ingredients', label: 'Ingredienti', icon: Wheat },
@@ -71,6 +73,7 @@ export const SUPPLIER_NAV: NavSection[] = [
     items: [
       { href: '/supplier',           label: 'Dashboard',         icon: Home },
       { href: '/supplier/orders',    label: 'Ordini ricevuti',   icon: Inbox },
+      { href: '/supplier/receipts',  label: 'Ricevimenti',       icon: PackageCheck },
       { href: '/supplier/catalog',   label: 'Catalogo & listino', icon: Package },
       { href: '/supplier/customers', label: 'Clienti bakery',    icon: Users },
       { href: '/supplier/analytics', label: 'Analytics',         icon: BarChart3 },

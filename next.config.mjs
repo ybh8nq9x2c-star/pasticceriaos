@@ -7,6 +7,12 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
+  experimental: {
+    // pdf-parse (goods receipt engine) va risolto a runtime Node, non bundlato:
+    // il wrapper del pacchetto ha side-effect incompatibili con webpack.
+    serverComponentsExternalPackages: ['pdf-parse'],
+  },
+
   // Compressione gzip e header puliti
   compress: true,
   poweredByHeader: false,

@@ -25,6 +25,25 @@ export type PlanStatus = 'draft' | 'in_progress' | 'completed' | 'cancelled';
 
 export type OrgRole = 'owner' | 'baker' | 'viewer';
 
+// ── goods receipts (migration 035) ───────────────────────────────────────────
+
+export type ReceiptMode = 'supplier' | 'bakery';
+
+export type ReceiptStatus =
+  | 'draft'
+  | 'expected'
+  | 'partial'
+  | 'completed'
+  | 'discrepancy'
+  | 'cancelled';
+
+export type ReceiptLineStatus =
+  | 'pending'
+  | 'matched'
+  | 'received'
+  | 'partial'
+  | 'discrepancy';
+
 // ── marketplace enums (migrations 012–016) ────────────────────────────────────
 
 export type AccountType = 'customer' | 'supplier';
@@ -183,6 +202,7 @@ export interface Database {
           supplier_id: string | null;
           name: string;
           sku: string | null;
+          barcode: string | null;
           unit: UnitOfMeasure;
           unit_price: number | null;
           notes: string | null;
@@ -196,6 +216,7 @@ export interface Database {
           supplier_id?: string | null;
           name: string;
           sku?: string | null;
+          barcode?: string | null;
           unit: UnitOfMeasure;
           unit_price?: number | null;
           notes?: string | null;
@@ -207,6 +228,7 @@ export interface Database {
           supplier_id?: string | null;
           name?: string;
           sku?: string | null;
+          barcode?: string | null;
           unit?: UnitOfMeasure;
           unit_price?: number | null;
           notes?: string | null;
@@ -319,6 +341,8 @@ export interface Database {
           performed_by: string | null;
           performed_at: string;
           created_at: string;
+          qty_before: number | null;
+          qty_after: number | null;
         };
         Insert: {
           id?: string;
@@ -333,6 +357,8 @@ export interface Database {
           performed_by?: string | null;
           performed_at?: string;
           created_at?: string;
+          qty_before?: number | null;
+          qty_after?: number | null;
         };
         Update: never; // append-only
         Relationships: [
@@ -762,6 +788,7 @@ export interface Database {
           notes: string | null;
           is_active: boolean;
           created_at: string;
+          receipt_line_id: string | null;
         };
         Insert: {
           id?: string;
@@ -777,6 +804,7 @@ export interface Database {
           received_at?: string;
           notes?: string | null;
           is_active?: boolean;
+          receipt_line_id?: string | null;
         };
         Update: {
           lot_number?: string | null;
@@ -784,6 +812,115 @@ export interface Database {
           quantity_remaining?: number;
           notes?: string | null;
           is_active?: boolean;
+        };
+        Relationships: [];
+      };
+
+      // ── goods receipts (migration 035) ───────────────────────────────────────
+      purchase_receipts: {
+        Row: {
+          id: string;
+          organization_id: string;
+          mode: ReceiptMode;
+          supplier_id: string | null;
+          purchase_order_id: string | null;
+          source_document_id: string | null;
+          ddt_number: string | null;
+          ddt_date: string | null;
+          status: ReceiptStatus;
+          notes: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          mode: ReceiptMode;
+          supplier_id?: string | null;
+          purchase_order_id?: string | null;
+          source_document_id?: string | null;
+          ddt_number?: string | null;
+          ddt_date?: string | null;
+          status?: ReceiptStatus;
+          notes?: string | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          supplier_id?: string | null;
+          purchase_order_id?: string | null;
+          source_document_id?: string | null;
+          ddt_number?: string | null;
+          ddt_date?: string | null;
+          status?: ReceiptStatus;
+          notes?: string | null;
+          updated_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [];
+      };
+
+      purchase_receipt_lines: {
+        Row: {
+          id: string;
+          receipt_id: string;
+          product_id: string | null;
+          raw_product_name: string;
+          sku: string | null;
+          barcode: string | null;
+          qty_expected: number | null;
+          qty_received: number;
+          qty_posted: number;
+          unit: UnitOfMeasure;
+          lot_number: string | null;
+          expiry_date: string | null;
+          discrepancy_reason: string | null;
+          line_status: ReceiptLineStatus;
+          sort_order: number;
+          scanned_by: string | null;
+          scanned_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          receipt_id: string;
+          product_id?: string | null;
+          raw_product_name: string;
+          sku?: string | null;
+          barcode?: string | null;
+          qty_expected?: number | null;
+          qty_received?: number;
+          qty_posted?: number;
+          unit?: UnitOfMeasure;
+          lot_number?: string | null;
+          expiry_date?: string | null;
+          discrepancy_reason?: string | null;
+          line_status?: ReceiptLineStatus;
+          sort_order?: number;
+          scanned_by?: string | null;
+          scanned_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          product_id?: string | null;
+          raw_product_name?: string;
+          sku?: string | null;
+          barcode?: string | null;
+          qty_expected?: number | null;
+          qty_received?: number;
+          qty_posted?: number;
+          unit?: UnitOfMeasure;
+          lot_number?: string | null;
+          expiry_date?: string | null;
+          discrepancy_reason?: string | null;
+          line_status?: ReceiptLineStatus;
+          sort_order?: number;
+          scanned_by?: string | null;
+          scanned_at?: string | null;
         };
         Relationships: [];
       };
@@ -1469,6 +1606,10 @@ export interface Database {
         Args: { p_order_id: string };
         Returns: undefined;
       };
+      complete_purchase_receipt: {
+        Args: { p_receipt_id: string };
+        Returns: ReceiptStatus;
+      };
       complete_production_plan: {
         Args: { p_plan_id: string };
         Returns: undefined;
@@ -1521,6 +1662,9 @@ export interface Database {
       account_type: AccountType;
       connection_status: ConnectionStatus;
       marketplace_order_status: MarketplaceOrderStatus;
+      receipt_mode: ReceiptMode;
+      receipt_status: ReceiptStatus;
+      receipt_line_status: ReceiptLineStatus;
     };
 
     CompositeTypes: Record<never, never>;
