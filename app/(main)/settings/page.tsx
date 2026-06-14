@@ -4,8 +4,9 @@
 // =============================================================================
 
 import type { Metadata } from 'next';
-import { requireSession } from '@/modules/identity/service';
+import { requireSession, getFiscalProfile } from '@/modules/identity/service';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { FiscalProfileForm } from '@/components/settings/FiscalProfileForm';
 
 export const metadata: Metadata = { title: 'Impostazioni' };
 
@@ -45,6 +46,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default async function SettingsPage() {
   const session = await requireSession();
+  const fiscal = await getFiscalProfile();
   const roleLabel = ROLE_LABELS[session.role] ?? session.role;
 
   return (
@@ -62,6 +64,14 @@ export default async function SettingsPage() {
         <Row label="Nome" value={session.organizationName} />
         <Row label="ID organizzazione" value={session.organizationId.slice(0, 8) + '…'} />
       </SectionCard>
+
+      {/* Dati fiscali (profilo P.IVA introdotto in onboarding, completabile qui) */}
+      <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+        <div className="px-6 py-4 border-b border-divider bg-bg">
+          <h2 className="text-base font-bold text-ink">Dati fiscali</h2>
+        </div>
+        <FiscalProfileForm initial={fiscal} canEdit={session.role === 'owner'} />
+      </div>
 
       {/* Soglie stock */}
       <SectionCard title="Soglie magazzino">

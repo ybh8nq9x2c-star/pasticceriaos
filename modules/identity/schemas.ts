@@ -54,6 +54,15 @@ export const onboardingSchema = z.object({
   legalForm:  z.string().trim().max(40).optional(),
 });
 
-export type SignUpInput     = z.infer<typeof signUpSchema>;
-export type SignInInput     = z.infer<typeof signInSchema>;
-export type OnboardingInput = z.infer<typeof onboardingSchema>;
+// Profilo fiscale modificabile da /settings (stessi campi fiscali dell'onboarding).
+export const fiscalProfileSchema = z.object({
+  vatNumber:  z.string().trim().max(30).optional(),
+  vatCountry: z.string().trim().length(2).optional(),
+  legalName:  z.string().trim().max(200).optional(),
+  legalForm:  z.string().trim().max(40).optional(),
+});
+
+export type SignUpInput        = z.infer<typeof signUpSchema>;
+export type SignInInput        = z.infer<typeof signInSchema>;
+export type OnboardingInput    = z.infer<typeof onboardingSchema>;
+export type FiscalProfileInput = z.infer<typeof fiscalProfileSchema>;

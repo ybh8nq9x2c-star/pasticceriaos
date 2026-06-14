@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createMarketplaceClient } from '@/modules/marketplace/db';
 import { mapSupabaseError, NotFoundError } from '@/lib/errors';
 import type { Organization, OrgMember, CreateOrganizationResult, FiscalProfile } from './types';
+import { normalizeLegalForm, type FiscalDataSource } from './vat';
 import type { OnboardingInput } from './schemas';
 import { slugify } from '@/lib/utils';
 
@@ -89,6 +90,27 @@ export async function setOrganizationFiscalProfile(
     .eq('id', orgId);
 
   if (error) throw mapSupabaseError(error);
+}
+
+/** Legge il profilo fiscale dell'organizzazione (colonne 038). */
+export async function getFiscalProfile(orgId: string): Promise<FiscalProfile> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('organizations')
+    .select('vat_number, vat_country, legal_name, legal_form, fiscal_data_source, vat_validated_at, billing_eligible')
+    .eq('id', orgId)
+    .single();
+
+  if (error) throw mapSupabaseError(error);
+  return {
+    vatNumber:        data.vat_number,
+    vatCountry:       data.vat_country,
+    legalName:        data.legal_name,
+    legalForm:        normalizeLegalForm(data.legal_form),
+    fiscalDataSource: (data.fiscal_data_source as FiscalDataSource | null) ?? null,
+    vatValidatedAt:   data.vat_validated_at,
+    billingEligible:  data.billing_eligible,
+  };
 }
 
 // ---------------------------------------------------------------------------

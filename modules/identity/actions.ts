@@ -12,6 +12,7 @@ import { getErrorMessage } from '@/lib/errors';
 import type { ActionState } from '@/lib/utils';
 import * as service from './service';
 import type { VerifyVatResult } from './service';
+import type { FiscalProfile } from './types';
 
 // ---------------------------------------------------------------------------
 // Sign Up
@@ -111,6 +112,30 @@ export async function verifyVatAction(
     const vat = await service.verifyVat(String(formData.get('vat') ?? ''));
     if (!vat.valid) return { status: 'error', error: vat.reason ?? 'P.IVA non valida.', vat };
     return { status: 'success', vat };
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Settings: aggiorna profilo fiscale (solo owner, via RLS organizations_update)
+// Input: FormData { vatNumber?, vatCountry?, legalName?, legalForm? }
+// ---------------------------------------------------------------------------
+export type FiscalProfileState = ActionState & { profile?: FiscalProfile };
+
+export async function updateFiscalProfileAction(
+  _prev: FiscalProfileState,
+  formData: FormData,
+): Promise<FiscalProfileState> {
+  try {
+    const profile = await service.updateFiscalProfile({
+      vatNumber:  (formData.get('vatNumber') as string) || undefined,
+      vatCountry: (formData.get('vatCountry') as string) || undefined,
+      legalName:  (formData.get('legalName') as string) || undefined,
+      legalForm:  (formData.get('legalForm') as string) || undefined,
+    });
+    revalidatePath('/settings');
+    return { status: 'success', message: 'Profilo fiscale aggiornato.', profile };
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };
   }

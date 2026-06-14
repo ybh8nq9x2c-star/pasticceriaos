@@ -7,9 +7,9 @@
 import { createClient } from '@/lib/supabase/server';
 import { AuthError } from '@/lib/errors';
 import * as repo from './repository';
-import { onboardingSchema, signInSchema, signUpSchema } from './schemas';
+import { fiscalProfileSchema, onboardingSchema, signInSchema, signUpSchema } from './schemas';
 import type { UserSession, CreateOrganizationResult, FiscalProfile } from './types';
-import type { SignInInput, SignUpInput, OnboardingInput } from './schemas';
+import type { SignInInput, SignUpInput, OnboardingInput, FiscalProfileInput } from './schemas';
 import {
   getVatLookupProvider,
   normalizeLegalForm,
@@ -122,7 +122,7 @@ export async function createOrganization(
 
   // Profilo fiscale: BEST-EFFORT. Non deve MAI bloccare la creazione account
   // (anche se 038 non fosse ancora applicata, l'onboarding deve riuscire).
-  const fiscal = buildFiscalProfile(validated);
+  const fiscal = computeFiscalProfile(validated);
   if (fiscal) {
     try {
       await repo.setOrganizationFiscalProfile(result.organizationId, fiscal);
@@ -134,8 +134,31 @@ export async function createOrganization(
   return result;
 }
 
-/** Costruisce il profilo fiscale dai campi onboarding (null se nessun dato). */
-function buildFiscalProfile(input: OnboardingInput): FiscalProfile | null {
+/** Profilo fiscale "vuoto" (reset coerente quando l'utente cancella tutti i campi). */
+const EMPTY_FISCAL_PROFILE: FiscalProfile = {
+  vatNumber: null,
+  vatCountry: 'IT',
+  legalName: null,
+  legalForm: null,
+  fiscalDataSource: null,
+  vatValidatedAt: null,
+  billingEligible: false,
+};
+
+/** Campi fiscali grezzi condivisi da onboarding e settings. */
+type FiscalInput = {
+  vatNumber?: string;
+  vatCountry?: string;
+  legalName?: string;
+  legalForm?: string;
+};
+
+/**
+ * Calcola il profilo fiscale dai campi grezzi (null se nessun dato). Logica
+ * UNICA per onboarding e settings: P.IVA valida (checksum) → verificata +
+ * idonea; denominazione/forma manuali → source 'manual'. Non attiva fatturazione.
+ */
+function computeFiscalProfile(input: FiscalInput): FiscalProfile | null {
   const hasAny = input.vatNumber || input.legalName || input.legalForm;
   if (!hasAny) return null;
 
@@ -182,4 +205,26 @@ export async function verifyVat(rawVat: string): Promise<VerifyVatResult> {
   const provider = getVatLookupProvider();
   const lookup = await provider.lookup(v.number, v.country); // V1: no-op → company null
   return { valid: true, formatted: v.formatted, company: lookup.company, source: lookup.source };
+}
+
+// ---------------------------------------------------------------------------
+// Profilo fiscale (lettura/modifica da /settings)
+// ---------------------------------------------------------------------------
+
+/** Profilo fiscale dell'organizzazione corrente (colonne 038). */
+export async function getFiscalProfile(): Promise<FiscalProfile> {
+  const orgId = await requireOrgId();
+  return repo.getFiscalProfile(orgId);
+}
+
+/**
+ * Aggiorna il profilo fiscale (solo colonne fiscali, non distruttivo sul resto).
+ * Ricalcola verifica/idoneità dalla P.IVA. RLS: solo l'owner (organizations_update).
+ */
+export async function updateFiscalProfile(raw: unknown): Promise<FiscalProfile> {
+  const orgId = await requireOrgId();
+  const input: FiscalProfileInput = fiscalProfileSchema.parse(raw);
+  const profile = computeFiscalProfile(input) ?? EMPTY_FISCAL_PROFILE;
+  await repo.setOrganizationFiscalProfile(orgId, profile);
+  return profile;
 }
