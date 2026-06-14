@@ -32,9 +32,13 @@ export async function signUpAction(
     return { status: 'error', error: getErrorMessage(err) };
   }
 
-  // Supabase invia email di conferma; redirect a pagina che lo comunica.
-  // Se email confirmation è disabilitata in Supabase → redirect /onboarding diretto.
-  redirect('/onboarding');
+  // Con email confirmation attiva l'utente NON ha ancora sessione: mostriamo lo
+  // stato "controlla la mail" (niente redirect a /onboarding che rimbalzerebbe a
+  // /login). La sessione nasce dal link → /auth/confirm.
+  return {
+    status: 'success',
+    message: 'Account creato! Ti abbiamo inviato un\'email di conferma: aprila e poi accedi.',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +59,11 @@ export async function signInAction(
     return { status: 'error', error: getErrorMessage(err) };
   }
 
-  redirect('/dashboard');
+  // Honor il deep-link `next` (impostato dal middleware), altrimenti '/' →
+  // il middleware smista a /dashboard o /supplier secondo account_type (1 hop).
+  const next = formData.get('next');
+  const dest = typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+  redirect(dest);
 }
 
 // ---------------------------------------------------------------------------

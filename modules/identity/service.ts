@@ -26,9 +26,14 @@ export async function signUp(input: SignUpInput): Promise<{ userId: string }> {
   const validated = signUpSchema.parse(input);
   const supabase = await createClient();
 
+  // Link di conferma → la nostra route robusta /auth/confirm (mai 500).
+  // emailRedirectTo richiede che l'URL sia nelle Redirect URLs del progetto Supabase.
+  const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, '');
+
   const { data, error } = await supabase.auth.signUp({
     email: validated.email,
     password: validated.password,
+    options: base ? { emailRedirectTo: `${base}/auth/confirm?next=/onboarding` } : undefined,
   });
 
   if (error) throw new AuthError(error.message);

@@ -16,7 +16,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
-const PUBLIC_ROUTES = ['/login', '/signup', '/auth/callback'];
+const PUBLIC_ROUTES = ['/login', '/signup', '/auth/callback', '/auth/confirm', '/auth/error'];
 const SEMI_AUTH_ROUTES = ['/onboarding'];
 const SUPPLIER_PREFIX = '/supplier';
 
