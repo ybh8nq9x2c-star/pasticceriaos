@@ -83,6 +83,12 @@ export function CompleteReceiptBar({
             {state.message}
           </p>
         )}
+        {canComplete && (
+          <p className="mb-2 rounded-md bg-warning-light px-3 py-2 text-xs font-medium text-warning-strong">
+            ⚠ Il magazzino <strong>non è ancora aggiornato</strong>: conferma per contabilizzare{' '}
+            {toPost.length} rig{toPost.length === 1 ? 'a' : 'he'}.
+          </p>
+        )}
         <div className="flex items-center gap-2">
           {canCancel && (
             <Button variant="ghost" className="text-danger" onClick={() => setCancelOpen(true)}>
@@ -96,7 +102,7 @@ export function CompleteReceiptBar({
             onClick={() => (preview === 'completed' ? complete() : setConfirmOpen(true))}
           >
             <CheckCircle2 size={16} aria-hidden="true" />
-            Completa ricevimento
+            Conferma e aggiorna magazzino
           </Button>
         </div>
         {!canComplete && (

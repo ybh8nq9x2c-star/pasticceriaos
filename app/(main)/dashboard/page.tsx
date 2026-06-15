@@ -17,6 +17,7 @@ import {
   getIngredientPurchaseStats,
 } from '@/modules/reporting/service';
 import { getLowStockAlerts, getExpiringBatches } from '@/modules/inventory/service';
+import { listReceipts } from '@/modules/goods-receipts/service';
 import { listDocuments } from '@/modules/documents/service';
 import { listCustomerOrders } from '@/modules/customers/service';
 import { requireSession } from '@/modules/identity/service';
@@ -67,7 +68,7 @@ export default async function TodayPage() {
   const session = await requireSession();
   const today = todayISODate();
 
-  const [summary, openOrders, stockAlerts, recipeCosts, expiring, documents, customerOrders, topSpend] =
+  const [summary, openOrders, stockAlerts, recipeCosts, expiring, documents, customerOrders, topSpend, openReceiptsRaw] =
     await Promise.all([
       getDashboardSummary(),
       getOpenOrders(),
@@ -77,6 +78,7 @@ export default async function TodayPage() {
       listDocuments(),
       listCustomerOrders(),
       getIngredientPurchaseStats(3),
+      listReceipts({ status: ['draft', 'expected', 'partial'] }),
     ]);
 
   // Fabbisogno del piano di oggi (se esiste): copertura stock reale.
@@ -98,6 +100,22 @@ export default async function TodayPage() {
   const negativeMarginRecipes = lowMarginRecipes.filter((r) => (r.marginPct ?? 0) < 0);
 
   const attention: AttentionItem[] = [];
+
+  // Ricevimenti rimasti aperti = merce fisicamente presente ma NON ancora a
+  // magazzino. È la verità del magazzino a rischio: massima priorità.
+  const OPEN_RECEIPT_HOURS = 2;
+  const openReceipts = openReceiptsRaw.filter(
+    (r) => r.linesCount > 0 && now - new Date(r.createdAt).getTime() > OPEN_RECEIPT_HOURS * 3600_000,
+  );
+  if (openReceipts.length > 0) {
+    attention.push({
+      emoji: '📦', severity: 'red',
+      text: `${openReceipts.length} ricevimento${openReceipts.length === 1 ? '' : 'i'} non contabilizzat${openReceipts.length === 1 ? 'o' : 'i'}: il magazzino non è ancora aggiornato`,
+      detail: openReceipts.map((r) => r.supplierName).filter(Boolean).slice(0, 3).join(', ') || 'conferma per aggiornare le giacenze',
+      href: '/receipts?tab=open',
+    });
+  }
+
   if (negativeMarginRecipes.length > 0) {
     attention.push({
       emoji: '🛑', severity: 'red',
