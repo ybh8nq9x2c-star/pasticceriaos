@@ -3,18 +3,20 @@
 // Business logic per inventory movements e livelli.
 // =============================================================================
 
-import { requireOrgId } from '@/modules/identity/service';
+import { requireOrgId, requireSession } from '@/modules/identity/service';
 import { createClient } from '@/lib/supabase/server';
-import { AuthError } from '@/lib/errors';
+import { AuthError, BusinessRuleError } from '@/lib/errors';
+import type { UnitOfMeasure } from '@/lib/database.types';
 import * as repo from './repository';
 import {
   createMovementSchema,
   updateThresholdSchema,
+  adjustStockSchema,
   initialStockSchema,
   createBatchSchema,
 } from './schemas';
 import type { InventoryLevel, InventoryMovement, LowStockAlert, IngredientBatch, ExpiringBatch } from './types';
-import type { CreateMovementInput, UpdateThresholdInput, InitialStockInput, CreateBatchInput } from './schemas';
+import type { CreateMovementInput, UpdateThresholdInput, AdjustStockInput, InitialStockInput, CreateBatchInput } from './schemas';
 
 // ---------------------------------------------------------------------------
 // Levels
@@ -88,6 +90,49 @@ export async function recordMovement(raw: unknown): Promise<InventoryMovement> {
   if (!user) throw new AuthError();
 
   return repo.insertMovement(orgId, user.id, normalizeSign(input));
+}
+
+export interface AdjustStockResult {
+  previousQuantity: number;
+  newQuantity: number;
+  delta: number;
+  unit: UnitOfMeasure;
+}
+
+/**
+ * Rettifica al volo: porta lo stock di un ingrediente ESATTAMENTE al conteggio
+ * reale. Calcola il delta firmato server-side (su lettura fresca della giacenza)
+ * e lo registra come movimento manual_adjustment: il trigger riproietta
+ * inventory_levels. Riservata a owner/baker; il viewer è sola lettura.
+ */
+export async function adjustStockToCount(raw: unknown): Promise<AdjustStockResult> {
+  const session = await requireSession();
+  if (session.role === 'viewer') {
+    throw new AuthError('Non hai i permessi per rettificare il magazzino.');
+  }
+
+  const input: AdjustStockInput = adjustStockSchema.parse(raw);
+
+  // Delta calcolato dalla giacenza FRESCA (non da un valore stale del client):
+  // così il risultato finale è sempre = conteggio reale, anche con concorrenza.
+  const level = await getLevelForIngredient(input.ingredientProductId);
+  const previous = level?.currentQuantity ?? 0;
+  const unit = level?.unit ?? input.unit;
+  const delta = Math.round((input.countedQuantity - previous) * 1000) / 1000;
+
+  if (delta === 0) {
+    throw new BusinessRuleError('Lo stock è già allineato al conteggio inserito.');
+  }
+
+  await recordMovement({
+    ingredientProductId: input.ingredientProductId,
+    movementType:        'manual_adjustment',
+    quantityDelta:       String(delta),
+    unit,
+    notes:               `Rettifica inventario: conteggio reale ${input.countedQuantity} ${unit} (prima ${previous} ${unit})`,
+  });
+
+  return { previousQuantity: previous, newQuantity: input.countedQuantity, delta, unit };
 }
 
 /**

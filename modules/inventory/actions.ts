@@ -35,6 +35,28 @@ export async function recordMovementAction(
   return { status: 'success', message: 'Movimento registrato.' };
 }
 
+export async function adjustStockAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    const res = await service.adjustStockToCount({
+      ingredientProductId: formField(formData, 'ingredientProductId'),
+      countedQuantity:     formField(formData, 'countedQuantity'),
+      unit:                formField(formData, 'unit'),
+    });
+    revalidatePath('/inventory');
+    revalidatePath('/inventory/movements');
+    revalidatePath('/dashboard');
+    return {
+      status: 'success',
+      message: `Stock allineato a ${res.newQuantity} ${res.unit}.`,
+    };
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+}
+
 export async function recordInitialStockAction(
   _prev: ActionState,
   formData: FormData,

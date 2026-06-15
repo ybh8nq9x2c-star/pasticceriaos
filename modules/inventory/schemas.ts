@@ -58,6 +58,20 @@ export const updateThresholdSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Rettifica al conteggio reale: porta lo stock ESATTAMENTE al valore contato.
+// Il delta firmato viene calcolato server-side (manual_adjustment).
+// ---------------------------------------------------------------------------
+
+export const adjustStockSchema = z.object({
+  ingredientProductId: z.string().uuid('ID ingrediente non valido'),
+  countedQuantity: z
+    .string()
+    .transform((v) => parseFloat(v.replace(',', '.')))
+    .pipe(z.number().min(0, 'Il conteggio non può essere negativo')),
+  unit: z.enum(UNITS),
+});
+
+// ---------------------------------------------------------------------------
 // Carico iniziale: shortcut per initial_stock movement
 // ---------------------------------------------------------------------------
 
@@ -92,5 +106,6 @@ export const createBatchSchema = z.object({
 
 export type CreateMovementInput  = z.infer<typeof createMovementSchema>;
 export type UpdateThresholdInput = z.infer<typeof updateThresholdSchema>;
+export type AdjustStockInput     = z.infer<typeof adjustStockSchema>;
 export type InitialStockInput    = z.infer<typeof initialStockSchema>;
 export type CreateBatchInput     = z.infer<typeof createBatchSchema>;

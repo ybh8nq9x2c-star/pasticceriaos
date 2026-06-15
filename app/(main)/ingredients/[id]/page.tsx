@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { IDLE_STATE, UNIT_LABELS } from '@/lib/utils';
 import { updateIngredientAction, deactivateIngredientAction } from '@/modules/catalog/actions';
+import { StockAdjustPanel } from '@/components/inventory/StockAdjustPanel';
 import type { IngredientProduct } from '@/modules/catalog/types';
 import type { UnitOfMeasure } from '@/lib/database.types';
 
@@ -198,6 +199,12 @@ export default function IngredientDetailPage({ params }: { params: { id: string 
           </button>
         </div>
       </form>
+
+      <StockAdjustPanel
+        ingredientId={ingredient.id}
+        ingredientName={ingredient.name}
+        unit={ingredient.unit}
+      />
 
       {ingredient.isActive && (
         <div className="mt-8 border border-danger-soft rounded-2xl p-5">
