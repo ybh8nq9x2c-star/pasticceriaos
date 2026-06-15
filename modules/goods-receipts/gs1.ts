@@ -19,6 +19,13 @@ export interface Gs1Parsed {
   lot?: string;         // (10) lotto
   expiry?: string;      // (17) scadenza → ISO YYYY-MM-DD
   bestBefore?: string;  // (15) → ISO YYYY-MM-DD
+  /**
+   * Data da usare nel campo "Scadenza" del ricevimento: usa la scadenza (17)
+   * se presente, altrimenti il termine minimo di conservazione / best-before
+   * (15). ISO YYYY-MM-DD. Le etichette alimentari spesso riportano solo l'una
+   * o l'altra: il campo deve popolarsi in entrambi i casi.
+   */
+  expiryForReceipt?: string;
   /** Codice più utile per il match prodotto: GTIN se presente, altrimenti SSCC/raw. */
   primary: string;
   raw: string;
@@ -35,9 +42,17 @@ const FIXED: Record<string, number> = {
 // AI a lunghezza VARIABILE (terminati da FNC1 o fine stringa). Sottoinsieme utile.
 const VARIABLE = new Set(['10', '21', '22', '30', '37', '240', '241', '250', '251', '400', '401', '10']);
 
+/** "YYYY-MM-DD" → "GG/MM/AAAA" per la UI italiana. '' se non valido. */
+export function gs1IsoToItalian(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? '');
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+
 /** "YYMMDD" → "YYYY-MM-DD" (DD=00 → ultimo giorno del mese). null se non valido. */
 export function gs1DateToIso(yymmdd: string): string | null {
-  if (!/^\d{6}$/.test(yymmdd)) return null;
+  const clean = yymmdd.replace(/\s+/g, '');
+  if (!/^\d{6}$/.test(clean)) return null;
+  yymmdd = clean;
   const yy = Number(yymmdd.slice(0, 2));
   const mm = Number(yymmdd.slice(2, 4));
   let dd = Number(yymmdd.slice(4, 6));
@@ -70,11 +85,17 @@ function parseParen(s: string): Record<string, string> | null {
 }
 
 /** Parse della forma "elementstring" (AI concatenati, separatore FNC1 sui variabili). */
+function isSep(ch: string): boolean {
+  // FNC1 oppure spazio/tab: alcuni scanner separano gli AI con spazi al posto
+  // del FNC1 (es. "15271203 10L6154R") invece di concatenarli.
+  return ch === GS || ch === ' ' || ch === '\t';
+}
+
 function parseElementString(s: string): Record<string, string> {
   const ai: Record<string, string> = {};
   let i = 0;
   while (i < s.length) {
-    if (s[i] === GS) { i++; continue; }
+    if (isSep(s[i])) { i++; continue; }
     // AI: prova 2, poi 3, poi 4 cifre.
     let aiKey = '';
     for (const len of [2, 3, 4]) {
@@ -88,9 +109,9 @@ function parseElementString(s: string): Record<string, string> {
       ai[aiKey] = val;
       i += FIXED[aiKey];
     } else {
-      // variabile: fino a FNC1 o fine
-      const gsIdx = s.indexOf(GS, i);
-      const end = gsIdx === -1 ? s.length : gsIdx;
+      // variabile: fino al prossimo separatore (FNC1/spazio) o fine stringa.
+      let end = i;
+      while (end < s.length && !isSep(s[end])) end++;
       ai[aiKey] = s.slice(i, end);
       i = end;
     }
@@ -103,6 +124,11 @@ function looksGs1(s: string): boolean {
   if (s.includes(GS) || s.startsWith('(')) return true;
   if (/^00\d{18}$/.test(s)) return true;             // SSCC
   if (/^01\d{14}/.test(s) && s.length >= 16) return true; // GTIN AI (+ eventuali altri AI)
+  // Element-string SENZA parentesi con AI separati da spazi (scanner che non
+  // emette FNC1): inizia con un AI noto ed è "spaziata". Lo spazio + l'AI noto
+  // la distinguono da un EAN/UPC semplice (che è solo cifre, senza spazi).
+  const head = s.replace(/^\s+/, '').slice(0, 2);
+  if (/\s/.test(s) && (FIXED[head] !== undefined || VARIABLE.has(head))) return true;
   return false;
 }
 
@@ -121,6 +147,8 @@ export function parseGs1(rawInput: string): Gs1Parsed {
   const lot = ai['10'] || undefined;
   const expiry = ai['17'] ? gs1DateToIso(ai['17']) ?? undefined : undefined;
   const bestBefore = ai['15'] ? gs1DateToIso(ai['15']) ?? undefined : undefined;
+  // Campo Scadenza del ricevimento: scadenza (17) se c'è, altrimenti best-before (15).
+  const expiryForReceipt = expiry ?? bestBefore;
 
   return {
     isGs1,
@@ -130,6 +158,7 @@ export function parseGs1(rawInput: string): Gs1Parsed {
     lot,
     expiry,
     bestBefore,
+    expiryForReceipt,
     primary: gtin ?? sscc ?? raw,
     raw,
   };

@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { registerScanAction } from '@/modules/goods-receipts/actions';
-import { parseGs1, type Gs1Parsed } from '@/modules/goods-receipts/gs1';
+import { parseGs1, gs1IsoToItalian, type Gs1Parsed } from '@/modules/goods-receipts/gs1';
 import { isIOS, hasBarcodeDetector } from '@/lib/device';
 import { IDLE_STATE, type ActionState, cn } from '@/lib/utils';
 import type { ReceiptMode } from '@/modules/goods-receipts/types';
@@ -109,7 +109,8 @@ export function ScannerPanel({
     setParsed(g);
     setCode(g.primary);
     if (g.lot) setLot(g.lot);
-    if (g.expiry) setExpiry(g.expiry);
+    // Scadenza: usa la scadenza (17) o, in mancanza, il best-before (15).
+    if (g.expiryForReceipt) setExpiry(g.expiryForReceipt);
 
     setResult(null);
     setPhase('confirm');
@@ -374,7 +375,7 @@ export function ScannerPanel({
             {parsed.gtin && (<><dt className="text-ink-muted">GTIN</dt><dd className="font-mono text-ink truncate">{parsed.gtin}</dd></>)}
             {parsed.sscc && (<><dt className="text-ink-muted">SSCC</dt><dd className="font-mono text-ink truncate">{parsed.sscc}</dd></>)}
             {parsed.lot && (<><dt className="text-ink-muted">Lotto</dt><dd className="font-mono text-ink truncate">{parsed.lot}</dd></>)}
-            {parsed.expiry && (<><dt className="text-ink-muted">Scadenza</dt><dd className="font-mono text-ink">{parsed.expiry}</dd></>)}
+            {parsed.expiryForReceipt && (<><dt className="text-ink-muted">Scadenza</dt><dd className="font-mono text-ink">{gs1IsoToItalian(parsed.expiryForReceipt)}</dd></>)}
           </dl>
           {!parsed.gtin && parsed.sscc && (
             <p className="text-xs text-warning-strong">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseGs1, gs1DateToIso } from '../gs1';
+import { parseGs1, gs1DateToIso, gs1IsoToItalian } from '../gs1';
 
 const GS = '\x1D';
 
@@ -55,5 +55,64 @@ describe('parseGs1', () => {
     const r = parseGs1('0123456789012');
     expect(r.isGs1).toBe(false);
     expect(r.primary).toBe('0123456789012');
+  });
+});
+
+describe('gs1IsoToItalian', () => {
+  it('ISO → GG/MM/AAAA', () => {
+    expect(gs1IsoToItalian('2027-12-03')).toBe('03/12/2027');
+    expect(gs1IsoToItalian(undefined)).toBe('');
+    expect(gs1IsoToItalian('non-data')).toBe('');
+  });
+});
+
+// ── Scadenza da AI multipli, ordine indifferente (bug best-before (15)) ──────
+describe('parseGs1 — AI multipli e scadenza (15)/(17)', () => {
+  // NB sul lotto: il valore dell'AI (10) è una stringa OPACA (tracciabilità
+  // HACCP). Il parser NON inventa caratteri: "L6154R" resta "L6154R"; lo spazio
+  // compare solo se è davvero nella sorgente (vedi caso "con spazi").
+
+  it('1) (15)271203(10)L6154R → best-before (15) → Scadenza 03/12/2027 + lotto', () => {
+    const r = parseGs1('(15)271203(10)L6154R');
+    expect(r.expiry).toBeUndefined();              // nessun AI 17
+    expect(r.bestBefore).toBe('2027-12-03');       // AI 15
+    expect(r.expiryForReceipt).toBe('2027-12-03'); // campo Scadenza UI
+    expect(gs1IsoToItalian(r.expiryForReceipt)).toBe('03/12/2027');
+    expect(r.lot).toBe('L6154R');
+  });
+
+  it('2) (10)L6154R(15)271203 → stesso risultato a ordine invertito', () => {
+    const r = parseGs1('(10)L6154R(15)271203');
+    expect(r.expiryForReceipt).toBe('2027-12-03');
+    expect(r.lot).toBe('L6154R');
+  });
+
+  it('3) (00)380000412300656352 → SSCC', () => {
+    const r = parseGs1('(00)380000412300656352');
+    expect(r.isGs1).toBe(true);
+    expect(r.sscc).toBe('380000412300656352');
+    expect(r.primary).toBe('380000412300656352');
+  });
+
+  it('4) (01)…(15)…(10)… → GTIN + scadenza + lotto tutti estratti', () => {
+    const r = parseGs1('(01)18052536243030(15)271203(10)L6154R');
+    expect(r.gtin).toBe('18052536243030');
+    expect(r.expiryForReceipt).toBe('2027-12-03');
+    expect(gs1IsoToItalian(r.expiryForReceipt)).toBe('03/12/2027');
+    expect(r.lot).toBe('L6154R');
+    expect(r.primary).toBe('18052536243030');
+  });
+
+  it('5) con spazi: "(15) 271203  (10) L6154 R" → scadenza + lotto con spazio reale', () => {
+    const r = parseGs1('(15) 271203  (10) L6154 R');
+    expect(r.expiryForReceipt).toBe('2027-12-03');
+    expect(r.lot).toBe('L6154 R'); // lo spazio è nella sorgente → preservato
+  });
+
+  it('6) senza parentesi, AI separati da spazio: "15271203 10L6154R"', () => {
+    const r = parseGs1('15271203 10L6154R');
+    expect(r.isGs1).toBe(true);
+    expect(r.expiryForReceipt).toBe('2027-12-03');
+    expect(r.lot).toBe('L6154R');
   });
 });
