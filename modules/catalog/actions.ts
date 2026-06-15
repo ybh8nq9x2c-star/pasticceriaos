@@ -159,6 +159,27 @@ export async function updateIngredientAction(
   return { status: 'success', message: 'Ingrediente aggiornato.' };
 }
 
+export async function assignSupplierBulkAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    const idsRaw = formData.get('ingredientIds');
+    const ingredientIds = idsRaw ? JSON.parse(idsRaw as string) : [];
+    const count = await service.assignSupplierBulk({
+      ingredientIds,
+      supplierId: formData.get('supplierId'),
+    });
+    revalidatePath('/ingredients');
+    return {
+      status: 'success',
+      message: `Fornitore assegnato a ${count} ingredient${count === 1 ? 'e' : 'i'}.`,
+    };
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+}
+
 export async function deactivateIngredientAction(id: string): Promise<ActionState> {
   try {
     await service.deactivateIngredient(id);

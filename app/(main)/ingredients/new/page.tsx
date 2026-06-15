@@ -31,6 +31,7 @@ const UNITS = [
 export default function NewIngredientPage() {
   const [state, formAction, pending] = useFormState(createIngredientAction, IDLE_STATE);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
+  const [supplierId, setSupplierId] = useState('');
 
   // BUG-05: il fornitore deve essere assegnabile già alla creazione, altrimenti
   // l'auto-riordino ("Genera bozze per fornitore") esclude l'ingrediente.
@@ -121,12 +122,26 @@ export default function NewIngredientPage() {
             <label className={labelClass}>
               Fornitore <span className={optClass}>(opz. — necessario per il riordino automatico)</span>
             </label>
-            <select name="supplierId" defaultValue="" className={fieldClass}>
+            <select
+              name="supplierId"
+              value={supplierId}
+              onChange={(e) => setSupplierId(e.target.value)}
+              className={fieldClass}
+            >
               <option value="">— Nessun fornitore —</option>
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
+            {supplierId === '' && (
+              <p className="mt-1.5 flex items-start gap-1.5 text-xs text-warning-strong">
+                <span aria-hidden="true">⚠</span>
+                <span>
+                  Senza fornitore questo ingrediente <strong>non comparirà</strong> nei suggerimenti di
+                  riordino automatico. Puoi assegnarlo anche dopo, dalla lista ingredienti.
+                </span>
+              </p>
+            )}
           </div>
 
           <div>

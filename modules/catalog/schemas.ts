@@ -47,6 +47,12 @@ export const updateIngredientSchema = createIngredientSchema.partial().extend({
   isActive: z.boolean().optional(),
 });
 
+// Assegnazione massiva di un fornitore a più ingredienti (colma i "buchi").
+export const assignSupplierBulkSchema = z.object({
+  ingredientIds: z.array(z.string().uuid()).min(1, 'Seleziona almeno un ingrediente'),
+  supplierId: z.string().uuid('Fornitore non valido'),
+});
+
 // ---------------------------------------------------------------------------
 // Recipe
 // ---------------------------------------------------------------------------
@@ -94,5 +100,6 @@ export type CreateSupplierInput    = z.infer<typeof createSupplierSchema>;
 export type UpdateSupplierInput    = z.infer<typeof updateSupplierSchema>;
 export type CreateIngredientInput  = z.infer<typeof createIngredientSchema>;
 export type UpdateIngredientInput  = z.infer<typeof updateIngredientSchema>;
+export type AssignSupplierBulkInput = z.infer<typeof assignSupplierBulkSchema>;
 export type CreateRecipeInput      = z.infer<typeof createRecipeSchema>;
 export type UpdateRecipeInput      = z.infer<typeof updateRecipeSchema>;

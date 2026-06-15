@@ -12,6 +12,7 @@ import {
   updateSupplierSchema,
   createIngredientSchema,
   updateIngredientSchema,
+  assignSupplierBulkSchema,
   createRecipeSchema,
   updateRecipeSchema,
 } from './schemas';
@@ -21,6 +22,7 @@ import type {
   UpdateSupplierInput,
   CreateIngredientInput,
   UpdateIngredientInput,
+  AssignSupplierBulkInput,
   CreateRecipeInput,
   UpdateRecipeInput,
 } from './schemas';
@@ -79,6 +81,18 @@ export async function updateIngredient(id: string, raw: unknown): Promise<Ingred
 
 export async function deactivateIngredient(id: string): Promise<IngredientProduct> {
   return repo.patchIngredient(id, { isActive: false });
+}
+
+/**
+ * Assegna massivamente un fornitore a più ingredienti (per colmare in fretta i
+ * buchi che escludono gli ingredienti dal riordino automatico). Verifica che il
+ * fornitore esista nell'org corrente (RLS) prima di scrivere. Ritorna il conteggio.
+ */
+export async function assignSupplierBulk(raw: unknown): Promise<number> {
+  const orgId = await requireOrgId();
+  const input: AssignSupplierBulkInput = assignSupplierBulkSchema.parse(raw);
+  await repo.getSupplierById(input.supplierId); // throws NotFoundError se non esiste/non è dell'org
+  return repo.assignSupplierToIngredients(orgId, input.ingredientIds, input.supplierId);
 }
 
 // ---------------------------------------------------------------------------

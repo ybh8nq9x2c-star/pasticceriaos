@@ -5,16 +5,16 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { listIngredients } from '@/modules/catalog/service';
-import { UNIT_LABELS, formatCurrency } from '@/lib/utils';
+import { listIngredients, listSuppliers } from '@/modules/catalog/service';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { IngredientsManager } from '@/components/ingredients/IngredientsManager';
 import { Wheat } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Ingredienti' };
 
 export default async function IngredientsPage() {
-  const ingredients = await listIngredients();
+  const [ingredients, suppliers] = await Promise.all([listIngredients(), listSuppliers()]);
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
@@ -40,41 +40,10 @@ export default async function IngredientsPage() {
           ctaLabel="Aggiungi ingrediente"
         />
       ) : (
-        <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-bg border-b border-border">
-              <tr>
-                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Nome</th>
-                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">SKU</th>
-                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Unità</th>
-                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Prezzo/unità</th>
-                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Fornitore</th>
-                <th className="px-6 py-3.5" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-divider">
-              {ingredients.map((ing) => (
-                <tr key={ing.id} className="hover:bg-surface-offset transition-colors">
-                  <td className="px-6 py-4 font-medium text-ink">{ing.name}</td>
-                  <td className="px-6 py-4 text-ink-muted font-mono text-xs">{ing.sku ?? '—'}</td>
-                  <td className="px-6 py-4 text-ink-muted">{UNIT_LABELS[ing.unit]}</td>
-                  <td className="px-6 py-4 text-ink-muted font-mono">
-                    {ing.unitPrice !== null ? formatCurrency(ing.unitPrice) : '—'}
-                  </td>
-                  <td className="px-6 py-4 text-ink-muted">{ing.supplierName ?? '—'}</td>
-                  <td className="px-6 py-4 text-right">
-                    <Link
-                      href={`/ingredients/${ing.id}`}
-                      className="text-primary text-xs font-semibold hover:underline"
-                    >
-                      Modifica
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <IngredientsManager
+          ingredients={ingredients}
+          suppliers={suppliers.map((s) => ({ id: s.id, name: s.name }))}
+        />
       )}
     </div>
   );

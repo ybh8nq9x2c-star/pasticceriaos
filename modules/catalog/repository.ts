@@ -151,6 +151,28 @@ export async function patchIngredient(id: string, input: UpdateIngredientInput):
   return toIngredient(data);
 }
 
+/**
+ * Assegna lo stesso fornitore a più ingredienti in un colpo solo. Aggiorna
+ * ESCLUSIVAMENTE supplier_id (non tocca gli altri campi, a differenza di
+ * patchIngredient). Ritorna il numero di righe aggiornate.
+ */
+export async function assignSupplierToIngredients(
+  orgId: string,
+  ingredientIds: string[],
+  supplierId: string,
+): Promise<number> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('ingredient_products')
+    .update({ supplier_id: supplierId })
+    .eq('organization_id', orgId)
+    .in('id', ingredientIds)
+    .select('id');
+
+  if (error) throw mapSupabaseError(error);
+  return (data ?? []).length;
+}
+
 // ---------------------------------------------------------------------------
 // Recipes
 // ---------------------------------------------------------------------------
