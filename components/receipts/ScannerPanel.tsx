@@ -1,32 +1,30 @@
 'use client';
 
 // =============================================================================
-// <ScannerPanel> — scanner barcode da fotocamera per il goods receipt engine.
-// Strategia: BarcodeDetector nativo quando disponibile (Chrome/Edge/Android),
-// fallback dinamico a html5-qrcode (iOS Safari, Firefox). Sempre disponibile
-// l'inserimento manuale del codice: lo scanner non è mai un dead-end.
-// Formati: EAN-13, EAN-8, Code 128, QR (+ GTIN da GS1-128 via normalizzazione).
-// Richiede secure context (HTTPS) per getUserMedia.
+// <ScannerPanel> — acquisizione barcode per il goods receipt engine.
+// Due UX, scelte per CAPABILITY (non per finta):
+//   • CAPABLE (Android/desktop con BarcodeDetector): fotocamera primaria, motore
+//     nativo affidabile su GS1-128; input manuale in fondo. UX invariata.
+//   • BEST-EFFORT (iPhone/iOS o browser senza BarcodeDetector): scanner esterno
+//     / input manuale PRIMARIO e autofocato (keyboard-wedge friendly), banner
+//     onesto, fotocamera disponibile ma secondaria.
+// In entrambi: parse GS1-128 immediato (SSCC/GTIN/lotto/scadenza) e conferma
+// rapida. registerScan e parseGs1 invariati. Richiede HTTPS per getUserMedia.
 // =============================================================================
 
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
-import { Camera, CameraOff, Check, Keyboard, RefreshCw, ScanLine } from 'lucide-react';
+import { Camera, CameraOff, Check, Crosshair, Keyboard, RefreshCw, ScanLine } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { registerScanAction } from '@/modules/goods-receipts/actions';
 import { parseGs1, type Gs1Parsed } from '@/modules/goods-receipts/gs1';
+import { isIOS, hasBarcodeDetector } from '@/lib/device';
 import { IDLE_STATE, type ActionState, cn } from '@/lib/utils';
 import type { ReceiptMode } from '@/modules/goods-receipts/types';
 import type { ScanOutcome } from '@/modules/goods-receipts/service';
 
-type ScannerPhase =
-  | 'idle'          // non avviato
-  | 'requesting'    // permesso camera in corso
-  | 'active'        // camera attiva, in lettura
-  | 'denied'        // permesso negato / nessuna camera
-  | 'unsupported'   // nessun motore di decodifica disponibile
-  | 'confirm';      // codice letto → conferma qty/lotto/scadenza
+type ScannerPhase = 'idle' | 'requesting' | 'active' | 'denied' | 'unsupported' | 'confirm';
 
 interface Html5QrcodeLike {
   start(
@@ -48,7 +46,6 @@ export function ScannerPanel({
 }: {
   receiptId: string;
   mode: ReceiptMode;
-  /** true quando il receipt non è più modificabile. */
   disabled?: boolean;
 }) {
   const [phase, setPhase] = useState<ScannerPhase>('idle');
@@ -62,11 +59,23 @@ export function ScannerPanel({
   const [result, setResult] = useState<(ActionState & { outcome?: ScanOutcome }) | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // UX device-aware (calcolata dopo il mount → niente hydration mismatch).
+  const [bestEffort, setBestEffort] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  const [autoSubmit, setAutoSubmit] = useState(true);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number>(0);
   const html5Ref = useRef<Html5QrcodeLike | null>(null);
   const lastCodeRef = useRef<{ value: string; at: number }>({ value: '', at: 0 });
+  const manualRef = useRef<HTMLInputElement>(null);
+  const burstRef = useRef<number>(0);
+
+  useEffect(() => {
+    setIsIos(isIOS());
+    setBestEffort(isIOS() || !hasBarcodeDetector());
+  }, []);
 
   // ── Spegnimento pulito di camera/decoder ───────────────────────────────────
   const stopCamera = useCallback(async () => {
@@ -86,9 +95,9 @@ export function ScannerPanel({
     }
   }, []);
 
-  useEffect(() => () => { void stopCamera(); }, [stopCamera]);
+  useEffect(() => () => { void stopCamera(); window.clearTimeout(burstRef.current); }, [stopCamera]);
 
-  // ── Lettura riuscita (debounce anti doppia-lettura dello stesso codice) ───
+  // ── Lettura riuscita (debounce anti doppia-lettura) → parse GS1 → conferma ──
   const onDecoded = useCallback((raw: string) => {
     const value = raw.trim();
     if (!value) return;
@@ -96,8 +105,6 @@ export function ScannerPanel({
     if (lastCodeRef.current.value === value && now - lastCodeRef.current.at < 2500) return;
     lastCodeRef.current = { value, at: now };
 
-    // Interpretazione GS1-128 (SSCC/GTIN/lotto/scadenza). Per il match prodotto
-    // si usa il GTIN (o l'SSCC/raw); lotto e scadenza precompilano i campi.
     const g = parseGs1(value);
     setParsed(g);
     setCode(g.primary);
@@ -109,6 +116,11 @@ export function ScannerPanel({
     void stopCamera();
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate?.(80);
   }, [stopCamera]);
+
+  // Autofocus del campo scanner in best-effort quando si è in attesa di uno scan.
+  useEffect(() => {
+    if (bestEffort && phase === 'idle') manualRef.current?.focus();
+  }, [bestEffort, phase]);
 
   // ── Avvio camera: BarcodeDetector → html5-qrcode → unsupported ────────────
   const startCamera = useCallback(async () => {
@@ -122,7 +134,6 @@ export function ScannerPanel({
       };
     };
 
-    // 1) Motore nativo
     if (w.BarcodeDetector && navigator.mediaDevices?.getUserMedia) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -161,11 +172,9 @@ export function ScannerPanel({
           setPhase('denied');
           return;
         }
-        // altri errori → tenta il fallback
       }
     }
 
-    // 2) Fallback cross-browser
     try {
       const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
       // Limitare i formati riduce l'ambiguità del locator ZXing su barcode
@@ -198,6 +207,32 @@ export function ScannerPanel({
     }
   }, [onDecoded, stopCamera]);
 
+  // ── Input manuale / keyboard-wedge ──────────────────────────────────────────
+  function handleManualChange(v: string) {
+    setManual(v);
+    window.clearTimeout(burstRef.current);
+    if (!bestEffort || !autoSubmit) return;
+    const value = v.trim();
+    // Auto-submit "a burst": scanner che NON inviano Enter. Gate su codice
+    // plausibilmente completo per non inviare mentre si digita un parziale.
+    const looksComplete = value.length >= 8 && (parseGs1(value).isGs1 || /^\d{8,14}$/.test(value));
+    if (looksComplete) {
+      burstRef.current = window.setTimeout(() => {
+        setManual('');
+        onDecoded(value);
+      }, 140);
+    }
+  }
+
+  function submitManual() {
+    window.clearTimeout(burstRef.current);
+    const value = manual.trim();
+    if (value.length >= 3) {
+      setManual('');
+      onDecoded(value);
+    }
+  }
+
   // ── Invio del codice confermato ─────────────────────────────────────────────
   function submitScan(scannedCode: string) {
     const fd = new FormData();
@@ -223,33 +258,192 @@ export function ScannerPanel({
 
   if (disabled) return null;
 
-  return (
-    <section
-      aria-label="Scanner merce"
-      className="bg-surface-2 rounded-lg border border-border shadow-sm overflow-hidden"
+  // ── Pezzi riutilizzabili ────────────────────────────────────────────────────
+
+  const cameraViewport = (
+    <div className="relative rounded-md overflow-hidden bg-surface-offset border border-border">
+      <div id={SCAN_REGION_ID} className={cn(engine === 'fallback' ? 'block' : 'hidden')} />
+      <video
+        ref={videoRef}
+        playsInline
+        muted
+        className={cn('w-full aspect-[4/3] object-cover', engine === 'native' && phase === 'active' ? 'block' : 'hidden')}
+      />
+      {phase !== 'active' && (
+        <div className="flex flex-col items-center justify-center gap-3 py-10 px-4 text-center">
+          {phase === 'requesting' ? (
+            <>
+              <Camera size={40} strokeWidth={1.5} className="text-ink-faint" aria-hidden="true" />
+              <p className="text-sm text-ink-muted">Richiesta accesso alla fotocamera…</p>
+            </>
+          ) : phase === 'denied' ? (
+            <>
+              <CameraOff size={40} strokeWidth={1.5} className="text-ink-faint" aria-hidden="true" />
+              <p className="text-sm text-ink-muted max-w-[36ch]">
+                Fotocamera non disponibile o permesso negato. Usa lo scanner esterno o l&apos;inserimento manuale.
+              </p>
+              <Button variant="secondary" size="sm" onClick={() => void startCamera()}>
+                <RefreshCw size={14} aria-hidden="true" /> Riprova
+              </Button>
+            </>
+          ) : phase === 'unsupported' ? (
+            <>
+              <CameraOff size={40} strokeWidth={1.5} className="text-ink-faint" aria-hidden="true" />
+              <p className="text-sm text-ink-muted max-w-[36ch]">
+                Questo browser non supporta la scansione. Usa lo scanner esterno o l&apos;inserimento manuale.
+              </p>
+            </>
+          ) : (
+            <>
+              <Camera size={40} strokeWidth={1.5} className="text-ink-faint" aria-hidden="true" />
+              <p className="text-sm text-ink-muted">Inquadra il barcode del collo o del prodotto.</p>
+              <Button onClick={() => void startCamera()}>
+                <Camera size={16} aria-hidden="true" /> Avvia fotocamera
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+      {phase === 'active' && (
+        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-glass backdrop-blur px-3 py-2">
+          <span className="text-xs text-ink-muted">In lettura…</span>
+          <Button variant="ghost" size="sm" onClick={() => void stopCamera().then(() => setPhase('idle'))}>
+            Ferma
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+
+  const scannerField = (
+    <form
+      className={cn(
+        'flex flex-col gap-2',
+        bestEffort ? 'rounded-md border border-primary-soft bg-primary-light/40 p-3' : 'border-t border-divider pt-4',
+      )}
+      onSubmit={(e) => { e.preventDefault(); submitManual(); }}
     >
+      <div className="flex items-end gap-2">
+        <Input
+          ref={manualRef}
+          label={bestEffort ? 'Spara il codice con lo scanner, oppure digita/incolla' : 'Oppure inserisci il codice manualmente'}
+          value={manual}
+          onChange={(e) => handleManualChange(e.target.value)}
+          placeholder="es. 0108001234567890 17261031 10L1A2"
+          inputMode="text"
+          autoComplete="off"
+          wrapClassName="flex-1"
+        />
+        <Button type="submit" variant={bestEffort ? 'primary' : 'secondary'} aria-label="Usa il codice inserito">
+          <Keyboard size={16} aria-hidden="true" />
+          <span className="hidden sm:inline">{bestEffort ? 'Conferma' : 'Usa codice'}</span>
+        </Button>
+      </div>
+      {bestEffort && (
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => manualRef.current?.focus()}
+            className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
+          >
+            <Crosshair size={13} aria-hidden="true" /> Metti a fuoco il campo scanner
+          </button>
+          <label className="flex items-center gap-1.5 text-xs text-ink-muted cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={autoSubmit}
+              onChange={(e) => setAutoSubmit(e.target.checked)}
+              className="accent-[var(--color-primary)]"
+            />
+            Invio automatico
+          </label>
+        </div>
+      )}
+    </form>
+  );
+
+  const confirmStep = code && (
+    <div className="space-y-3 animate-state-fade">
+      {parsed?.isGs1 ? (
+        <div className="rounded-md bg-surface-offset px-3 py-2 space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs uppercase tracking-wide text-ink-muted">Etichetta GS1-128 letta</p>
+            <Badge variant="info" size="sm">GS1</Badge>
+          </div>
+          <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-sm">
+            {parsed.gtin && (<><dt className="text-ink-muted">GTIN</dt><dd className="font-mono text-ink truncate">{parsed.gtin}</dd></>)}
+            {parsed.sscc && (<><dt className="text-ink-muted">SSCC</dt><dd className="font-mono text-ink truncate">{parsed.sscc}</dd></>)}
+            {parsed.lot && (<><dt className="text-ink-muted">Lotto</dt><dd className="font-mono text-ink truncate">{parsed.lot}</dd></>)}
+            {parsed.expiry && (<><dt className="text-ink-muted">Scadenza</dt><dd className="font-mono text-ink">{parsed.expiry}</dd></>)}
+          </dl>
+          {!parsed.gtin && parsed.sscc && (
+            <p className="text-xs text-warning-strong">
+              Codice logistico (SSCC): non identifica un prodotto. Associa la riga manualmente dopo la registrazione.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3 rounded-md bg-surface-offset px-3 py-2">
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-wide text-ink-muted">Codice letto</p>
+            <p className="font-mono text-md text-ink truncate">{code}</p>
+          </div>
+          <Badge variant="info" size="sm">1 · Codice</Badge>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        <Input label="Quantità" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} required />
+        <Input label="Lotto (opz.)" value={lot} onChange={(e) => setLot(e.target.value)} placeholder="es. FA26-0610" />
+      </div>
+      <Input label="Scadenza (opz.)" type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+      <div className="flex gap-2">
+        <Button variant="secondary" fullWidth onClick={() => { setCode(null); setParsed(null); setPhase('idle'); }}>
+          Annulla
+        </Button>
+        <Button fullWidth loading={pending} onClick={() => code && submitScan(code)}>
+          <Check size={16} aria-hidden="true" /> Registra
+        </Button>
+      </div>
+    </div>
+  );
+
+  const honestBanner = (
+    <div className="rounded-md bg-warning-light px-3 py-2 text-sm text-warning-strong">
+      {isIos
+        ? 'Su iPhone la scansione camera di barcode industriali (GS1-128/SSCC) può essere meno affidabile. Per il magazzino consigliamo uno scanner esterno o l’inserimento rapido qui sopra.'
+        : 'Su questo browser la scansione camera di barcode industriali può essere meno affidabile. Usa uno scanner esterno o l’inserimento rapido qui sopra.'}
+    </div>
+  );
+
+  const secondaryCameraButton = (
+    <button
+      type="button"
+      onClick={() => void startCamera()}
+      className="w-full rounded-md border border-border bg-surface-2 py-2.5 text-sm font-medium text-ink-muted hover:bg-surface-offset inline-flex items-center justify-center gap-2"
+    >
+      <Camera size={16} aria-hidden="true" /> Prova comunque la fotocamera (best-effort)
+    </button>
+  );
+
+  return (
+    <section aria-label="Scanner merce" className="bg-surface-2 rounded-lg border border-border shadow-sm overflow-hidden">
       <header className="flex items-center justify-between gap-3 px-4 py-3 border-b border-divider">
         <h2 className="flex items-center gap-2 text-md font-semibold text-ink">
           <ScanLine size={16} aria-hidden="true" className="text-ink-muted" />
           Scansiona merce
         </h2>
         {engine && phase === 'active' && (
-          <Badge variant="neutral" size="sm">
-            {engine === 'native' ? 'Scanner nativo' : 'Scanner compatibile'}
-          </Badge>
+          <Badge variant="neutral" size="sm">{engine === 'native' ? 'Scanner nativo' : 'Scanner compatibile'}</Badge>
         )}
       </header>
 
       <div className="p-4 space-y-4">
-        {/* Esito ultimo invio */}
         {result?.status === 'success' && (
           <p
             role="status"
             className={cn(
               'rounded-md px-3 py-2 text-sm animate-state-fade',
-              result.outcome?.status === 'matched'
-                ? 'bg-success-light text-success-strong'
-                : 'bg-warning-light text-warning-strong',
+              result.outcome?.status === 'matched' ? 'bg-success-light text-success-strong' : 'bg-warning-light text-warning-strong',
             )}
           >
             {result.message}
@@ -261,163 +455,19 @@ export function ScannerPanel({
           </p>
         )}
 
-        {/* ── Viewport camera ────────────────────────────────────────────── */}
-        {phase !== 'confirm' && (
-          <div className="relative rounded-md overflow-hidden bg-surface-offset border border-border">
-            {/* host del fallback html5-qrcode */}
-            <div id={SCAN_REGION_ID} className={cn(engine === 'fallback' ? 'block' : 'hidden')} />
-            <video
-              ref={videoRef}
-              playsInline
-              muted
-              className={cn(
-                'w-full aspect-[4/3] object-cover',
-                engine === 'native' && phase === 'active' ? 'block' : 'hidden',
-              )}
-            />
-            {phase !== 'active' && (
-              <div className="flex flex-col items-center justify-center gap-3 py-10 px-4 text-center">
-                {phase === 'requesting' ? (
-                  <>
-                    <Camera size={40} strokeWidth={1.5} className="text-ink-faint" aria-hidden="true" />
-                    <p className="text-sm text-ink-muted">Richiesta accesso alla fotocamera…</p>
-                  </>
-                ) : phase === 'denied' ? (
-                  <>
-                    <CameraOff size={40} strokeWidth={1.5} className="text-ink-faint" aria-hidden="true" />
-                    <p className="text-sm text-ink-muted max-w-[36ch]">
-                      Fotocamera non disponibile o permesso negato. Abilita la
-                      fotocamera dalle impostazioni del browser, oppure inserisci
-                      il codice manualmente qui sotto.
-                    </p>
-                    <Button variant="secondary" size="sm" onClick={() => void startCamera()}>
-                      <RefreshCw size={14} aria-hidden="true" /> Riprova
-                    </Button>
-                  </>
-                ) : phase === 'unsupported' ? (
-                  <>
-                    <CameraOff size={40} strokeWidth={1.5} className="text-ink-faint" aria-hidden="true" />
-                    <p className="text-sm text-ink-muted max-w-[36ch]">
-                      Questo browser non supporta la scansione. Usa l&apos;inserimento
-                      manuale del codice qui sotto.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <Camera size={40} strokeWidth={1.5} className="text-ink-faint" aria-hidden="true" />
-                    <p className="text-sm text-ink-muted">
-                      Inquadra il barcode del collo o del prodotto.
-                    </p>
-                    <Button onClick={() => void startCamera()}>
-                      <Camera size={16} aria-hidden="true" /> Avvia fotocamera
-                    </Button>
-                  </>
-                )}
-              </div>
-            )}
-            {phase === 'active' && (
-              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-glass backdrop-blur px-3 py-2">
-                <span className="text-xs text-ink-muted">In lettura…</span>
-                <Button variant="ghost" size="sm" onClick={() => void stopCamera().then(() => setPhase('idle'))}>
-                  Ferma
-                </Button>
-              </div>
-            )}
+        {phase === 'confirm' ? (
+          confirmStep
+        ) : bestEffort ? (
+          <div className="space-y-3">
+            {honestBanner}
+            {scannerField}
+            {phase === 'idle' ? secondaryCameraButton : cameraViewport}
           </div>
-        )}
-
-        {/* ── Step di conferma dopo lettura ──────────────────────────────── */}
-        {phase === 'confirm' && code && (
-          <div className="space-y-3 animate-state-fade">
-            {parsed?.isGs1 ? (
-              <div className="rounded-md bg-surface-offset px-3 py-2 space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs uppercase tracking-wide text-ink-muted">Etichetta GS1-128 letta</p>
-                  <Badge variant="info" size="sm">GS1</Badge>
-                </div>
-                <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-sm">
-                  {parsed.gtin && (<><dt className="text-ink-muted">GTIN</dt><dd className="font-mono text-ink truncate">{parsed.gtin}</dd></>)}
-                  {parsed.sscc && (<><dt className="text-ink-muted">SSCC</dt><dd className="font-mono text-ink truncate">{parsed.sscc}</dd></>)}
-                  {parsed.lot && (<><dt className="text-ink-muted">Lotto</dt><dd className="font-mono text-ink truncate">{parsed.lot}</dd></>)}
-                  {parsed.expiry && (<><dt className="text-ink-muted">Scadenza</dt><dd className="font-mono text-ink">{parsed.expiry}</dd></>)}
-                </dl>
-                {!parsed.gtin && parsed.sscc && (
-                  <p className="text-xs text-warning-strong">
-                    Codice logistico (SSCC): non identifica un prodotto. Associa la riga manualmente dopo la registrazione.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center justify-between gap-3 rounded-md bg-surface-offset px-3 py-2">
-                <div className="min-w-0">
-                  <p className="text-xs uppercase tracking-wide text-ink-muted">Codice letto</p>
-                  <p className="font-mono text-md text-ink truncate">{code}</p>
-                </div>
-                <Badge variant="info" size="sm">1 · Codice</Badge>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="Quantità"
-                inputMode="decimal"
-                value={qty}
-                onChange={(e) => setQty(e.target.value)}
-                required
-              />
-              <Input
-                label="Lotto (opz.)"
-                value={lot}
-                onChange={(e) => setLot(e.target.value)}
-                placeholder="es. FA26-0610"
-              />
-            </div>
-            <Input
-              label="Scadenza (opz.)"
-              type="date"
-              value={expiry}
-              onChange={(e) => setExpiry(e.target.value)}
-            />
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                fullWidth
-                onClick={() => { setCode(null); setParsed(null); setPhase('idle'); }}
-              >
-                Annulla
-              </Button>
-              <Button fullWidth loading={pending} onClick={() => submitScan(code)}>
-                <Check size={16} aria-hidden="true" /> Registra
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Fallback manuale, sempre disponibile ───────────────────────── */}
-        {phase !== 'confirm' && (
-          <form
-            className="flex items-end gap-2 border-t border-divider pt-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const value = manual.trim();
-              if (value.length >= 3) {
-                setManual('');
-                onDecoded(value);
-              }
-            }}
-          >
-            <Input
-              label="Oppure inserisci il codice manualmente"
-              value={manual}
-              onChange={(e) => setManual(e.target.value)}
-              placeholder="es. 8001234567890"
-              inputMode="text"
-              wrapClassName="flex-1"
-            />
-            <Button type="submit" variant="secondary" aria-label="Usa il codice inserito">
-              <Keyboard size={16} aria-hidden="true" />
-              <span className="hidden sm:inline">Usa codice</span>
-            </Button>
-          </form>
+        ) : (
+          <>
+            {cameraViewport}
+            {scannerField}
+          </>
         )}
       </div>
     </section>
