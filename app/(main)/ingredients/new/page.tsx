@@ -6,10 +6,11 @@ import { useFormState } from 'react-dom';
 // Form creazione ingrediente. Carica fornitori via fetch client-side.
 // =============================================================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { IDLE_STATE } from '@/lib/utils';
+import { IDLE_STATE, UNIT_LABELS } from '@/lib/utils';
 import { createIngredientAction } from '@/modules/catalog/actions';
+import { suggestProducts, type CatalogProductRef } from '@/modules/goods-receipts/matching';
 
 interface SupplierOption { id: string; name: string }
 
@@ -32,15 +33,43 @@ export default function NewIngredientPage() {
   const [state, formAction, pending] = useFormState(createIngredientAction, IDLE_STATE);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [supplierId, setSupplierId] = useState('');
+  const [name, setName] = useState('');
+  const [catalog, setCatalog] = useState<CatalogProductRef[]>([]);
 
   // BUG-05: il fornitore deve essere assegnabile già alla creazione, altrimenti
   // l'auto-riordino ("Genera bozze per fornitore") esclude l'ingrediente.
+  // Carico anche gli ingredienti esistenti per l'anti-doppione ("forse intendi…").
   useEffect(() => {
-    fetch('/api/catalog/suppliers')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setSuppliers(Array.isArray(data) ? data : []))
-      .catch(() => setSuppliers([]));
+    Promise.all([
+      fetch('/api/catalog/suppliers').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/catalog/ingredients').then((r) => (r.ok ? r.json() : [])),
+    ])
+      .then(([sups, ings]) => {
+        setSuppliers(Array.isArray(sups) ? sups : []);
+        setCatalog(
+          (Array.isArray(ings) ? ings : []).map(
+            (i: { id: string; name: string; unit: CatalogProductRef['unit'] }) => ({
+              id: i.id,
+              name: i.name,
+              unit: i.unit,
+              sku: null,
+              barcode: null,
+            }),
+          ),
+        );
+      })
+      .catch(() => {
+        setSuppliers([]);
+        setCatalog([]);
+      });
   }, []);
+
+  // Anti-doppione: suggerimenti per nome simile (logica pura riusata dal matcher).
+  const suggestions = useMemo(
+    () => (name.trim().length >= 2 ? suggestProducts(catalog, name, 4) : []),
+    [catalog, name],
+  );
+  const exactDuplicate = suggestions.find((s) => s.matchedBy === 'name');
 
   return (
     <div className="p-8 max-w-xl mx-auto">
@@ -74,8 +103,36 @@ export default function NewIngredientPage() {
               required
               maxLength={200}
               placeholder="es. Farina 00"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               className={fieldClass}
+              autoComplete="off"
             />
+            {suggestions.length > 0 && (
+              <div className="mt-2 rounded-xl bg-warning-light p-3">
+                <p className="text-xs font-semibold text-warning-strong mb-2">
+                  {exactDuplicate
+                    ? '⚠ Esiste già un ingrediente con questo nome — usa quello per non frammentare le giacenze:'
+                    : 'Forse intendi uno di questi? Evita i doppioni:'}
+                </p>
+                <ul className="space-y-1.5">
+                  {suggestions.map((s) => (
+                    <li key={s.product.id} className="flex items-center justify-between gap-2">
+                      <span className="text-sm text-ink truncate">
+                        {s.product.name}{' '}
+                        <span className="text-xs text-ink-muted">({UNIT_LABELS[s.product.unit]})</span>
+                      </span>
+                      <Link
+                        href={`/ingredients/${s.product.id}`}
+                        className="shrink-0 text-xs font-semibold text-primary hover:underline"
+                      >
+                        Usa questo →
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
