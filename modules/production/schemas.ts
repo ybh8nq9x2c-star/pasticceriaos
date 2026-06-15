@@ -53,7 +53,20 @@ export const updatePlanSchema = z.object({
 
 export const addPlanItemSchema = planItemSchema;
 
+// ---------------------------------------------------------------------------
+// Scarico produzione rapido (una ricetta × n batch, senza piano formale)
+// ---------------------------------------------------------------------------
+
+export const quickProduceSchema = z.object({
+  recipeId: z.string().uuid('Ricetta non valida'),
+  batchCount: z.coerce
+    .number()
+    .int('Il numero di infornate deve essere intero')
+    .positive('Indica almeno 1 infornata'),
+});
+
 export type CreatePlanInput   = z.infer<typeof createPlanSchema>;
 export type UpdatePlanInput   = z.infer<typeof updatePlanSchema>;
 export type AddPlanItemInput  = z.infer<typeof addPlanItemSchema>;
 export type PlanItemInput     = z.infer<typeof planItemSchema>;
+export type QuickProduceInput = z.infer<typeof quickProduceSchema>;

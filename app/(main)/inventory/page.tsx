@@ -100,12 +100,20 @@ export default async function InventoryPage() {
         title="Magazzino"
         subtitle={`${levels.length} ingredienti tracciati`}
         action={
-          <Link
-            href="/inventory/movement"
-            className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
-          >
-            + Registra movimento
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/production/quick"
+              className="px-4 py-2.5 bg-surface-2 text-ink border border-border rounded-xl text-sm font-semibold hover:bg-surface-offset transition-colors"
+            >
+              🏭 Scarica per ricetta
+            </Link>
+            <Link
+              href="/inventory/movement"
+              className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
+            >
+              + Registra movimento
+            </Link>
+          </div>
         }
       />
 

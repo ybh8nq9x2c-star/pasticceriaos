@@ -55,6 +55,25 @@ export async function updatePlanAction(
   return { status: 'success', message: 'Piano aggiornato.' };
 }
 
+export async function quickProduceAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    await service.quickProduce({
+      recipeId:   formData.get('recipeId'),
+      batchCount: formData.get('batchCount'),
+    });
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+
+  revalidatePath('/inventory');
+  revalidatePath('/inventory/movements');
+  revalidatePath('/dashboard');
+  return { status: 'success', message: 'Scarico registrato: magazzino aggiornato.' };
+}
+
 export async function completePlanAction(id: string): Promise<ActionState> {
   try {
     await service.completePlan(id);

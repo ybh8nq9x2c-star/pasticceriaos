@@ -231,9 +231,18 @@ export default async function RecipeDetailPage({ params }: { params: { id: strin
             </dl>
           </div>
 
+          {recipe.ingredients.length > 0 && (
+            <Link
+              href={`/production/quick?recipe=${recipe.id}`}
+              className="block w-full py-3 text-center bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
+            >
+              🏭 Segna prodotto (scarica magazzino)
+            </Link>
+          )}
+
           <Link
             href={`/recipes/${recipe.id}/edit`}
-            className="block w-full py-3 text-center bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
+            className="block w-full py-3 text-center bg-surface-2 text-ink border border-border rounded-xl text-sm font-semibold hover:bg-surface-offset transition-colors"
           >
             ✏️ Modifica ricetta
           </Link>

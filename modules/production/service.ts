@@ -6,10 +6,11 @@
 import { requireOrgId } from '@/modules/identity/service';
 import { createClient } from '@/lib/supabase/server';
 import { BusinessRuleError, mapSupabaseError } from '@/lib/errors';
+import { todayISODate } from '@/lib/utils';
 import * as repo from './repository';
-import { createPlanSchema, updatePlanSchema } from './schemas';
+import { createPlanSchema, quickProduceSchema, updatePlanSchema } from './schemas';
 import type { ProductionPlan, ProductionPlanListItem } from './types';
-import type { CreatePlanInput, UpdatePlanInput } from './schemas';
+import type { CreatePlanInput, QuickProduceInput, UpdatePlanInput } from './schemas';
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -93,6 +94,34 @@ export async function completePlan(id: string): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.rpc('complete_production_plan', { p_plan_id: id });
   if (error) throw mapSupabaseError(error);
+}
+
+/**
+ * Scarico produzione RAPIDO: "ho prodotto N infornate di questa ricetta".
+ * Si appoggia al path CANONICO (piano di una ricetta → completamento
+ * transazionale): inserisce i movimenti production_usage e consuma i lotti FEFO,
+ * esattamente come un piano normale. NESSUN secondo write-path di scarico stock.
+ * Se il completamento fallisce, il piano-bozza viene annullato (niente bozze orfane).
+ */
+export async function quickProduce(raw: unknown): Promise<void> {
+  const input: QuickProduceInput = quickProduceSchema.parse(raw);
+
+  const plan = await createPlan({
+    planDate: todayISODate(),
+    notes: 'Scarico produzione rapido',
+    items: [{ recipeId: input.recipeId, batchCount: input.batchCount, sortOrder: 0 }],
+  });
+
+  try {
+    await completePlan(plan.id);
+  } catch (err) {
+    try {
+      await cancelPlan(plan.id);
+    } catch {
+      // best-effort: il piano resta in bozza, nessuno scarico è avvenuto.
+    }
+    throw err;
+  }
 }
 
 export async function cancelPlan(id: string): Promise<void> {
