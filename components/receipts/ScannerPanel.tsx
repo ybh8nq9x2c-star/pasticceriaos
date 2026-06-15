@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { registerScanAction } from '@/modules/goods-receipts/actions';
+import { parseGs1, type Gs1Parsed } from '@/modules/goods-receipts/gs1';
 import { IDLE_STATE, type ActionState, cn } from '@/lib/utils';
 import type { ReceiptMode } from '@/modules/goods-receipts/types';
 import type { ScanOutcome } from '@/modules/goods-receipts/service';
@@ -53,6 +54,7 @@ export function ScannerPanel({
   const [phase, setPhase] = useState<ScannerPhase>('idle');
   const [engine, setEngine] = useState<'native' | 'fallback' | null>(null);
   const [code, setCode] = useState<string | null>(null);
+  const [parsed, setParsed] = useState<Gs1Parsed | null>(null);
   const [manual, setManual] = useState('');
   const [qty, setQty] = useState('1');
   const [lot, setLot] = useState('');
@@ -93,7 +95,15 @@ export function ScannerPanel({
     const now = Date.now();
     if (lastCodeRef.current.value === value && now - lastCodeRef.current.at < 2500) return;
     lastCodeRef.current = { value, at: now };
-    setCode(value);
+
+    // Interpretazione GS1-128 (SSCC/GTIN/lotto/scadenza). Per il match prodotto
+    // si usa il GTIN (o l'SSCC/raw); lotto e scadenza precompilano i campi.
+    const g = parseGs1(value);
+    setParsed(g);
+    setCode(g.primary);
+    if (g.lot) setLot(g.lot);
+    if (g.expiry) setExpiry(g.expiry);
+
     setResult(null);
     setPhase('confirm');
     void stopCamera();
@@ -157,8 +167,20 @@ export function ScannerPanel({
 
     // 2) Fallback cross-browser
     try {
-      const { Html5Qrcode } = await import('html5-qrcode');
-      const instance = new Html5Qrcode(SCAN_REGION_ID) as unknown as Html5QrcodeLike;
+      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
+      // Limitare i formati riduce l'ambiguità del locator ZXing su barcode
+      // lineari (GS1-128/EAN) e velocizza: più affidabile su iOS/Firefox.
+      const instance = new Html5Qrcode(SCAN_REGION_ID, {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.QR_CODE,
+        ],
+        verbose: false,
+      }) as unknown as Html5QrcodeLike;
       html5Ref.current = instance;
       setEngine('fallback');
       await instance.start(
@@ -190,6 +212,7 @@ export function ScannerPanel({
       setResult(res);
       if (res.status === 'success') {
         setCode(null);
+        setParsed(null);
         setQty('1');
         setLot('');
         setExpiry('');
@@ -306,13 +329,33 @@ export function ScannerPanel({
         {/* ── Step di conferma dopo lettura ──────────────────────────────── */}
         {phase === 'confirm' && code && (
           <div className="space-y-3 animate-state-fade">
-            <div className="flex items-center justify-between gap-3 rounded-md bg-surface-offset px-3 py-2">
-              <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wide text-ink-muted">Codice letto</p>
-                <p className="font-mono text-md text-ink truncate">{code}</p>
+            {parsed?.isGs1 ? (
+              <div className="rounded-md bg-surface-offset px-3 py-2 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs uppercase tracking-wide text-ink-muted">Etichetta GS1-128 letta</p>
+                  <Badge variant="info" size="sm">GS1</Badge>
+                </div>
+                <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-sm">
+                  {parsed.gtin && (<><dt className="text-ink-muted">GTIN</dt><dd className="font-mono text-ink truncate">{parsed.gtin}</dd></>)}
+                  {parsed.sscc && (<><dt className="text-ink-muted">SSCC</dt><dd className="font-mono text-ink truncate">{parsed.sscc}</dd></>)}
+                  {parsed.lot && (<><dt className="text-ink-muted">Lotto</dt><dd className="font-mono text-ink truncate">{parsed.lot}</dd></>)}
+                  {parsed.expiry && (<><dt className="text-ink-muted">Scadenza</dt><dd className="font-mono text-ink">{parsed.expiry}</dd></>)}
+                </dl>
+                {!parsed.gtin && parsed.sscc && (
+                  <p className="text-xs text-warning-strong">
+                    Codice logistico (SSCC): non identifica un prodotto. Associa la riga manualmente dopo la registrazione.
+                  </p>
+                )}
               </div>
-              <Badge variant="info" size="sm">1 · Codice</Badge>
-            </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3 rounded-md bg-surface-offset px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-wide text-ink-muted">Codice letto</p>
+                  <p className="font-mono text-md text-ink truncate">{code}</p>
+                </div>
+                <Badge variant="info" size="sm">1 · Codice</Badge>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Input
                 label="Quantità"
@@ -338,7 +381,7 @@ export function ScannerPanel({
               <Button
                 variant="secondary"
                 fullWidth
-                onClick={() => { setCode(null); setPhase('idle'); }}
+                onClick={() => { setCode(null); setParsed(null); setPhase('idle'); }}
               >
                 Annulla
               </Button>
