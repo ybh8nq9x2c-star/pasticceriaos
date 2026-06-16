@@ -213,6 +213,9 @@ export function ScannerPanel({
     fd.set('qty', qty || '1');
     if (lot) fd.set('lotNumber', lot);
     if (expiry) fd.set('expiryDate', expiry);
+    // Tracciabilità: invia il raw GS1 originale; il server lo riparsa e persiste
+    // SSCC/GTIN/colli/date/AI. Solo per letture GS1 (non per EAN/codici semplici).
+    if (parsed?.isGs1 && parsed.raw) fd.set('gs1Raw', parsed.raw);
     startTransition(async () => {
       const res = await registerScanAction(IDLE_STATE, fd);
       setResult(res);
@@ -308,9 +311,13 @@ export function ScannerPanel({
           </div>
           <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-sm">
             {parsed.gtin && (<><dt className="text-ink-muted">GTIN</dt><dd className="font-mono text-ink truncate">{parsed.gtin}</dd></>)}
+            {parsed.gtinContent && !parsed.gtin && (<><dt className="text-ink-muted">GTIN contenuto</dt><dd className="font-mono text-ink truncate">{parsed.gtinContent}</dd></>)}
             {parsed.sscc && (<><dt className="text-ink-muted">SSCC</dt><dd className="font-mono text-ink truncate">{parsed.sscc}</dd></>)}
             {parsed.lot && (<><dt className="text-ink-muted">Lotto</dt><dd className="font-mono text-ink truncate">{parsed.lot}</dd></>)}
             {parsed.expiryForReceipt && (<><dt className="text-ink-muted">Scadenza</dt><dd className="font-mono text-ink">{gs1IsoToItalian(parsed.expiryForReceipt)}</dd></>)}
+            {parsed.caseQuantity != null && (<><dt className="text-ink-muted">Colli/pezzi</dt><dd className="font-mono text-ink">{parsed.caseQuantity}</dd></>)}
+            {parsed.productionDate && (<><dt className="text-ink-muted">Produzione</dt><dd className="font-mono text-ink">{gs1IsoToItalian(parsed.productionDate)}</dd></>)}
+            {parsed.netWeight && (<><dt className="text-ink-muted">Peso netto</dt><dd className="font-mono text-ink">{parsed.netWeight.value} {parsed.netWeight.unit}</dd></>)}
           </dl>
           {!parsed.gtin && parsed.sscc && (
             <p className="text-xs text-warning-strong">

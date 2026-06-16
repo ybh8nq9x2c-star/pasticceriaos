@@ -89,6 +89,7 @@ export async function registerScanAction(
       qty: formField(formData, 'qty') || '1',
       lotNumber: formField(formData, 'lotNumber'),
       expiryDate: formField(formData, 'expiryDate'),
+      gs1Raw: formField(formData, 'gs1Raw'),
     });
     revalidateReceipt(mode, formField(formData, 'receiptId'));
     return {

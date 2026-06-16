@@ -6,8 +6,9 @@
 // Mobile-first: card per riga; nessuna tabella sotto md.
 // =============================================================================
 
-import { useState, useTransition } from 'react';
+import { Fragment, useState, useTransition } from 'react';
 import { AlertTriangle, PackagePlus, Save } from 'lucide-react';
+import { gs1DetailRows } from '@/modules/goods-receipts/gs1';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
@@ -241,6 +242,28 @@ function LineRow({
 
       {state.status === 'error' && (
         <p role="alert" className="text-xs text-danger">{state.error}</p>
+      )}
+
+      {/* ── Dati GS1 rilevati (collapsible, leggera; visibile anche da chiusa) ── */}
+      {(line.gs1Ai || line.sscc || line.gs1Raw) && (
+        <details className="rounded-md bg-surface-offset/60 px-3 py-2">
+          <summary className="cursor-pointer select-none text-xs font-medium text-ink-muted">
+            Dati GS1 rilevati{line.sscc ? ' · SSCC (collo/pallet)' : ''}
+          </summary>
+          <dl className="mt-2 grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-xs">
+            {gs1DetailRows(line.gs1Ai).map((r) => (
+              <Fragment key={r.code}>
+                <dt className="text-ink-muted">{r.label}</dt>
+                <dd className="font-mono text-ink break-all">{r.value}</dd>
+              </Fragment>
+            ))}
+          </dl>
+          {line.gs1Raw && (
+            <p className="mt-2 text-[11px] text-ink-faint break-all">
+              raw: <span className="font-mono">{line.gs1Raw}</span>
+            </p>
+          )}
+        </details>
       )}
 
       {/* ── Dialog discrepanza ───────────────────────────────────────────── */}

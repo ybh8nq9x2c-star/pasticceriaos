@@ -36,6 +36,12 @@ function toLineView(l: LineRow, productName: string | null): ReceiptLineView {
     lineStatus: l.line_status,
     sortOrder: l.sort_order,
     scannedAt: l.scanned_at,
+    gtin: l.gtin,
+    sscc: l.sscc,
+    caseQuantity: numOrNull(l.case_quantity),
+    productionDate: l.production_date,
+    gs1Raw: l.gs1_raw,
+    gs1Ai: l.gs1_ai,
   };
 }
 

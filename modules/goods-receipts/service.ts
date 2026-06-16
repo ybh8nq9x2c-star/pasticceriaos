@@ -40,6 +40,7 @@ import {
 } from './matching';
 import { parseDdtText, type ParsedDdt } from './ddt-parser';
 import { extractPdfText } from './pdf-text';
+import { parseGs1, gs1ToLineFields } from './gs1';
 import type { ReceiptDetail, ReceiptListItem, ReceiptMode } from './types';
 
 const OPEN_STATUSES: ReceiptStatus[] = ['draft', 'expected', 'partial'];
@@ -298,6 +299,20 @@ export async function registerScan(raw: unknown): Promise<ScanOutcome> {
   const match = matchProduct(catalog, { barcode: input.code, sku: input.code });
   const now = new Date().toISOString();
 
+  // Tracciabilità GS1: riparsa il raw payload (server = unica fonte) e ricava le
+  // colonne canoniche + raw + mappa AI completa. Nessun dato GS1 utile va perso.
+  const gs1 = input.gs1Raw ? gs1ToLineFields(parseGs1(input.gs1Raw)) : null;
+  const gs1Cols = gs1
+    ? {
+        gtin: gs1.gtin,
+        sscc: gs1.sscc,
+        case_quantity: gs1.caseQuantity,
+        production_date: gs1.productionDate,
+        gs1_raw: gs1.gs1Raw,
+        gs1_ai: gs1.gs1Ai,
+      }
+    : {};
+
   const detail = await repo.getReceiptDetail(input.receiptId);
 
   if (match && match.confidence >= AUTO_MATCH_THRESHOLD) {
@@ -313,6 +328,8 @@ export async function registerScan(raw: unknown): Promise<ScanOutcome> {
         scanned_by: userId,
         scanned_at: now,
         line_status: existing.lineStatus === 'pending' ? 'matched' : existing.lineStatus,
+        // Riempi i dati GS1 solo se la scan ne porta (non azzerarli su re-scan).
+        ...gs1Cols,
       });
       return { status: 'matched', lineId: existing.id, productName: match.product.name, suggestions: [] };
     }
@@ -330,6 +347,7 @@ export async function registerScan(raw: unknown): Promise<ScanOutcome> {
       sort_order: detail.lines.length,
       scanned_by: userId,
       scanned_at: now,
+      ...gs1Cols,
     });
     return { status: 'matched', lineId, productName: match.product.name, suggestions: [] };
   }
@@ -347,6 +365,7 @@ export async function registerScan(raw: unknown): Promise<ScanOutcome> {
     sort_order: detail.lines.length,
     scanned_by: userId,
     scanned_at: now,
+    ...gs1Cols,
   });
   return {
     status: 'unmatched',

@@ -905,6 +905,12 @@ export interface Database {
           scanned_by: string | null;
           scanned_at: string | null;
           created_at: string;
+          gtin: string | null;
+          sscc: string | null;
+          case_quantity: number | null;
+          production_date: string | null;
+          gs1_raw: string | null;
+          gs1_ai: Record<string, string> | null;
         };
         Insert: {
           id?: string;
@@ -925,6 +931,12 @@ export interface Database {
           scanned_by?: string | null;
           scanned_at?: string | null;
           created_at?: string;
+          gtin?: string | null;
+          sscc?: string | null;
+          case_quantity?: number | null;
+          production_date?: string | null;
+          gs1_raw?: string | null;
+          gs1_ai?: Record<string, string> | null;
         };
         Update: {
           product_id?: string | null;
@@ -942,6 +954,12 @@ export interface Database {
           sort_order?: number;
           scanned_by?: string | null;
           scanned_at?: string | null;
+          gtin?: string | null;
+          sscc?: string | null;
+          case_quantity?: number | null;
+          production_date?: string | null;
+          gs1_raw?: string | null;
+          gs1_ai?: Record<string, string> | null;
         };
         Relationships: [];
       };

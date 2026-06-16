@@ -63,6 +63,9 @@ export const scanSchema = z.object({
   qty: qty.optional().default(1),
   lotNumber: optionalText(100),
   expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish().or(z.literal('')),
+  // Raw payload GS1 originale: il service lo riparsa e ne persiste i dati di
+  // tracciabilità (SSCC/GTIN/colli/date/AI). Vuoto per scan non-GS1.
+  gs1Raw: optionalText(200),
 });
 
 export const createProductFromLineSchema = z.object({

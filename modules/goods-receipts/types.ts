@@ -52,6 +52,13 @@ export interface ReceiptLineView {
   lineStatus: ReceiptLineStatus;
   sortOrder: number;
   scannedAt: string | null;
+  // ── Tracciabilità GS1 (migration 039) — null sui ricevimenti senza GS1 ──────
+  gtin: string | null;
+  sscc: string | null;
+  caseQuantity: number | null;
+  productionDate: string | null;
+  gs1Raw: string | null;
+  gs1Ai: Record<string, string> | null;
 }
 
 export interface ReceiptDetail {

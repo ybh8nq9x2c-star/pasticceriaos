@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseGs1, gs1DateToIso, gs1IsoToItalian } from '../gs1';
+import { parseGs1, gs1DateToIso, gs1IsoToItalian, gs1ToLineFields, gs1DetailRows } from '../gs1';
 
 const GS = '\x1D';
 
@@ -114,5 +114,87 @@ describe('parseGs1 — AI multipli e scadenza (15)/(17)', () => {
     expect(r.isGs1).toBe(true);
     expect(r.expiryForReceipt).toBe('2027-12-03');
     expect(r.lot).toBe('L6154R');
+  });
+});
+
+// ── Tracciabilità GS1: AI estesi, peso, mapping persistenza, rendering UI ─────
+describe('parseGs1 — AI estesi per tracciabilità', () => {
+  it('lotto + best before (15)', () => {
+    const r = parseGs1('(15)271203(10)L6154R');
+    expect(r.lot).toBe('L6154R');
+    expect(r.bestBefore).toBe('2027-12-03');
+    expect(r.expiryForReceipt).toBe('2027-12-03');
+  });
+
+  it('GTIN + lotto + scadenza (17)', () => {
+    const r = parseGs1('(01)18052536243030(17)271203(10)L6154R');
+    expect(r.gtin).toBe('18052536243030');
+    expect(r.expiry).toBe('2027-12-03');
+    expect(r.expiryForReceipt).toBe('2027-12-03');
+    expect(r.lot).toBe('L6154R');
+  });
+
+  it('SSCC (00)', () => {
+    const r = parseGs1('(00)380000412300656352');
+    expect(r.sscc).toBe('380000412300656352');
+    expect(r.gtin).toBeUndefined();
+  });
+
+  it('numero colli (37) → caseQuantity numerico', () => {
+    const r = parseGs1('(01)18052536243030(37)68(10)L6154R');
+    expect(r.gtin).toBe('18052536243030');
+    expect(r.caseQuantity).toBe(68);
+    expect(r.lot).toBe('L6154R');
+  });
+
+  it('data produzione (11)', () => {
+    const r = parseGs1('(11)260101(10)L1');
+    expect(r.productionDate).toBe('2026-01-01');
+  });
+
+  it('peso netto 310x (kg) con decimale applicato', () => {
+    const r = parseGs1('(01)18052536243030(3103)001250');
+    expect(r.netWeight).toEqual({ value: 1.25, unit: 'kg' });
+  });
+
+  it('più AI insieme: GTIN contenuto (02) + SSCC (00) + colli (37)', () => {
+    const r = parseGs1('(00)380000412300656352(02)18052536243030(37)68');
+    expect(r.sscc).toBe('380000412300656352');
+    expect(r.gtinContent).toBe('18052536243030');
+    expect(r.caseQuantity).toBe(68);
+  });
+});
+
+describe('gs1ToLineFields — mapping per la persistenza', () => {
+  it('colonne canoniche + raw + mappa AI completa', () => {
+    const f = gs1ToLineFields(parseGs1('(00)380000412300656352(02)18052536243030(37)68'));
+    expect(f.sscc).toBe('380000412300656352');
+    expect(f.gtin).toBe('18052536243030'); // (02) usato come GTIN se manca (01)
+    expect(f.caseQuantity).toBe(68);
+    expect(f.gs1Raw).toBe('(00)380000412300656352(02)18052536243030(37)68');
+    expect(f.gs1Ai).toEqual({ '00': '380000412300656352', '02': '18052536243030', '37': '68' });
+  });
+
+  it('non-GS1 → tutto null (niente dati spuri)', () => {
+    const f = gs1ToLineFields(parseGs1('8001234567890'));
+    expect(f).toEqual({ gtin: null, sscc: null, caseQuantity: null, productionDate: null, gs1Raw: null, gs1Ai: null });
+  });
+});
+
+describe('gs1DetailRows — rendering "Dati GS1 rilevati"', () => {
+  it('etichette umane, date formattate, peso calcolato', () => {
+    const rows = gs1DetailRows({ '00': '380000412300656352', '17': '271203', '37': '68', '3103': '001250' });
+    const byCode = Object.fromEntries(rows.map((r) => [r.code, r]));
+    expect(byCode['00'].label).toBe('SSCC (unità logistica)');
+    expect(byCode['17'].label).toBe('Scadenza');
+    expect(byCode['17'].value).toBe('03/12/2027');
+    expect(byCode['37'].label).toBe('Numero colli/pezzi');
+    expect(byCode['37'].value).toBe('68');
+    expect(byCode['3103'].label).toBe('Peso netto (kg)');
+    expect(byCode['3103'].value).toBe('1.25 kg');
+  });
+
+  it('null → nessuna riga', () => {
+    expect(gs1DetailRows(null)).toEqual([]);
   });
 });
