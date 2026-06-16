@@ -7,13 +7,61 @@
 // Barra azioni sticky in basso per l'uso da telefono.
 // =============================================================================
 
-import { useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import { UNIT_LABELS, formatCurrency, IDLE_STATE, cn } from '@/lib/utils';
 import { assignSupplierBulkAction } from '@/modules/catalog/actions';
 import type { IngredientProduct } from '@/modules/catalog/types';
+
+// Riga memoizzata: la spunta di una checkbox aggiorna il Set di selezione nel
+// parent, ma solo la riga il cui `checked` è cambiato viene ri-renderizzata
+// (le altre ricevono props identiche → React.memo le salta). Evita di
+// ri-renderizzare l'intera lista a ogni tap su liste lunghe.
+const IngredientRow = memo(function IngredientRow({
+  ing,
+  checked,
+  onToggle,
+}: {
+  ing: IngredientProduct;
+  checked: boolean;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <tr className={cn('transition-colors', checked ? 'bg-primary-light/40' : 'hover:bg-surface-offset')}>
+      <td className="px-4 py-4">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => onToggle(ing.id)}
+          aria-label={`Seleziona ${ing.name}`}
+          className="h-4 w-4 rounded border-border accent-primary"
+        />
+      </td>
+      <td className="px-4 py-4 font-medium text-ink">{ing.name}</td>
+      <td className="px-4 py-4 text-ink-muted font-mono text-xs">{ing.sku ?? '—'}</td>
+      <td className="px-4 py-4 text-ink-muted">{UNIT_LABELS[ing.unit]}</td>
+      <td className="px-4 py-4 text-ink-muted font-mono">
+        {ing.unitPrice !== null ? formatCurrency(ing.unitPrice) : '—'}
+      </td>
+      <td className="px-4 py-4">
+        {ing.supplierName ? (
+          <span className="text-ink-muted">{ing.supplierName}</span>
+        ) : (
+          <span className="inline-flex items-center rounded-full bg-warning-light px-2 py-0.5 text-xs font-semibold text-warning-strong">
+            senza fornitore
+          </span>
+        )}
+      </td>
+      <td className="px-4 py-4 text-right">
+        <Link href={`/ingredients/${ing.id}`} className="text-primary text-xs font-semibold hover:underline">
+          Modifica
+        </Link>
+      </td>
+    </tr>
+  );
+});
 
 type Filter = 'all' | 'no-supplier';
 interface SupplierOpt {
@@ -44,14 +92,15 @@ export function IngredientsManager({
   const visibleIds = visible.map((i) => i.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
 
-  function toggle(id: string) {
+  // Stabile (nessuna dipendenza): non invalida il memo delle righe.
+  const toggle = useCallback((id: string) => {
     setSelected((prev) => {
       const n = new Set(prev);
       if (n.has(id)) n.delete(id);
       else n.add(id);
       return n;
     });
-  }
+  }, []);
 
   function toggleAll() {
     setSelected((prev) => {
@@ -153,42 +202,9 @@ export function IngredientsManager({
               </tr>
             </thead>
             <tbody className="divide-y divide-divider">
-              {visible.map((ing) => {
-                const checked = selected.has(ing.id);
-                return (
-                  <tr key={ing.id} className={cn('transition-colors', checked ? 'bg-primary-light/40' : 'hover:bg-surface-offset')}>
-                    <td className="px-4 py-4">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggle(ing.id)}
-                        aria-label={`Seleziona ${ing.name}`}
-                        className="h-4 w-4 rounded border-border accent-primary"
-                      />
-                    </td>
-                    <td className="px-4 py-4 font-medium text-ink">{ing.name}</td>
-                    <td className="px-4 py-4 text-ink-muted font-mono text-xs">{ing.sku ?? '—'}</td>
-                    <td className="px-4 py-4 text-ink-muted">{UNIT_LABELS[ing.unit]}</td>
-                    <td className="px-4 py-4 text-ink-muted font-mono">
-                      {ing.unitPrice !== null ? formatCurrency(ing.unitPrice) : '—'}
-                    </td>
-                    <td className="px-4 py-4">
-                      {ing.supplierName ? (
-                        <span className="text-ink-muted">{ing.supplierName}</span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-warning-light px-2 py-0.5 text-xs font-semibold text-warning-strong">
-                          senza fornitore
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-right">
-                      <Link href={`/ingredients/${ing.id}`} className="text-primary text-xs font-semibold hover:underline">
-                        Modifica
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
+              {visible.map((ing) => (
+                <IngredientRow key={ing.id} ing={ing} checked={selected.has(ing.id)} onToggle={toggle} />
+              ))}
             </tbody>
           </table>
         </div>

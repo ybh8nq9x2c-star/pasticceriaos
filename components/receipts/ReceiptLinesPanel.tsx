@@ -244,37 +244,41 @@ function LineRow({
       )}
 
       {/* ── Dialog discrepanza ───────────────────────────────────────────── */}
-      <DiscrepancyDialog
-        open={discrepancyOpen}
-        onClose={() => setDiscrepancyOpen(false)}
-        line={line}
-        onSubmit={(reason, receivedQty) => {
-          const fd = new FormData();
-          fd.set('lineId', line.id);
-          fd.set('qtyReceived', receivedQty);
-          fd.set('discrepancyReason', reason);
-          run(updateLineAction, fd);
-          setDiscrepancyOpen(false);
-        }}
-      />
+      {/* Montati SOLO da aperti: niente N×2 istanze di Modal nel fiber tree per
+          una lista lunga, e lo stato del dialog parte pulito a ogni apertura. */}
+      {discrepancyOpen && (
+        <DiscrepancyDialog
+          onClose={() => setDiscrepancyOpen(false)}
+          line={line}
+          onSubmit={(reason, receivedQty) => {
+            const fd = new FormData();
+            fd.set('lineId', line.id);
+            fd.set('qtyReceived', receivedQty);
+            fd.set('discrepancyReason', reason);
+            run(updateLineAction, fd);
+            setDiscrepancyOpen(false);
+          }}
+        />
+      )}
 
       {/* ── Modal crea prodotto al volo ──────────────────────────────────── */}
-      <CreateProductModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        line={line}
-        pending={pending}
-        onSubmit={(name, unit) => {
-          const fd = new FormData();
-          fd.set('lineId', line.id);
-          fd.set('name', name);
-          fd.set('unit', unit);
-          if (line.barcode) fd.set('barcode', line.barcode);
-          if (line.sku) fd.set('sku', line.sku);
-          run(createProductFromLineAction, fd);
-          setCreateOpen(false);
-        }}
-      />
+      {createOpen && (
+        <CreateProductModal
+          onClose={() => setCreateOpen(false)}
+          line={line}
+          pending={pending}
+          onSubmit={(name, unit) => {
+            const fd = new FormData();
+            fd.set('lineId', line.id);
+            fd.set('name', name);
+            fd.set('unit', unit);
+            if (line.barcode) fd.set('barcode', line.barcode);
+            if (line.sku) fd.set('sku', line.sku);
+            run(createProductFromLineAction, fd);
+            setCreateOpen(false);
+          }}
+        />
+      )}
     </li>
   );
 }
@@ -282,12 +286,10 @@ function LineRow({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DiscrepancyDialog({
-  open,
   onClose,
   line,
   onSubmit,
 }: {
-  open: boolean;
   onClose: () => void;
   line: ReceiptLineView;
   onSubmit: (reason: string, qtyReceived: string) => void;
@@ -297,7 +299,7 @@ function DiscrepancyDialog({
 
   return (
     <Modal
-      open={open}
+      open
       onClose={onClose}
       title="Segnala discrepanza"
       footer={
@@ -339,13 +341,11 @@ function DiscrepancyDialog({
 }
 
 function CreateProductModal({
-  open,
   onClose,
   line,
   pending,
   onSubmit,
 }: {
-  open: boolean;
   onClose: () => void;
   line: ReceiptLineView;
   pending: boolean;
@@ -356,7 +356,7 @@ function CreateProductModal({
 
   return (
     <Modal
-      open={open}
+      open
       onClose={onClose}
       title="Crea prodotto dal ricevimento"
       footer={

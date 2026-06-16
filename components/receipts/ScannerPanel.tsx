@@ -52,7 +52,6 @@ export function ScannerPanel({
   const [engine, setEngine] = useState<'native' | 'fallback' | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [parsed, setParsed] = useState<Gs1Parsed | null>(null);
-  const [manual, setManual] = useState('');
   const [qty, setQty] = useState('1');
   const [lot, setLot] = useState('');
   const [expiry, setExpiry] = useState('');
@@ -62,6 +61,9 @@ export function ScannerPanel({
   // UX device-aware (calcolata dopo il mount → niente hydration mismatch).
   const [bestEffort, setBestEffort] = useState(false);
   const [isIos, setIsIos] = useState(false);
+  // Preferenza "Invio automatico": qui nel parent così persiste tra una scan e
+  // l'altra (il campo manuale si smonta in fase 'confirm'). Cambia di rado →
+  // nessun impatto sulla digitazione.
   const [autoSubmit, setAutoSubmit] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -69,8 +71,6 @@ export function ScannerPanel({
   const rafRef = useRef<number>(0);
   const html5Ref = useRef<Html5QrcodeLike | null>(null);
   const lastCodeRef = useRef<{ value: string; at: number }>({ value: '', at: 0 });
-  const manualRef = useRef<HTMLInputElement>(null);
-  const burstRef = useRef<number>(0);
 
   useEffect(() => {
     setIsIos(isIOS());
@@ -95,7 +95,7 @@ export function ScannerPanel({
     }
   }, []);
 
-  useEffect(() => () => { void stopCamera(); window.clearTimeout(burstRef.current); }, [stopCamera]);
+  useEffect(() => () => { void stopCamera(); }, [stopCamera]);
 
   // ── Lettura riuscita (debounce anti doppia-lettura) → parse GS1 → conferma ──
   const onDecoded = useCallback((raw: string) => {
@@ -117,11 +117,6 @@ export function ScannerPanel({
     void stopCamera();
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate?.(80);
   }, [stopCamera]);
-
-  // Autofocus del campo scanner in best-effort quando si è in attesa di uno scan.
-  useEffect(() => {
-    if (bestEffort && phase === 'idle') manualRef.current?.focus();
-  }, [bestEffort, phase]);
 
   // ── Avvio camera: BarcodeDetector → html5-qrcode → unsupported ────────────
   const startCamera = useCallback(async () => {
@@ -208,31 +203,6 @@ export function ScannerPanel({
     }
   }, [onDecoded, stopCamera]);
 
-  // ── Input manuale / keyboard-wedge ──────────────────────────────────────────
-  function handleManualChange(v: string) {
-    setManual(v);
-    window.clearTimeout(burstRef.current);
-    if (!bestEffort || !autoSubmit) return;
-    const value = v.trim();
-    // Auto-submit "a burst": scanner che NON inviano Enter. Gate su codice
-    // plausibilmente completo per non inviare mentre si digita un parziale.
-    const looksComplete = value.length >= 8 && (parseGs1(value).isGs1 || /^\d{8,14}$/.test(value));
-    if (looksComplete) {
-      burstRef.current = window.setTimeout(() => {
-        setManual('');
-        onDecoded(value);
-      }, 140);
-    }
-  }
-
-  function submitManual() {
-    window.clearTimeout(burstRef.current);
-    const value = manual.trim();
-    if (value.length >= 3) {
-      setManual('');
-      onDecoded(value);
-    }
-  }
 
   // ── Invio del codice confermato ─────────────────────────────────────────────
   function submitScan(scannedCode: string) {
@@ -316,51 +286,16 @@ export function ScannerPanel({
     </div>
   );
 
+  // Campo manuale isolato: la digitazione/incolla del barcode aggiorna lo stato
+  // LOCALE del campo, non l'intero ScannerPanel (camera, preview, dl GS1).
   const scannerField = (
-    <form
-      className={cn(
-        'flex flex-col gap-2',
-        bestEffort ? 'rounded-md border border-primary-soft bg-primary-light/40 p-3' : 'border-t border-divider pt-4',
-      )}
-      onSubmit={(e) => { e.preventDefault(); submitManual(); }}
-    >
-      <div className="flex items-end gap-2">
-        <Input
-          ref={manualRef}
-          label={bestEffort ? 'Spara il codice con lo scanner, oppure digita/incolla' : 'Oppure inserisci il codice manualmente'}
-          value={manual}
-          onChange={(e) => handleManualChange(e.target.value)}
-          placeholder="es. 0108001234567890 17261031 10L1A2"
-          inputMode="text"
-          autoComplete="off"
-          wrapClassName="flex-1"
-        />
-        <Button type="submit" variant={bestEffort ? 'primary' : 'secondary'} aria-label="Usa il codice inserito">
-          <Keyboard size={16} aria-hidden="true" />
-          <span className="hidden sm:inline">{bestEffort ? 'Conferma' : 'Usa codice'}</span>
-        </Button>
-      </div>
-      {bestEffort && (
-        <div className="flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => manualRef.current?.focus()}
-            className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
-          >
-            <Crosshair size={13} aria-hidden="true" /> Metti a fuoco il campo scanner
-          </button>
-          <label className="flex items-center gap-1.5 text-xs text-ink-muted cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={autoSubmit}
-              onChange={(e) => setAutoSubmit(e.target.checked)}
-              className="accent-[var(--color-primary)]"
-            />
-            Invio automatico
-          </label>
-        </div>
-      )}
-    </form>
+    <ManualScanField
+      bestEffort={bestEffort}
+      autoFocus={bestEffort && phase === 'idle'}
+      autoSubmit={autoSubmit}
+      onAutoSubmitChange={setAutoSubmit}
+      onSubmit={onDecoded}
+    />
   );
 
   const confirmStep = code && (
@@ -472,5 +407,106 @@ export function ScannerPanel({
         )}
       </div>
     </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Campo barcode manuale / keyboard-wedge — stato LOCALE per non ri-renderizzare
+// l'intero ScannerPanel a ogni carattere digitato o incollato.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ManualScanField({
+  bestEffort,
+  autoFocus,
+  autoSubmit,
+  onAutoSubmitChange,
+  onSubmit,
+}: {
+  bestEffort: boolean;
+  autoFocus: boolean;
+  autoSubmit: boolean;
+  onAutoSubmitChange: (v: boolean) => void;
+  onSubmit: (value: string) => void;
+}) {
+  const [manual, setManual] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const burstRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
+
+  useEffect(() => () => window.clearTimeout(burstRef.current), []);
+
+  function handleChange(v: string) {
+    setManual(v);
+    window.clearTimeout(burstRef.current);
+    if (!bestEffort || !autoSubmit) return;
+    const value = v.trim();
+    // Auto-submit "a burst": scanner che NON inviano Enter. Gate su codice
+    // plausibilmente completo per non inviare mentre si digita un parziale.
+    const looksComplete = value.length >= 8 && (parseGs1(value).isGs1 || /^\d{8,14}$/.test(value));
+    if (looksComplete) {
+      burstRef.current = window.setTimeout(() => {
+        setManual('');
+        onSubmit(value);
+      }, 140);
+    }
+  }
+
+  function submit() {
+    window.clearTimeout(burstRef.current);
+    const value = manual.trim();
+    if (value.length >= 3) {
+      setManual('');
+      onSubmit(value);
+    }
+  }
+
+  return (
+    <form
+      className={cn(
+        'flex flex-col gap-2',
+        bestEffort ? 'rounded-md border border-primary-soft bg-primary-light/40 p-3' : 'border-t border-divider pt-4',
+      )}
+      onSubmit={(e) => { e.preventDefault(); submit(); }}
+    >
+      <div className="flex items-end gap-2">
+        <Input
+          ref={inputRef}
+          label={bestEffort ? 'Spara il codice con lo scanner, oppure digita/incolla' : 'Oppure inserisci il codice manualmente'}
+          value={manual}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder="es. 0108001234567890 17261031 10L1A2"
+          inputMode="text"
+          autoComplete="off"
+          wrapClassName="flex-1"
+        />
+        <Button type="submit" variant={bestEffort ? 'primary' : 'secondary'} aria-label="Usa il codice inserito">
+          <Keyboard size={16} aria-hidden="true" />
+          <span className="hidden sm:inline">{bestEffort ? 'Conferma' : 'Usa codice'}</span>
+        </Button>
+      </div>
+      {bestEffort && (
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => inputRef.current?.focus()}
+            className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
+          >
+            <Crosshair size={13} aria-hidden="true" /> Metti a fuoco il campo scanner
+          </button>
+          <label className="flex items-center gap-1.5 text-xs text-ink-muted cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={autoSubmit}
+              onChange={(e) => onAutoSubmitChange(e.target.checked)}
+              className="accent-[var(--color-primary)]"
+            />
+            Invio automatico
+          </label>
+        </div>
+      )}
+    </form>
   );
 }
