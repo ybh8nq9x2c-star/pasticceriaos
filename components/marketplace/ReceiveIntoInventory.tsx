@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useFormState } from 'react-dom';
 import { IDLE_STATE } from '@/lib/utils';
 import { receiveMarketplaceOrderAction } from '@/modules/marketplace/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 export function ReceiveIntoInventory({
   orderId,
@@ -18,7 +19,7 @@ export function ReceiveIntoInventory({
   orderId: string;
   linkedPurchaseOrderId: string | null;
 }) {
-  const [state, formAction, pending] = useFormState(receiveMarketplaceOrderAction, IDLE_STATE);
+  const [state, formAction] = useFormState(receiveMarketplaceOrderAction, IDLE_STATE);
 
   if (linkedPurchaseOrderId) {
     return (
@@ -58,13 +59,12 @@ export function ReceiveIntoInventory({
       )}
       <form action={formAction}>
         <input type="hidden" name="orderId" value={orderId} />
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+        <SubmitButton
+          pendingLabel="Registrazione…"
+          className="w-full py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
         >
-          {pending ? 'Registrazione…' : '📦 Registra carico a magazzino'}
-        </button>
+          📦 Registra carico a magazzino
+        </SubmitButton>
       </form>
     </div>
   );

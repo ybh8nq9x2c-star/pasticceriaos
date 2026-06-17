@@ -7,8 +7,10 @@
 
 import Link from 'next/link';
 import { useFormState } from 'react-dom';
+import { ShoppingCart } from 'lucide-react';
 import { IDLE_STATE, type ActionState } from '@/lib/utils';
 import { createDraftsFromShortageAction } from '@/modules/ordering/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 export function DraftOrdersButton({ planId }: { planId: string }) {
   const bound = (async (_prev: ActionState, _fd: FormData) =>
@@ -16,7 +18,7 @@ export function DraftOrdersButton({ planId }: { planId: string }) {
     prev: ActionState,
     formData: FormData,
   ) => Promise<ActionState>;
-  const [state, formAction, pending] = useFormState(bound, IDLE_STATE);
+  const [state, formAction] = useFormState(bound, IDLE_STATE);
 
   if (state.status === 'success') {
     return (
@@ -46,13 +48,12 @@ export function DraftOrdersButton({ planId }: { planId: string }) {
         </div>
       )}
       <form action={formAction}>
-        <button
-          type="submit"
-          disabled={pending}
-          className="px-3 py-2 bg-primary text-primary-fg rounded-xl text-xs font-semibold hover:bg-primary-hover disabled:opacity-60"
+        <SubmitButton
+          pendingLabel="Generazione…"
+          className="px-3 py-2 bg-primary text-primary-fg rounded-xl text-xs font-semibold hover:bg-primary-hover"
         >
-          {pending ? 'Generazione…' : '🛒 Genera bozze per fornitore'}
-        </button>
+          <ShoppingCart size={14} aria-hidden="true" /> Genera bozze per fornitore
+        </SubmitButton>
       </form>
       <Link
         href={`/orders/new?plan=${planId}`}

@@ -7,6 +7,7 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Factory, Pencil } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { getRecipe } from '@/modules/catalog/service';
 import { getRecipeCost, getRecipeCostBreakdown } from '@/modules/reporting/service';
@@ -236,7 +237,7 @@ export default async function RecipeDetailPage({ params }: { params: { id: strin
               href={`/production/quick?recipe=${recipe.id}`}
               className="block w-full py-3 text-center bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
             >
-              🏭 Segna prodotto (scarica magazzino)
+              <Factory size={16} className="inline-block mr-1.5 -mt-0.5" aria-hidden="true" /> Segna prodotto (scarica magazzino)
             </Link>
           )}
 
@@ -244,7 +245,7 @@ export default async function RecipeDetailPage({ params }: { params: { id: strin
             href={`/recipes/${recipe.id}/edit`}
             className="block w-full py-3 text-center bg-surface-2 text-ink border border-border rounded-xl text-sm font-semibold hover:bg-surface-offset transition-colors"
           >
-            ✏️ Modifica ricetta
+            <Pencil size={15} className="inline-block mr-1.5 -mt-0.5" aria-hidden="true" /> Modifica ricetta
           </Link>
         </div>
       </div>

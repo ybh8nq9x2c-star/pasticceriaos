@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { IDLE_STATE, UNIT_LABELS } from '@/lib/utils';
 import { updateIngredientAction, deactivateIngredientAction } from '@/modules/catalog/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 import { StockAdjustPanel } from '@/components/inventory/StockAdjustPanel';
 import type { IngredientProduct } from '@/modules/catalog/types';
 import type { UnitOfMeasure } from '@/lib/database.types';
@@ -29,7 +30,7 @@ export default function IngredientDetailPage({ params }: { params: { id: string 
   const [loading, setLoading]       = useState(true);
   const [confirming, setConfirming] = useState(false);
 
-  const [state, formAction, pending] = useFormState(
+  const [state, formAction] = useFormState(
     (prev: typeof IDLE_STATE, formData: FormData) =>
       updateIngredientAction(params.id, prev, formData),
     IDLE_STATE,
@@ -190,13 +191,12 @@ export default function IngredientDetailPage({ params }: { params: { id: string 
           >
             Annulla
           </Link>
-          <button
-            type="submit"
-            disabled={pending}
-            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+          <SubmitButton
+            pendingLabel="Salvataggio…"
+            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
-            {pending ? 'Salvataggio…' : 'Salva modifiche'}
-          </button>
+            Salva modifiche
+          </SubmitButton>
         </div>
       </form>
 

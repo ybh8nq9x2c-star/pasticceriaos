@@ -10,11 +10,12 @@
 import { useFormState } from 'react-dom';
 import { IDLE_STATE } from '@/lib/utils';
 import { supplierUploadDocumentAction } from '@/modules/documents/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 const fieldClass = 'w-full rounded-xl border border-border px-3 py-2.5 text-sm bg-surface-2 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary';
 
 export function SupplierDocumentUpload({ orderId }: { orderId: string }) {
-  const [state, formAction, pending] = useFormState(supplierUploadDocumentAction, IDLE_STATE);
+  const [state, formAction] = useFormState(supplierUploadDocumentAction, IDLE_STATE);
 
   return (
     <div className="bg-surface-2 rounded-2xl border border-border p-4 sm:p-5">
@@ -43,13 +44,12 @@ export function SupplierDocumentUpload({ orderId }: { orderId: string }) {
           <input name="totalAmount" type="number" step="0.01" min={0} placeholder="Totale € (opz.)" className={fieldClass} />
         </div>
         <input name="notes" type="text" maxLength={500} placeholder="Note (opz.)" className={fieldClass} />
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+        <SubmitButton
+          pendingLabel="Invio…"
+          className="w-full py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
         >
-          {pending ? 'Invio…' : '📎 Invia documento'}
-        </button>
+          📎 Invia documento
+        </SubmitButton>
       </form>
     </div>
   );

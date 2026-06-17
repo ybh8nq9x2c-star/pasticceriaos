@@ -8,6 +8,7 @@
 import { useFormState } from 'react-dom';
 import { IDLE_STATE, type ActionState } from '@/lib/utils';
 import { runMatchingAction } from '@/modules/documents/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 export function MatchPanel({
   documentId,
@@ -22,7 +23,7 @@ export function MatchPanel({
     prev: ActionState,
     formData: FormData,
   ) => Promise<ActionState>;
-  const [state, formAction, pending] = useFormState(bound, IDLE_STATE);
+  const [state, formAction] = useFormState(bound, IDLE_STATE);
 
   return (
     <div className="bg-surface-2 rounded-2xl border border-border p-5">
@@ -46,13 +47,12 @@ export function MatchPanel({
             <option key={o.id} value={o.id}>{o.label}</option>
           ))}
         </select>
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+        <SubmitButton
+          pendingLabel="Verifica…"
+          className="w-full py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
         >
-          {pending ? 'Verifica…' : currentOrderId ? 'Ri-esegui matching' : 'Associa e verifica'}
-        </button>
+          {currentOrderId ? 'Ri-esegui matching' : 'Associa e verifica'}
+        </SubmitButton>
       </form>
       <p className="text-xs text-ink-muted mt-2.5">
         Confronta quantità e prezzi del documento con le righe dell'ordine e

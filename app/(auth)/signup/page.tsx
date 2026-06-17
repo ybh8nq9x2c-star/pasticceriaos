@@ -11,9 +11,10 @@ import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { signUpAction } from '@/modules/identity/actions';
 import { Logo } from '@/components/shared/Logo';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 export default function SignupPage() {
-  const [state, formAction, pending] = useFormState(signUpAction, IDLE_STATE);
+  const [state, formAction] = useFormState(signUpAction, IDLE_STATE);
 
   return (
     <div className="space-y-8">
@@ -66,13 +67,12 @@ export default function SignupPage() {
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full py-3 bg-primary hover:bg-primary-hover text-primary-fg rounded-xl font-semibold text-sm transition-all disabled:opacity-60"
+        <SubmitButton
+          pendingLabel="Creazione account…"
+          className="w-full py-3 bg-primary hover:bg-primary-hover text-primary-fg rounded-xl font-semibold text-sm transition-all"
         >
-          {pending ? 'Creazione account…' : 'Crea account'}
-        </button>
+          Crea account
+        </SubmitButton>
       </form>
 
       <p className="text-xs text-center text-ink-muted">

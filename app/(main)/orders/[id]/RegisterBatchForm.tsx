@@ -8,6 +8,7 @@
 import { useFormState } from 'react-dom';
 import { IDLE_STATE } from '@/lib/utils';
 import { recordBatchAction } from '@/modules/inventory/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 export function RegisterBatchForm({
   orderId,
@@ -20,7 +21,7 @@ export function RegisterBatchForm({
   defaultQuantity: number;
   unit: string;
 }) {
-  const [state, formAction, pending] = useFormState(recordBatchAction, IDLE_STATE);
+  const [state, formAction] = useFormState(recordBatchAction, IDLE_STATE);
 
   if (state.status === 'success') {
     return <p className="text-xs font-semibold text-success-strong">✓ Lotto registrato</p>;
@@ -53,13 +54,9 @@ export function RegisterBatchForm({
         defaultValue={defaultQuantity}
         className="w-20 rounded-lg border border-border px-2 py-1.5 text-xs text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
       />
-      <button
-        type="submit"
-        disabled={pending}
-        className="px-3 py-1.5 bg-primary text-primary-fg rounded-lg text-xs font-semibold hover:bg-primary-hover disabled:opacity-60"
-      >
-        {pending ? '…' : 'Registra'}
-      </button>
+      <SubmitButton className="px-3 py-1.5 bg-primary text-primary-fg rounded-lg text-xs font-semibold hover:bg-primary-hover">
+        Registra
+      </SubmitButton>
       {state.status === 'error' && (
         <span className="text-xs text-danger basis-full">{state.error}</span>
       )}

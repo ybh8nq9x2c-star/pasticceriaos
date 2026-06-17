@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { updateSupplierAction, deactivateSupplierAction } from '@/modules/catalog/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 import { PortalLinkPanel } from '@/components/suppliers/PortalLinkPanel';
 import type { Supplier } from '@/modules/catalog/types';
 
@@ -24,7 +25,7 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
   const [loading, setLoading]       = useState(true);
   const [confirming, setConfirming] = useState(false);
 
-  const [state, formAction, pending] = useFormState(
+  const [state, formAction] = useFormState(
     (prev: typeof IDLE_STATE, formData: FormData) =>
       updateSupplierAction(params.id, prev, formData),
     IDLE_STATE,
@@ -154,13 +155,12 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
           >
             Annulla
           </Link>
-          <button
-            type="submit"
-            disabled={pending}
-            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+          <SubmitButton
+            pendingLabel="Salvataggio…"
+            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
-            {pending ? 'Salvataggio…' : 'Salva modifiche'}
-          </button>
+            Salva modifiche
+          </SubmitButton>
         </div>
       </form>
 

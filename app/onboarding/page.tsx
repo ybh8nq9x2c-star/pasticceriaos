@@ -12,6 +12,7 @@ import { useState, useTransition } from 'react';
 import { useFormState } from 'react-dom';
 import { IDLE_STATE } from '@/lib/utils';
 import { createOrganizationAction, verifyVatAction } from '@/modules/identity/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 import { LEGAL_FORMS, LEGAL_FORM_LABELS, guessLegalForm } from '@/modules/identity/vat';
 import { Logo } from '@/components/shared/Logo';
 
@@ -38,7 +39,7 @@ const COPY = {
 } as const;
 
 export default function OnboardingPage() {
-  const [state, formAction, pending] = useFormState(createOrganizationAction, IDLE_STATE);
+  const [state, formAction] = useFormState(createOrganizationAction, IDLE_STATE);
   const [accountType, setAccountType] = useState<'customer' | 'supplier'>('customer');
   const copy = COPY[accountType];
 
@@ -256,13 +257,12 @@ export default function OnboardingPage() {
               )}
             </div>
 
-            <button
-              type="submit"
-              disabled={pending}
-              className="w-full py-3 bg-primary hover:bg-primary-hover text-primary-fg rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 mt-2"
+            <SubmitButton
+              pendingLabel="Creazione in corso…"
+              className="w-full py-3 bg-primary hover:bg-primary-hover text-primary-fg rounded-xl font-semibold text-sm transition-colors mt-2"
             >
-              {pending ? 'Creazione in corso…' : copy.cta}
-            </button>
+              {copy.cta}
+            </SubmitButton>
           </form>
         </div>
 

@@ -8,7 +8,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { cancelReceiptAction, completeReceiptAction } from '@/modules/goods-receipts/actions';
@@ -84,9 +84,12 @@ export function CompleteReceiptBar({
           </p>
         )}
         {canComplete && (
-          <p className="mb-2 rounded-md bg-warning-light px-3 py-2 text-xs font-medium text-warning-strong">
-            ⚠ Il magazzino <strong>non è ancora aggiornato</strong>: conferma per contabilizzare{' '}
-            {toPost.length} rig{toPost.length === 1 ? 'a' : 'he'}.
+          <p className="mb-2 flex items-start gap-1.5 rounded-md bg-warning-light px-3 py-2 text-xs font-medium text-warning-strong">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <span>
+              Il magazzino <strong>non è ancora aggiornato</strong>: conferma per contabilizzare{' '}
+              {toPost.length} rig{toPost.length === 1 ? 'a' : 'he'}.
+            </span>
           </p>
         )}
         <div className="flex items-center gap-2">

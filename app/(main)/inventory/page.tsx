@@ -11,7 +11,7 @@ import { UNIT_LABELS, formatCurrency } from '@/lib/utils';
 import type { InventoryStockFull } from '@/modules/reporting/types';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Warehouse } from 'lucide-react';
+import { Warehouse, Factory } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Magazzino' };
 
@@ -112,7 +112,7 @@ export default async function InventoryPage() {
               href="/production/quick"
               className="px-4 py-2.5 bg-surface-2 text-ink border border-border rounded-xl text-sm font-semibold hover:bg-surface-offset transition-colors"
             >
-              🏭 Scarica per ricetta
+              <Factory size={15} className="inline-block mr-1.5 -mt-0.5" aria-hidden="true" /> Scarica per ricetta
             </Link>
             <Link
               href="/inventory/movement"

@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { IDLE_STATE, type ActionState } from '@/lib/utils';
 import { updateRecipeAction } from '@/modules/catalog/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 const UNITS = ['g', 'kg', 'ml', 'l', 'pz', 'bustina', 'foglio'] as const;
 
@@ -52,7 +53,7 @@ export function EditRecipeForm({
     prev: ActionState,
     formData: FormData,
   ) => Promise<ActionState>;
-  const [state, formAction, pending] = useFormState(boundAction, IDLE_STATE);
+  const [state, formAction] = useFormState(boundAction, IDLE_STATE);
 
   const [rows, setRows] = useState<IngredientRow[]>(
     recipe.ingredients.length > 0
@@ -268,13 +269,12 @@ export function EditRecipeForm({
           >
             Annulla
           </Link>
-          <button
-            type="submit"
-            disabled={pending}
-            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+          <SubmitButton
+            pendingLabel="Salvataggio…"
+            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
-            {pending ? 'Salvataggio…' : 'Salva modifiche'}
-          </button>
+            Salva modifiche
+          </SubmitButton>
         </div>
       </form>
     </div>
