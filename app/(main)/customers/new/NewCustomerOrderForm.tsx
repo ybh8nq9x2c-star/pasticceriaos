@@ -9,6 +9,7 @@ import { useFormState } from 'react-dom';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { createCustomerOrderAction } from '@/modules/customers/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 interface ItemRow {
   key: number;
@@ -28,7 +29,7 @@ const EMPTY_ITEM = (): ItemRow => ({
 });
 
 export function NewCustomerOrderForm({ recipes }: { recipes: { id: string; name: string }[] }) {
-  const [state, formAction, pending] = useFormState(createCustomerOrderAction, IDLE_STATE);
+  const [state, formAction] = useFormState(createCustomerOrderAction, IDLE_STATE);
   const [items, setItems] = useState<ItemRow[]>([EMPTY_ITEM()]);
 
   function updateItem(key: number, field: keyof ItemRow, value: string) {
@@ -195,13 +196,12 @@ export function NewCustomerOrderForm({ recipes }: { recipes: { id: string; name:
           <Link href="/customers" className="flex-1 py-3 text-center rounded-xl border border-border text-sm font-semibold text-ink hover:bg-surface-offset">
             Annulla
           </Link>
-          <button
-            type="submit"
-            disabled={pending}
-            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+          <SubmitButton
+            pendingLabel="Salvataggio…"
+            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
-            {pending ? 'Salvataggio…' : 'Registra ordine'}
-          </button>
+            Registra ordine
+          </SubmitButton>
         </div>
       </form>
     </div>

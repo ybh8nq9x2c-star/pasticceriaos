@@ -8,17 +8,13 @@ import { useFormState } from 'react-dom';
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { IDLE_STATE, UNIT_LABELS } from '@/lib/utils';
+import { IDLE_STATE, UNIT_LABELS, cn } from '@/lib/utils';
 import { createIngredientAction } from '@/modules/catalog/actions';
 import { suggestProducts, type CatalogProductRef } from '@/modules/goods-receipts/matching';
 import { SubmitButton } from '@/components/ui/SubmitButton';
+import { supplierLabel } from '@/lib/entity-label';
 
 interface SupplierOption { id: string; name: string; email?: string | null }
-
-/** Etichetta fornitore con email per distinguere omonimi (es. due "matteo emiri"). */
-function supplierLabel(s: SupplierOption): string {
-  return s.email ? `${s.name} — ${s.email}` : s.name;
-}
 
 // Stile campo condiviso
 const fieldClass = 'w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary bg-surface-2';
@@ -196,15 +192,21 @@ export default function NewIngredientPage() {
                 <option key={s.id} value={s.id}>{supplierLabel(s)}</option>
               ))}
             </select>
-            {supplierId === '' && (
-              <p className="mt-1.5 flex items-start gap-1.5 text-xs text-warning-strong">
-                <span aria-hidden="true">⚠</span>
-                <span>
-                  Senza fornitore questo ingrediente <strong>non comparirà</strong> nei suggerimenti di
-                  riordino automatico. Puoi assegnarlo anche dopo, dalla lista ingredienti.
-                </span>
-              </p>
-            )}
+            {/* Sempre renderizzato (invisibile se c'è un fornitore): riserva lo
+                spazio → il bottone "Salva" non salta quando l'avviso compare/sparisce. */}
+            <p
+              className={cn(
+                'mt-1.5 flex items-start gap-1.5 text-xs text-warning-strong',
+                supplierId !== '' && 'invisible',
+              )}
+              aria-hidden={supplierId !== ''}
+            >
+              <span aria-hidden="true">⚠</span>
+              <span>
+                Senza fornitore questo ingrediente <strong>non comparirà</strong> nei suggerimenti di
+                riordino automatico. Puoi assegnarlo anche dopo, dalla lista ingredienti.
+              </span>
+            </p>
           </div>
 
           <div>

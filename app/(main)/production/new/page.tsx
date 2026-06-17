@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { createPlanAction } from '@/modules/production/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 interface RecipeOption { id: string; name: string; emoji: string | null; basePortions: number }
 interface PlanRow { key: number; recipeId: string; batchCount: string; notes: string }
@@ -36,7 +37,7 @@ export default function NewProductionPage() {
   const [planDate, setPlanDate] = useState(today());
   const [customerOrders, setCustomerOrders] = useState<CustomerOrderForDate[]>([]);
 
-  const [state, formAction, pending] = useFormState(createPlanAction, IDLE_STATE);
+  const [state, formAction] = useFormState(createPlanAction, IDLE_STATE);
 
   useEffect(() => {
     fetch('/api/catalog/recipes')
@@ -279,13 +280,12 @@ export default function NewProductionPage() {
           >
             Annulla
           </Link>
-          <button
-            type="submit"
-            disabled={pending}
-            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+          <SubmitButton
+            pendingLabel="Creazione…"
+            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
-            {pending ? 'Creazione…' : 'Crea piano'}
-          </button>
+            Crea piano
+          </SubmitButton>
         </div>
       </form>
     </div>

@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { recordMovementAction } from '@/modules/inventory/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 interface IngredientOption { id: string; name: string; unit: string }
 
@@ -29,7 +30,7 @@ export default function MovementPage() {
   const [ingredients, setIngredients] = useState<IngredientOption[]>([]);
   const [movType, setMovType] = useState('purchase_receipt');
 
-  const [state, formAction, pending] = useFormState(recordMovementAction, IDLE_STATE);
+  const [state, formAction] = useFormState(recordMovementAction, IDLE_STATE);
 
   useEffect(() => {
     fetch('/api/catalog/ingredients')
@@ -141,13 +142,12 @@ export default function MovementPage() {
           >
             Annulla
           </Link>
-          <button
-            type="submit"
-            disabled={pending}
-            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+          <SubmitButton
+            pendingLabel="Registrazione…"
+            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
-            {pending ? 'Registrazione…' : 'Registra movimento'}
-          </button>
+            Registra movimento
+          </SubmitButton>
         </div>
       </form>
     </div>

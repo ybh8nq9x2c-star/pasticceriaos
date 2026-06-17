@@ -11,6 +11,7 @@ import { useFormState } from 'react-dom';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { createDocumentAction } from '@/modules/documents/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 export interface DocLinePrefill {
   orderLineItemId: string | null;
@@ -45,7 +46,7 @@ export function NewDocumentForm({
   prefillSupplierId?: string;
   prefillLines?: DocLinePrefill[];
 }) {
-  const [state, formAction, pending] = useFormState(createDocumentAction, IDLE_STATE);
+  const [state, formAction] = useFormState(createDocumentAction, IDLE_STATE);
   const [rows, setRows] = useState<LineRow[]>(
     prefillLines && prefillLines.length > 0
       ? prefillLines.map((l) => ({ ...l, key: ++keyCounter }))
@@ -223,13 +224,12 @@ export function NewDocumentForm({
           <Link href="/documents" className="flex-1 py-3 text-center rounded-xl border border-border text-sm font-semibold text-ink hover:bg-surface-offset">
             Annulla
           </Link>
-          <button
-            type="submit"
-            disabled={pending}
-            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+          <SubmitButton
+            pendingLabel="Registrazione…"
+            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
-            {pending ? 'Registrazione…' : 'Registra e verifica'}
-          </button>
+            Registra e verifica
+          </SubmitButton>
         </div>
       </form>
     </div>

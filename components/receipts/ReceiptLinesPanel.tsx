@@ -22,16 +22,9 @@ import {
 } from '@/modules/goods-receipts/actions';
 import { LINE_STATUS_LABELS, type ReceiptLineView, type ReceiptMode } from '@/modules/goods-receipts/types';
 import type { CatalogProductRef } from '@/modules/goods-receipts/matching';
+import { RECEIPT_LINE_BADGE } from '@/lib/status';
 import { IDLE_STATE, UNIT_LABELS, cn, type ActionState } from '@/lib/utils';
 import type { UnitOfMeasure } from '@/lib/database.types';
-
-const LINE_BADGE: Record<ReceiptLineView['lineStatus'], 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
-  pending: 'warning',
-  matched: 'info',
-  received: 'success',
-  partial: 'warning',
-  discrepancy: 'danger',
-};
 
 const UNITS: UnitOfMeasure[] = ['g', 'kg', 'ml', 'l', 'pz', 'bustina', 'foglio'];
 
@@ -144,7 +137,7 @@ function LineRow({
               .join(' · ') || '—'}
           </p>
         </div>
-        <Badge variant={LINE_BADGE[line.lineStatus]} size="sm">
+        <Badge variant={RECEIPT_LINE_BADGE[line.lineStatus]} size="sm">
           {LINE_STATUS_LABELS[line.lineStatus]}
         </Badge>
       </div>

@@ -9,13 +9,14 @@ import { useFormState } from 'react-dom';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { createSupplierAction } from '@/modules/catalog/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 const fieldClass = 'w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary bg-surface-2';
 const labelClass = 'block text-sm font-medium text-ink mb-1.5';
 const optClass   = 'text-ink-muted font-normal text-xs';
 
 export default function NewSupplierPage() {
-  const [state, formAction, pending] = useFormState(createSupplierAction, IDLE_STATE);
+  const [state, formAction] = useFormState(createSupplierAction, IDLE_STATE);
 
   return (
     <div className="p-8 max-w-xl mx-auto">
@@ -99,13 +100,12 @@ export default function NewSupplierPage() {
             >
               Annulla
             </Link>
-            <button
-              type="submit"
-              disabled={pending}
-              className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+            <SubmitButton
+              pendingLabel="Salvataggio…"
+              className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
             >
-              {pending ? 'Salvataggio…' : 'Salva fornitore'}
-            </button>
+              Salva fornitore
+            </SubmitButton>
           </div>
         </form>
       </div>
