@@ -9,6 +9,7 @@ import { useFormState } from 'react-dom';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Cake } from 'lucide-react';
 import { IDLE_STATE } from '@/lib/utils';
 import { createPlanAction } from '@/modules/production/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -169,8 +170,9 @@ export default function NewProductionPage() {
           <div className="rounded-2xl border border-primary-soft bg-primary-light p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-primary-hover">
-                  🎂 {customerOrders.length} {customerOrders.length === 1 ? 'ordine cliente' : 'ordini clienti'} con ritiro in questa data
+                <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-hover">
+                  <Cake size={15} aria-hidden="true" className="shrink-0" />
+                  {customerOrders.length} {customerOrders.length === 1 ? 'ordine cliente' : 'ordini clienti'} con ritiro in questa data
                 </p>
                 <ul className="mt-2 space-y-1 text-xs text-ink-muted">
                   {customerOrders.map((o) => (

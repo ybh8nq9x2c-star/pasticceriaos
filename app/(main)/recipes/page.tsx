@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { listRecipes } from '@/modules/catalog/service';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Utensils, UtensilsCrossed } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Ricette' };
 
@@ -66,8 +66,12 @@ export default async function RecipesPage() {
                 </div>
               </div>
               <div className="flex items-center gap-4 mt-4 text-xs text-ink-muted">
-                <span className="font-mono">🥄 {recipe.ingredientsCount} ingredienti</span>
-                <span className="font-mono">🍽️ {recipe.basePortions} porzioni</span>
+                <span className="inline-flex items-center gap-1 font-mono">
+                  <Utensils size={13} aria-hidden="true" /> {recipe.ingredientsCount} ingredienti
+                </span>
+                <span className="inline-flex items-center gap-1 font-mono">
+                  <UtensilsCrossed size={13} aria-hidden="true" /> {recipe.basePortions} porzioni
+                </span>
               </div>
             </Link>
           ))}

@@ -5,6 +5,7 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { ReceiptText, Package } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { getOrder, getOrderHistory } from '@/modules/ordering/service';
 import { getBatchesForOrder } from '@/modules/inventory/service';
@@ -308,7 +309,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
               href={`/documents/new?order=${order.id}`}
               className="block w-full py-3 text-center border border-border text-ink rounded-xl text-sm font-semibold hover:bg-surface-offset transition-colors"
             >
-              🧾 Registra DDT / fattura
+              <ReceiptText size={15} className="inline-block mr-1.5 -mt-0.5" aria-hidden="true" /> Registra DDT / fattura
             </Link>
           )}
 
@@ -319,7 +320,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
               href={`/receipts/new?order=${order.id}`}
               className="block w-full py-3 text-center rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
             >
-              📦 Ricevi merce
+              <Package size={15} className="inline-block mr-1.5 -mt-0.5" aria-hidden="true" /> Ricevi merce
             </Link>
           )}
 

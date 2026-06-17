@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { useFormState } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { ClipboardList } from 'lucide-react';
 import { IDLE_STATE } from '@/lib/utils';
 import { createOrderAction } from '@/modules/ordering/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -114,7 +115,9 @@ export function NewOrderForm({
 
       {prefillNote && (
         <div className="mb-6 rounded-2xl bg-primary-light border border-primary-soft p-4">
-          <p className="text-sm font-semibold text-primary-hover">📋 Bozza generata dal fabbisogno</p>
+          <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-hover">
+            <ClipboardList size={15} aria-hidden="true" className="shrink-0" /> Bozza generata dal fabbisogno
+          </p>
           <p className="text-xs text-ink-muted mt-1">{prefillNote}</p>
         </div>
       )}

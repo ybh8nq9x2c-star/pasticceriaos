@@ -9,6 +9,11 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import type { LucideIcon } from 'lucide-react';
+import {
+  Package, Ban, AlertTriangle, Hourglass, Mail, ReceiptText, TrendingDown,
+  ShoppingCart, Cake, Recycle, Calculator,
+} from 'lucide-react';
 import {
   getDashboardSummary,
   getOpenOrders,
@@ -50,7 +55,7 @@ function KpiCard({ label, value, sub, href, accentClass }: {
 }
 
 interface AttentionItem {
-  emoji: string;
+  icon: LucideIcon;
   text: string;
   detail: string;
   href: string;
@@ -58,7 +63,7 @@ interface AttentionItem {
 }
 
 interface SuggestedAction {
-  emoji: string;
+  icon: LucideIcon;
   text: string;
   cta: string;
   href: string;
@@ -109,7 +114,7 @@ export default async function TodayPage() {
   );
   if (openReceipts.length > 0) {
     attention.push({
-      emoji: '📦', severity: 'red',
+      icon: Package, severity: 'red',
       text: `${openReceipts.length} riceviment${openReceipts.length === 1 ? 'o' : 'i'} non contabilizzat${openReceipts.length === 1 ? 'o' : 'i'}: il magazzino non è ancora aggiornato`,
       detail: openReceipts.map((r) => r.supplierName).filter(Boolean).slice(0, 3).join(', ') || 'conferma per aggiornare le giacenze',
       href: '/receipts?tab=open',
@@ -118,7 +123,7 @@ export default async function TodayPage() {
 
   if (negativeMarginRecipes.length > 0) {
     attention.push({
-      emoji: '🛑', severity: 'red',
+      icon: Ban, severity: 'red',
       text: `Stai producendo in perdita: ${negativeMarginRecipes.map((r) => r.name).join(', ')}`,
       detail: 'food cost sopra il prezzo di vendita',
       href: '/analytics',
@@ -126,7 +131,7 @@ export default async function TodayPage() {
   }
   if (docsWithAnomalies.length > 0) {
     attention.push({
-      emoji: '⚠️', severity: 'red',
+      icon: AlertTriangle, severity: 'red',
       text: `${docsWithAnomalies.length} ${docsWithAnomalies.length === 1 ? 'documento con anomalie' : 'documenti con anomalie'} di prezzo/quantità`,
       detail: docsWithAnomalies.map((d) => d.supplierName).filter(Boolean).slice(0, 3).join(', '),
       href: '/documents?stato=anomaly',
@@ -134,7 +139,7 @@ export default async function TodayPage() {
   }
   if (expiring.length > 0) {
     attention.push({
-      emoji: '⏳', severity: 'red',
+      icon: Hourglass, severity: 'red',
       text: `${expiring.length} ${expiring.length === 1 ? 'lotto scade' : 'lotti scadono'} entro 3 giorni`,
       detail: expiring.slice(0, 3).map((b) => b.ingredientName).join(', '),
       href: '/inventory/batches',
@@ -142,7 +147,7 @@ export default async function TodayPage() {
   }
   if (staleOrders.length > 0) {
     attention.push({
-      emoji: '📨', severity: 'amber',
+      icon: Mail, severity: 'amber',
       text: `${staleOrders.length} ${staleOrders.length === 1 ? 'ordine inviato' : 'ordini inviati'} senza conferma da oltre 24h`,
       detail: staleOrders.map((o) => o.supplierName).slice(0, 3).join(', '),
       href: '/orders',
@@ -150,7 +155,7 @@ export default async function TodayPage() {
   }
   if (docsToVerify.length > 0) {
     attention.push({
-      emoji: '🧾', severity: 'amber',
+      icon: ReceiptText, severity: 'amber',
       text: `${docsToVerify.length} ${docsToVerify.length === 1 ? 'documento da verificare' : 'documenti da verificare'}`,
       detail: 'esegui il matching con gli ordini',
       href: '/documents?stato=received',
@@ -159,7 +164,7 @@ export default async function TodayPage() {
   if (lowMarginRecipes.length > negativeMarginRecipes.length) {
     const risky = lowMarginRecipes.filter((r) => (r.marginPct ?? 0) >= 0);
     attention.push({
-      emoji: '📉', severity: 'amber',
+      icon: TrendingDown, severity: 'amber',
       text: `${risky.length} ${risky.length === 1 ? 'ricetta' : 'ricette'} con margine sotto il 30%`,
       detail: risky.slice(0, 3).map((r) => `${r.name} (${r.marginPct}%)`).join(', '),
       href: '/analytics',
@@ -170,7 +175,7 @@ export default async function TodayPage() {
   const suggested: SuggestedAction[] = [];
   if (summary.todayPlan && todayShortages.length > 0) {
     suggested.push({
-      emoji: '🛒',
+      icon: ShoppingCart,
       text: `Mancano ${todayShortages.length} ingredienti per il piano di oggi (${todayShortages.slice(0, 3).map((s) => s.ingredientName).join(', ')})`,
       cta: 'Genera bozze ordine',
       href: `/production/${summary.todayPlan.id}`,
@@ -182,14 +187,14 @@ export default async function TodayPage() {
   const ordersTomorrow = customerOrders.filter((o) => o.pickupDate === tomorrowIso);
   if (ordersTomorrow.length > 0 && !summary.todayPlan) {
     suggested.push({
-      emoji: '🎂',
+      icon: Cake,
       text: `Hai ${ordersTomorrow.reduce((s, o) => s + o.piecesCount, 0)} pezzi da consegnare domani (${ordersTomorrow.length} ordini clienti)`,
       cta: 'Pianifica la produzione',
       href: '/production/new',
     });
   } else if (ordersTomorrow.length > 0) {
     suggested.push({
-      emoji: '🎂',
+      icon: Cake,
       text: `${ordersTomorrow.length} ordini clienti con ritiro domani: verifica che il piano li copra`,
       cta: 'Vedi ordini',
       href: '/customers',
@@ -198,7 +203,7 @@ export default async function TodayPage() {
   for (const b of expiring.slice(0, 2)) {
     if (b.suggestedRecipes.length > 0) {
       suggested.push({
-        emoji: '♻️',
+        icon: Recycle,
         text: `${b.quantityRemaining} ${b.unit} di ${b.ingredientName} ${b.daysToExpiry <= 0 ? 'scadono oggi' : `scadono tra ${b.daysToExpiry}g`} — usali in: ${b.suggestedRecipes.slice(0, 2).join(', ')}`,
         cta: 'Vedi lotti',
         href: '/inventory/batches',
@@ -207,7 +212,7 @@ export default async function TodayPage() {
   }
   if (!summary.todayPlan) {
     suggested.push({
-      emoji: '🧮',
+      icon: Calculator,
       text: 'Nessun piano di produzione per oggi',
       cta: 'Crea il piano',
       href: '/production/new',
@@ -321,7 +326,11 @@ export default async function TodayPage() {
           <div className="bg-surface-2 rounded-2xl border border-border divide-y divide-divider overflow-hidden">
             {attention.map((item, i) => (
               <Link key={i} href={item.href} className="flex items-center gap-4 px-6 py-3.5 hover:bg-surface-offset transition-colors group">
-                <span className="text-xl leading-none shrink-0">{item.emoji}</span>
+                <item.icon
+                  size={20}
+                  aria-hidden="true"
+                  className={`shrink-0 ${item.severity === 'red' ? 'text-danger' : 'text-warning-strong'}`}
+                />
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm font-medium ${item.severity === 'red' ? 'text-danger' : 'text-ink'}`}>
                     {item.text}
@@ -342,7 +351,7 @@ export default async function TodayPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {suggested.slice(0, 4).map((a, i) => (
               <div key={i} className="bg-surface-2 rounded-2xl border border-border p-5 text-ink flex items-start gap-3 shadow-sm">
-                <span className="text-xl leading-none shrink-0">{a.emoji}</span>
+                <a.icon size={20} aria-hidden="true" className="shrink-0 mt-0.5 text-primary" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm leading-snug">{a.text}</p>
                   <Link href={a.href} className="inline-block mt-2 text-xs font-semibold text-primary hover:underline">

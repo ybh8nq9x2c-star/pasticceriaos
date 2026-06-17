@@ -15,7 +15,7 @@ import { requireOrgId } from '@/modules/identity/service';
 import { ConnectSupplierForm } from '@/components/marketplace/ConnectSupplierForm';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Truck } from 'lucide-react';
+import { Truck, ShoppingCart, Link2, ReceiptText, ChartColumn } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Fornitori' };
 
@@ -73,17 +73,17 @@ export default async function SuppliersPage() {
       {/* Scorciatoie operative del dominio fornitori */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { href: '/orders',              label: 'Ordini interni',     emoji: '🛒' },
-          { href: '/marketplace/orders',  label: 'Ordini marketplace', emoji: '🔗' },
-          { href: '/documents',           label: 'Documenti e fatture', emoji: '🧾' },
-          { href: '/analytics',           label: 'Spesa e prezzi',     emoji: '📊' },
+          { href: '/orders',              label: 'Ordini interni',     icon: ShoppingCart },
+          { href: '/marketplace/orders',  label: 'Ordini marketplace', icon: Link2 },
+          { href: '/documents',           label: 'Documenti e fatture', icon: ReceiptText },
+          { href: '/analytics',           label: 'Spesa e prezzi',     icon: ChartColumn },
         ].map((s) => (
           <Link
             key={s.href}
             href={s.href}
             className="flex items-center gap-2.5 px-4 py-3 bg-surface-2 rounded-xl border border-border hover:border-primary-soft transition-colors"
           >
-            <span className="text-xl leading-none">{s.emoji}</span>
+            <s.icon size={18} className="text-ink-muted shrink-0" aria-hidden="true" />
             <span className="text-xs font-semibold text-ink">{s.label}</span>
           </Link>
         ))}

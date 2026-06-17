@@ -6,6 +6,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { listMovements } from '@/modules/inventory/service';
+import { ClipboardList } from 'lucide-react';
 import { UNIT_LABELS } from '@/lib/utils';
 import type { MovementType } from '@/modules/inventory/types';
 
@@ -62,7 +63,7 @@ export default async function MovementsPage() {
 
       {movements.length === 0 ? (
         <div className="text-center py-20 bg-surface-2 rounded-2xl border border-border">
-          <p className="text-4xl mb-3">📋</p>
+          <ClipboardList size={40} className="mx-auto mb-3 text-ink-faint" aria-hidden="true" />
           <p className="text-lg font-bold text-ink">Nessun movimento</p>
           <p className="text-sm text-ink-muted mt-1">I movimenti vengono registrati automaticamente dagli ordini e dalla produzione.</p>
         </div>
