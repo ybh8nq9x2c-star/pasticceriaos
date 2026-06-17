@@ -10,6 +10,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { createRecipeAction } from '@/modules/catalog/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 const UNITS = ['g', 'kg', 'ml', 'l', 'pz', 'bustina', 'foglio'] as const;
 
@@ -33,7 +34,7 @@ const fieldClass = 'w-full rounded-xl border border-border px-3 py-2.5 text-sm f
 const labelClass = 'block text-sm font-medium text-ink mb-1.5';
 
 export default function NewRecipePage() {
-  const [state, formAction, pending] = useFormState(createRecipeAction, IDLE_STATE);
+  const [state, formAction] = useFormState(createRecipeAction, IDLE_STATE);
   const [rows, setRows] = useState<IngredientRow[]>([
     { key: ++keyCounter, ingredientProductId: '', quantity: '', unit: 'g' },
   ]);
@@ -257,13 +258,12 @@ export default function NewRecipePage() {
           >
             Annulla
           </Link>
-          <button
-            type="submit"
-            disabled={pending}
-            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+          <SubmitButton
+            pendingLabel="Salvataggio…"
+            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
-            {pending ? 'Salvataggio…' : 'Salva ricetta'}
-          </button>
+            Salva ricetta
+          </SubmitButton>
         </div>
       </form>
     </div>

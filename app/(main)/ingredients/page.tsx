@@ -42,7 +42,7 @@ export default async function IngredientsPage() {
       ) : (
         <IngredientsManager
           ingredients={ingredients}
-          suppliers={suppliers.map((s) => ({ id: s.id, name: s.name }))}
+          suppliers={suppliers.map((s) => ({ id: s.id, name: s.name, email: s.email }))}
         />
       )}
     </div>

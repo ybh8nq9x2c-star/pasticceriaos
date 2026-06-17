@@ -16,7 +16,7 @@ import type { IngredientProduct } from '@/modules/catalog/types';
 import type { UnitOfMeasure } from '@/lib/database.types';
 
 const UNITS: UnitOfMeasure[] = ['g', 'kg', 'ml', 'l', 'pz', 'bustina', 'foglio'];
-interface SupplierOption { id: string; name: string }
+interface SupplierOption { id: string; name: string; email?: string | null }
 
 const fieldClass = 'w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary bg-surface-2';
 const labelClass = 'block text-sm font-medium text-ink mb-1.5';
@@ -164,7 +164,7 @@ export default function IngredientDetailPage({ params }: { params: { id: string 
             >
               <option value="">— Nessun fornitore —</option>
               {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id}>{s.email ? `${s.name} — ${s.email}` : s.name}</option>
               ))}
             </select>
           </div>

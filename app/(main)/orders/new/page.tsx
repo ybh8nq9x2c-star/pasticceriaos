@@ -64,7 +64,7 @@ export default async function NewOrderPage({
 
   return (
     <NewOrderForm
-      suppliers={suppliers.map((s) => ({ id: s.id, name: s.name }))}
+      suppliers={suppliers.map((s) => ({ id: s.id, name: s.name, email: s.email }))}
       ingredients={ingredients.map((i) => ({
         id: i.id, name: i.name, unit: i.unit, unitPrice: i.unitPrice,
       }))}

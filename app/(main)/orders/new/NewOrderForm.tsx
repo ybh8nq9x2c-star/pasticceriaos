@@ -13,8 +13,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { createOrderAction } from '@/modules/ordering/actions';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
-export interface SupplierOption   { id: string; name: string }
+export interface SupplierOption   { id: string; name: string; email?: string | null }
 export interface IngredientOption { id: string; name: string; unit: string; unitPrice: number | null }
 export interface PrefillRow {
   ingredientProductId: string;
@@ -55,10 +56,10 @@ export function NewOrderForm({
       : [EMPTY_ROW()],
   );
 
-  const [state, formAction, pending] = useFormState(createOrderAction, IDLE_STATE);
+  const [state, formAction] = useFormState(createOrderAction, IDLE_STATE);
 
   useEffect(() => {
-    if (state.status === 'success') router.push('/orders');
+    if (state.status === 'success') router.push(`/orders?flash=${encodeURIComponent('Ordine creato')}`);
   }, [state, router]);
 
   function addRow() {
@@ -141,7 +142,7 @@ export function NewOrderForm({
             >
               <option value="">Seleziona fornitore…</option>
               {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id}>{s.email ? `${s.name} — ${s.email}` : s.name}</option>
               ))}
             </select>
             {suppliers.length === 0 && (
@@ -290,13 +291,12 @@ export function NewOrderForm({
           >
             Annulla
           </Link>
-          <button
-            type="submit"
-            disabled={pending}
-            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+          <SubmitButton
+            pendingLabel="Creazione…"
+            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
-            {pending ? 'Creazione…' : 'Crea ordine'}
-          </button>
+            Crea ordine
+          </SubmitButton>
         </div>
       </form>
     </div>

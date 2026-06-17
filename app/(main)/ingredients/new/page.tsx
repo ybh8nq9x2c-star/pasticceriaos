@@ -11,8 +11,14 @@ import Link from 'next/link';
 import { IDLE_STATE, UNIT_LABELS } from '@/lib/utils';
 import { createIngredientAction } from '@/modules/catalog/actions';
 import { suggestProducts, type CatalogProductRef } from '@/modules/goods-receipts/matching';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
-interface SupplierOption { id: string; name: string }
+interface SupplierOption { id: string; name: string; email?: string | null }
+
+/** Etichetta fornitore con email per distinguere omonimi (es. due "matteo emiri"). */
+function supplierLabel(s: SupplierOption): string {
+  return s.email ? `${s.name} — ${s.email}` : s.name;
+}
 
 // Stile campo condiviso
 const fieldClass = 'w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary bg-surface-2';
@@ -30,7 +36,7 @@ const UNITS = [
 ] as const;
 
 export default function NewIngredientPage() {
-  const [state, formAction, pending] = useFormState(createIngredientAction, IDLE_STATE);
+  const [state, formAction] = useFormState(createIngredientAction, IDLE_STATE);
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
   const [supplierId, setSupplierId] = useState('');
   const [name, setName] = useState('');
@@ -187,7 +193,7 @@ export default function NewIngredientPage() {
             >
               <option value="">— Nessun fornitore —</option>
               {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id}>{supplierLabel(s)}</option>
               ))}
             </select>
             {supplierId === '' && (
@@ -221,13 +227,12 @@ export default function NewIngredientPage() {
             >
               Annulla
             </Link>
-            <button
-              type="submit"
-              disabled={pending}
-              className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
+            <SubmitButton
+              pendingLabel="Salvataggio…"
+              className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
             >
-              {pending ? 'Salvataggio…' : 'Salva ingrediente'}
-            </button>
+              Salva ingrediente
+            </SubmitButton>
           </div>
         </form>
       </div>

@@ -4,11 +4,14 @@
 // Legge la sessione server-side e inietta orgName/email nella sidebar.
 // =============================================================================
 
+import { Suspense } from 'react';
 import { requireCustomerSession } from '@/modules/identity/workspace';
 import { getLowStockAlerts } from '@/modules/inventory/service';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { AppTopbar } from '@/components/layout/AppTopbar';
 import { MobileChrome } from '@/components/layout/MobileChrome';
+import { ToastProvider } from '@/components/ui/Toast';
+import { FlashToast } from '@/components/ui/FlashToast';
 
 export default async function MainLayout({
   children,
@@ -43,9 +46,15 @@ export default async function MainLayout({
           userEmail={session.email}
           lowStockCount={lowStockCount}
         />
-        <div className="flex-1 pb-24 lg:pb-0">
-          {children}
-        </div>
+        <ToastProvider>
+          {/* Feedback "Salvato" post-redirect (creazione ingrediente/ricetta/…) */}
+          <Suspense fallback={null}>
+            <FlashToast />
+          </Suspense>
+          <div className="flex-1 pb-24 lg:pb-0">
+            {children}
+          </div>
+        </ToastProvider>
       </main>
     </div>
   );

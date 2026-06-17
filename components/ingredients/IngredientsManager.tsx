@@ -67,6 +67,7 @@ type Filter = 'all' | 'no-supplier';
 interface SupplierOpt {
   id: string;
   name: string;
+  email?: string | null;
 }
 
 export function IngredientsManager({
@@ -230,7 +231,7 @@ export function IngredientsManager({
                   {suppliers.length === 0 ? '— Nessun fornitore: creane uno prima —' : '— Scegli fornitore —'}
                 </option>
                 {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                  <option key={s.id} value={s.id}>{s.email ? `${s.name} — ${s.email}` : s.name}</option>
                 ))}
               </select>
               <button

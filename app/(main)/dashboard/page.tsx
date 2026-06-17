@@ -110,7 +110,7 @@ export default async function TodayPage() {
   if (openReceipts.length > 0) {
     attention.push({
       emoji: '📦', severity: 'red',
-      text: `${openReceipts.length} ricevimento${openReceipts.length === 1 ? '' : 'i'} non contabilizzat${openReceipts.length === 1 ? 'o' : 'i'}: il magazzino non è ancora aggiornato`,
+      text: `${openReceipts.length} riceviment${openReceipts.length === 1 ? 'o' : 'i'} non contabilizzat${openReceipts.length === 1 ? 'o' : 'i'}: il magazzino non è ancora aggiornato`,
       detail: openReceipts.map((r) => r.supplierName).filter(Boolean).slice(0, 3).join(', ') || 'conferma per aggiornare le giacenze',
       href: '/receipts?tab=open',
     });

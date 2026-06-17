@@ -35,7 +35,7 @@ export async function createSupplierAction(
   }
 
   revalidatePath('/suppliers');
-  redirect('/suppliers');
+  redirect(`/suppliers?flash=${encodeURIComponent('Fornitore creato')}`);
 }
 
 export async function updateSupplierAction(
@@ -133,7 +133,7 @@ export async function createIngredientAction(
   }
 
   revalidatePath('/ingredients');
-  redirect('/ingredients');
+  redirect(`/ingredients?flash=${encodeURIComponent('Ingrediente creato')}`);
 }
 
 export async function updateIngredientAction(
@@ -222,7 +222,7 @@ export async function createRecipeAction(
   }
 
   revalidatePath('/recipes');
-  redirect('/recipes');
+  redirect(`/recipes?flash=${encodeURIComponent('Ricetta creata')}`);
 }
 
 export async function updateRecipeAction(
