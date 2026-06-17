@@ -92,6 +92,7 @@ export async function listInventoryStockFull(
       minThreshold:        num(r.min_threshold),
       stockStatus:         r.stock_status,
       stockValue:          unitPrice !== null ? currentQuantity * unitPrice : null,
+      isActive:            r.is_active ?? true,
     };
   });
 }

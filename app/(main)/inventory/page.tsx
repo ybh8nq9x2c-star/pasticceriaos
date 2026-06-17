@@ -93,12 +93,19 @@ export default async function InventoryPage() {
   const alertItems = levels.filter((l) => l.stockStatus !== 'ok');
   const okItems    = levels.filter((l) => l.stockStatus === 'ok');
   const stockValue = levels.reduce((sum, l) => sum + (l.stockValue ?? 0), 0);
+  // Coerenza catalogo↔magazzino: il catalogo mostra solo gli attivi. Qui restano
+  // visibili anche i disattivati con giacenza residua, ma marcati (non spariscono).
+  const archivedCount = levels.filter((l) => !l.isActive).length;
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8">
       <PageHeader
         title="Magazzino"
-        subtitle={`${levels.length} ingredienti tracciati`}
+        subtitle={
+          archivedCount > 0
+            ? `${levels.length} ingredienti tracciati · ${archivedCount} disattivat${archivedCount === 1 ? 'o' : 'i'} con giacenza`
+            : `${levels.length} ingredienti tracciati`
+        }
         action={
           <div className="flex items-center gap-2">
             <Link
@@ -183,7 +190,14 @@ export default async function InventoryPage() {
                   return (
                     <tr key={lv.ingredientProductId} className={cfg.rowBg}>
                       <td className="px-6 py-3.5">
-                        <p className="font-medium text-ink">{lv.ingredientName}</p>
+                        <p className="font-medium text-ink">
+                        {lv.ingredientName}
+                        {!lv.isActive && (
+                          <span className="ml-2 inline-flex items-center rounded-full bg-neutral-light px-2 py-0.5 text-[11px] font-semibold text-ink-muted align-middle">
+                            Disattivato
+                          </span>
+                        )}
+                      </p>
                         {lv.supplierName && (
                           <p className="text-xs text-ink-muted mt-0.5">{lv.supplierName}</p>
                         )}
@@ -242,7 +256,14 @@ export default async function InventoryPage() {
                 {okItems.map((lv) => (
                   <tr key={lv.ingredientProductId} className="hover:bg-surface-offset transition-colors">
                     <td className="px-6 py-3.5">
-                      <p className="font-medium text-ink">{lv.ingredientName}</p>
+                      <p className="font-medium text-ink">
+                        {lv.ingredientName}
+                        {!lv.isActive && (
+                          <span className="ml-2 inline-flex items-center rounded-full bg-neutral-light px-2 py-0.5 text-[11px] font-semibold text-ink-muted align-middle">
+                            Disattivato
+                          </span>
+                        )}
+                      </p>
                       {lv.supplierName && (
                         <p className="text-xs text-ink-muted mt-0.5">{lv.supplierName}</p>
                       )}

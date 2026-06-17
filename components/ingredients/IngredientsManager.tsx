@@ -83,11 +83,15 @@ export function IngredientsManager({
   const [supplierId, setSupplierId] = useState('');
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  // Copia locale per l'OPTIMISTIC UPDATE: dopo il bulk-assign la lista e il
+  // conteggio si aggiornano subito in-page (la persistenza server è già ok),
+  // senza dipendere da un reload manuale.
+  const [items, setItems] = useState<IngredientProduct[]>(ingredients);
 
-  const noSupplierCount = useMemo(() => ingredients.filter((i) => !i.supplierId).length, [ingredients]);
+  const noSupplierCount = useMemo(() => items.filter((i) => !i.supplierId).length, [items]);
   const visible = useMemo(
-    () => (filter === 'no-supplier' ? ingredients.filter((i) => !i.supplierId) : ingredients),
-    [filter, ingredients],
+    () => (filter === 'no-supplier' ? items.filter((i) => !i.supplierId) : items),
+    [filter, items],
   );
 
   const visibleIds = visible.map((i) => i.id);
@@ -119,13 +123,22 @@ export function IngredientsManager({
     const fd = new FormData();
     fd.set('ingredientIds', JSON.stringify([...selected]));
     fd.set('supplierId', supplierId);
+    const assignedIds = new Set(selected);
     const res = await assignSupplierBulkAction(IDLE_STATE, fd);
     setPending(false);
     if (res.status === 'success') {
+      // Optimistic update: rifletti subito il nuovo fornitore sulle righe
+      // assegnate (il server ha già persistito) → righe + conteggio aggiornati.
+      const sup = suppliers.find((s) => s.id === supplierId);
+      setItems((prev) =>
+        prev.map((i) =>
+          assignedIds.has(i.id) ? { ...i, supplierId, supplierName: sup?.name ?? i.supplierName } : i,
+        ),
+      );
       setSelected(new Set());
       setSupplierId('');
       setFeedback({ kind: 'success', text: res.message ?? 'Fornitore assegnato.' });
-      router.refresh(); // ricarica i dati server → supplierName aggiornato
+      router.refresh(); // riconciliazione in background (supplierName autorevole)
     } else if (res.status === 'error') {
       setFeedback({ kind: 'error', text: res.error });
     }

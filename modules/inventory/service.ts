@@ -63,6 +63,15 @@ const MUST_BE_POSITIVE: CreateMovementInput['movementType'][] = [
   'initial_stock',
 ];
 
+// Movimenti operativi in uscita soggetti alla guardia "no stock sotto zero".
+// manual_adjustment è ESCLUSO di proposito: la rettifica è l'eccezione esplicita
+// (atterra sempre a un conteggio reale >= 0, con motivo).
+const GUARDED_OUTBOUND: CreateMovementInput['movementType'][] = [
+  'production_usage',
+  'waste',
+  'return_to_supplier',
+];
+
 function normalizeSign(input: CreateMovementInput): CreateMovementInput {
   let delta = input.quantityDelta;
   if (MUST_BE_NEGATIVE.includes(input.movementType)) {
@@ -84,12 +93,26 @@ function normalizeSign(input: CreateMovementInput): CreateMovementInput {
 export async function recordMovement(raw: unknown): Promise<InventoryMovement> {
   const orgId = await requireOrgId();
   const input: CreateMovementInput = createMovementSchema.parse(raw);
+  const normalized = normalizeSign(input);
+
+  // Guardia verità del magazzino: un movimento operativo in uscita non può
+  // portare la giacenza sotto zero. La rettifica (manual_adjustment) è esente.
+  if (GUARDED_OUTBOUND.includes(normalized.movementType) && normalized.quantityDelta < 0) {
+    const level = await repo.getLevelByIngredient(orgId, normalized.ingredientProductId);
+    const current = level?.currentQuantity ?? 0;
+    if (current + normalized.quantityDelta < 0) {
+      throw new BusinessRuleError(
+        `Stock insufficiente${level ? ` per ${level.ingredientName}` : ''}: disponibili ${current} ${normalized.unit}, ` +
+          `l'operazione ne toglie ${Math.abs(normalized.quantityDelta)}. Registra prima un carico o usa la rettifica del magazzino.`,
+      );
+    }
+  }
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new AuthError();
 
-  return repo.insertMovement(orgId, user.id, normalizeSign(input));
+  return repo.insertMovement(orgId, user.id, normalized);
 }
 
 export interface AdjustStockResult {

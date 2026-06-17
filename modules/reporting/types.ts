@@ -41,6 +41,7 @@ export interface InventoryStockFull {
   minThreshold: number;
   stockStatus: StockStatus;
   stockValue: number | null; // currentQuantity * unitPrice
+  isActive: boolean;         // false = ingrediente disattivato (giacenza residua)
 }
 
 // ---------------------------------------------------------------------------
