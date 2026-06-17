@@ -11,6 +11,8 @@ import { UNIT_LABELS, formatCurrency } from '@/lib/utils';
 import type { InventoryStockFull } from '@/modules/reporting/types';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Badge } from '@/components/ui/Badge';
+import { STOCK_STATUS_BADGE } from '@/lib/status';
 import { Warehouse, Factory } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Magazzino' };
@@ -19,31 +21,13 @@ export const metadata: Metadata = { title: 'Magazzino' };
 // Config badge/colori per status
 // ---------------------------------------------------------------------------
 
+// Badge → <Badge variant={STOCK_STATUS_BADGE[...]}> (canonico). Qui restano solo
+// il colore della barra e l'eventuale tinta riga (non-badge) + la label.
 const STATUS_CFG = {
-  out_of_stock: {
-    bar:   'bg-danger',
-    badge: 'bg-danger-light text-danger',
-    label: 'Esaurito',
-    rowBg: 'bg-danger-light',
-  },
-  critical: {
-    bar:   'bg-warning',
-    badge: 'bg-amber-100 text-amber-700',
-    label: 'Critico',
-    rowBg: 'bg-amber-50/50',
-  },
-  low: {
-    bar:   'bg-primary',
-    badge: 'bg-primary-light text-primary-hover',
-    label: 'Basso',
-    rowBg: 'bg-primary-light',
-  },
-  ok: {
-    bar:   'bg-success',
-    badge: 'bg-success-light text-success-strong',
-    label: 'OK',
-    rowBg: '',
-  },
+  out_of_stock: { bar: 'bg-danger',  label: 'Esaurito', rowBg: 'bg-danger-light' },
+  critical:     { bar: 'bg-warning', label: 'Critico',  rowBg: 'bg-warning-light/50' },
+  low:          { bar: 'bg-primary', label: 'Basso',    rowBg: 'bg-primary-light' },
+  ok:           { bar: 'bg-success', label: 'OK',       rowBg: '' },
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -193,9 +177,9 @@ export default async function InventoryPage() {
                         <p className="font-medium text-ink">
                         {lv.ingredientName}
                         {!lv.isActive && (
-                          <span className="ml-2 inline-flex items-center rounded-full bg-neutral-light px-2 py-0.5 text-[11px] font-semibold text-ink-muted align-middle">
+                          <Badge variant="neutral" size="sm" className="ml-2 align-middle">
                             Disattivato
-                          </span>
+                          </Badge>
                         )}
                       </p>
                         {lv.supplierName && (
@@ -214,9 +198,9 @@ export default async function InventoryPage() {
                         <StockBar current={lv.currentQuantity} threshold={lv.minThreshold} status={lv.stockStatus} />
                       </td>
                       <td className="px-6 py-3.5 text-center">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${cfg.badge}`}>
+                        <Badge variant={STOCK_STATUS_BADGE[lv.stockStatus]} size="sm">
                           {cfg.label}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-6 py-3.5 text-right">
                         <Link
@@ -259,9 +243,9 @@ export default async function InventoryPage() {
                       <p className="font-medium text-ink">
                         {lv.ingredientName}
                         {!lv.isActive && (
-                          <span className="ml-2 inline-flex items-center rounded-full bg-neutral-light px-2 py-0.5 text-[11px] font-semibold text-ink-muted align-middle">
+                          <Badge variant="neutral" size="sm" className="ml-2 align-middle">
                             Disattivato
-                          </span>
+                          </Badge>
                         )}
                       </p>
                       {lv.supplierName && (

@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import { UNIT_LABELS, formatCurrency, IDLE_STATE, cn } from '@/lib/utils';
 import { assignSupplierBulkAction } from '@/modules/catalog/actions';
+import { Badge } from '@/components/ui/Badge';
 import type { IngredientProduct } from '@/modules/catalog/types';
 
 // Riga memoizzata: la spunta di una checkbox aggiorna il Set di selezione nel
@@ -49,9 +50,7 @@ const IngredientRow = memo(function IngredientRow({
         {ing.supplierName ? (
           <span className="text-ink-muted">{ing.supplierName}</span>
         ) : (
-          <span className="inline-flex items-center rounded-full bg-warning-light px-2 py-0.5 text-xs font-semibold text-warning-strong">
-            senza fornitore
-          </span>
+          <Badge variant="warning" size="sm">senza fornitore</Badge>
         )}
       </td>
       <td className="px-4 py-4 text-right">

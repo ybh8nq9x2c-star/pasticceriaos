@@ -152,7 +152,7 @@ export default async function RecipeDetailPage({ params }: { params: { id: strin
             </h2>
             {cost?.costPerPortion !== null && cost?.costPerPortion !== undefined ? (
               <>
-                <p className="text-3xl font-bold leading-none">
+                <p className="text-3xl font-bold leading-none tnum">
                   €{formatCurrency(cost.costPerPortion)}
                   <span className="text-sm font-sans font-normal text-ink-muted"> /porzione</span>
                 </p>

@@ -25,9 +25,9 @@ const MOVEMENT_BADGE: Record<MovementType, string> = {
   purchase_receipt:   'bg-success-light text-success-strong',
   production_usage:   'bg-neutral-light text-ink',
   waste:              'bg-danger-light text-danger',
-  manual_adjustment:  'bg-amber-100 text-amber-700',
+  manual_adjustment:  'bg-warning-light text-warning-strong',
   initial_stock:      'bg-primary-light text-primary',
-  return_to_supplier: 'bg-indigo-100 text-indigo-700',
+  return_to_supplier: 'bg-info-light text-info-strong',
 };
 
 function formatDate(iso: string) {

@@ -36,14 +36,13 @@ export const RECEIPT_LINE_BADGE: Record<ReceiptLineStatus, BadgeVariant> = {
 };
 
 /**
- * Stato scorta → tono. Riferimento canonico per /inventory.
- * NB: `low` è elevato a `warning` (basso = da tenere d'occhio), non `primary`:
- * il verde-brand su una scorta bassa si confonde con "ok". Da adottare quando
- * si instrada il badge magazzino (oggi /inventory usa ancora STATUS_CFG locale).
+ * Stato scorta → tono canonico per /inventory. Allineato ai toni attuali del
+ * magazzino (nessun cambio cromatico): `critical` normalizzato dal raw amber al
+ * token `warning`, `low` resta `primary` come oggi.
  */
 export const STOCK_STATUS_BADGE: Record<StockStatus, BadgeVariant> = {
   out_of_stock: 'danger',
   critical:     'warning',
-  low:          'warning',
+  low:          'primary',
   ok:           'success',
 };

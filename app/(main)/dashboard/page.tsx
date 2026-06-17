@@ -47,7 +47,7 @@ function KpiCard({ label, value, sub, href, accentClass }: {
     <div className="relative rounded-2xl border border-border bg-surface-2 px-5 py-4 overflow-hidden transition-all hover:shadow-[0_4px_24px_rgba(26,43,74,0.10)] hover:-translate-y-px">
       {accentClass && <span className={`absolute top-0 left-0 h-full w-1 rounded-l-2xl ${accentClass}`} />}
       <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">{label}</p>
-      <p className="text-[28px] font-bold text-ink mt-1 leading-none">{value}</p>
+      <p className="text-[28px] font-bold text-ink mt-1 leading-none tnum">{value}</p>
       {sub && <p className="text-xs text-ink-muted mt-1.5">{sub}</p>}
     </div>
   );

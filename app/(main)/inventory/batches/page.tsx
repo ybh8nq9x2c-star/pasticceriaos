@@ -18,7 +18,7 @@ function fmtDate(iso: string) {
 function urgencyStyle(days: number): { badge: string; label: string } {
   if (days < 0)  return { badge: 'bg-danger text-white', label: 'SCADUTO' };
   if (days <= 1) return { badge: 'bg-danger-light text-danger', label: days === 0 ? 'scade oggi' : 'scade domani' };
-  if (days <= 3) return { badge: 'bg-amber-100 text-amber-700', label: `${days} giorni` };
+  if (days <= 3) return { badge: 'bg-warning-light text-warning-strong', label: `${days} giorni` };
   return { badge: 'bg-primary-light text-primary-hover', label: `${days} giorni` };
 }
 
