@@ -46,6 +46,49 @@ export interface ParsedRecipe {
 
 export type ImportSourceKind = 'text' | 'csv' | 'pdf';
 
+/**
+ * Campo a cui una colonna del CSV può essere abbinata nel passo di MAPPING.
+ * È un concetto di SOLO PREVIEW: determina come il parser costruisce le
+ * ParsedRecipe, ma il commit finale resta validato dagli schemi stretti.
+ */
+export type ImportColumnField =
+  | 'recipe'      // nome ricetta
+  | 'portions'    // porzioni / resa
+  | 'ingredient'  // nome ingrediente (obbligatorio)
+  | 'quantity'    // quantità ingrediente (obbligatorio)
+  | 'unit'        // unità
+  | 'category'    // categoria
+  | 'notes'       // istruzioni / note
+  | 'allergens'   // allergeni (confluiscono nelle note)
+  | 'ignore';     // colonna ignorata
+
+/** Una colonna vista nel file, con campioni e abbinamento suggerito. */
+export interface CsvColumn {
+  index: number;
+  /** Testo dell'intestazione (vuoto se il file non ha intestazioni). */
+  header: string;
+  /** Primi valori non vuoti della colonna (anteprima per l'utente). */
+  sample: string[];
+  /** Abbinamento auto-suggerito (header-synonym + contenuto). */
+  suggested: ImportColumnField;
+}
+
+/** Esito dell'ispezione di un CSV per decidere se serve il passo di mapping. */
+export interface CsvInspection {
+  delimiter: string;
+  /** Best-effort: la prima riga è un'intestazione? */
+  hasHeader: boolean;
+  columns: CsvColumn[];
+  /** true → l'auto-detect basta (ingrediente + quantità riconosciuti). */
+  confident: boolean;
+}
+
+/** Mappatura risolta dall'utente, ri-applicata dal parser lato server. */
+export interface ResolvedMapping {
+  fields: ImportColumnField[];
+  hasHeader: boolean;
+}
+
 /** Risultato dell'analisi: ciò che la preview mostra e l'utente corregge. */
 export interface AnalyzeResult {
   source: ImportSourceKind;

@@ -18,9 +18,15 @@ import {
   type CatalogProductRef,
 } from '@/modules/goods-receipts/matching';
 import { BusinessRuleError, getErrorMessage } from '@/lib/errors';
-import { parseCsv, parseText } from './parse';
+import { parseCsv, parseCsvWithMapping, parseText } from './parse';
 import { importRecipesSchema, type ImportRecipesInput } from './schemas';
-import type { AnalyzeResult, ImportSourceKind, ImportSummary, ParsedRecipe } from './types';
+import type {
+  AnalyzeResult,
+  ImportSourceKind,
+  ImportSummary,
+  ParsedRecipe,
+  ResolvedMapping,
+} from './types';
 
 async function catalogRefs(): Promise<CatalogProductRef[]> {
   const ingredients = await listIngredients(true);
@@ -32,6 +38,8 @@ export interface AnalyzeArgs {
   kind: ImportSourceKind;
   text?: string;
   file?: File;
+  /** Mappatura colonne risolta dall'utente (solo CSV, preview-layer). */
+  mapping?: ResolvedMapping;
 }
 
 export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeResult> {
@@ -51,12 +59,24 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
   } else if (args.kind === 'csv') {
     const text = args.text ?? (args.file ? await args.file.text() : '');
     if (!text.trim()) throw new BusinessRuleError('Il CSV è vuoto.');
-    recipes = parseCsv(text);
-    if (recipes.length === 0) {
-      // Forse non è davvero tabellare: prova come testo libero.
-      recipes = parseText(text);
+    if (args.mapping) {
+      // Mappatura confermata dall'utente: il parser usa esattamente quella.
+      recipes = parseCsvWithMapping(text, args.mapping.fields, args.mapping.hasHeader);
       if (recipes.length === 0) {
-        warnings.push('CSV non riconosciuto: servono almeno una colonna ingrediente e una quantità.');
+        warnings.push(
+          'Con questa mappatura non risultano righe valide: assicurati di aver indicato la colonna dell’ingrediente.',
+        );
+      }
+    } else {
+      recipes = parseCsv(text);
+      if (recipes.length === 0) {
+        // Forse non è davvero tabellare: prova come testo libero.
+        recipes = parseText(text);
+        if (recipes.length === 0) {
+          warnings.push(
+            'Non ho riconosciuto le colonne del file. Servono almeno una colonna con gli ingredienti e una con le quantità. Se esporti da Excel, salva come CSV (UTF-8). In alternativa, incolla le righe come testo.',
+          );
+        }
       }
     }
   } else {

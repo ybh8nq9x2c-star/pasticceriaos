@@ -6,20 +6,50 @@
 // =============================================================================
 
 import type { UnitOfMeasure } from '@/lib/database.types';
-import type { ParsedIngredientLine, ParsedRecipe } from './types';
+import type {
+  ParsedIngredientLine,
+  ParsedRecipe,
+  ImportColumnField,
+  CsvColumn,
+  CsvInspection,
+} from './types';
 
 const UNITS: UnitOfMeasure[] = ['g', 'kg', 'ml', 'l', 'pz', 'bustina', 'foglio'];
 
 // Sinonimi → unità canonica. Tutto ciò che non è qui resta `null` (da confermare).
 const UNIT_SYNONYMS: Record<string, UnitOfMeasure> = {
-  g: 'g', gr: 'g', grammo: 'g', grammi: 'g',
-  kg: 'kg', kilo: 'kg', kili: 'kg', chilo: 'kg', chili: 'kg', chilogrammi: 'kg', kilogrammi: 'kg',
-  ml: 'ml', millilitri: 'ml', millilitro: 'ml',
+  g: 'g', gr: 'g', grs: 'g', grammo: 'g', grammi: 'g',
+  kg: 'kg', kilo: 'kg', kili: 'kg', chilo: 'kg', chili: 'kg', chilogrammo: 'kg', chilogrammi: 'kg', kilogrammi: 'kg',
+  ml: 'ml', cc: 'ml', millilitri: 'ml', millilitro: 'ml',
   l: 'l', lt: 'l', litro: 'l', litri: 'l',
-  pz: 'pz', pezzo: 'pz', pezzi: 'pz', pc: 'pz', pcs: 'pz', n: 'pz', unita: 'pz',
-  bustina: 'bustina', bustine: 'bustina', bst: 'bustina',
+  pz: 'pz', pezzo: 'pz', pezzi: 'pz', pc: 'pz', pcs: 'pz', n: 'pz', nr: 'pz', unita: 'pz',
+  bustina: 'bustina', bustine: 'bustina', busta: 'bustina', buste: 'bustina', bst: 'bustina',
   foglio: 'foglio', fogli: 'foglio', fg: 'foglio',
 };
+
+// Parole-misura comuni (cucchiaio, tazza…) che NON corrispondono a un'unità
+// canonica: non possiamo convertirle senza distorcere, ma le riconosciamo per
+// TOGLIERLE dal nome (così "2 cucchiai di zucchero" → "zucchero", non
+// "cucchiai zucchero"). L'unità resta da confermare in preview. Elenco
+// volutamente conservativo: niente termini ambigui ("noce", "foglia", "spicchio")
+// che spesso fanno parte del nome reale dell'ingrediente.
+const MEASURE_WORDS = new Set<string>([
+  'cucchiaio', 'cucchiai', 'cucchiaino', 'cucchiaini', 'cucchiaiata', 'cucchiaiate',
+  'tazza', 'tazze', 'tazzina', 'tazzine',
+  'bicchiere', 'bicchieri', 'pizzico', 'pizzichi', 'manciata', 'manciate',
+]);
+
+// Frazioni unicode comuni nei testi incollati ("½ tazza", "1¾ kg").
+const UNICODE_FRACTIONS: Record<string, number> = {
+  '½': 0.5, '⅓': 1 / 3, '⅔': 2 / 3, '¼': 0.25, '¾': 0.75,
+  '⅕': 0.2, '⅖': 0.4, '⅗': 0.6, '⅘': 0.8,
+  '⅙': 1 / 6, '⅚': 5 / 6, '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875,
+};
+const UNI_FRAC = '½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞';
+
+function round3(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}
 
 function stripDiacriticsLower(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -32,21 +62,52 @@ export function normalizeUnit(raw: string | null | undefined): UnitOfMeasure | n
   return UNIT_SYNONYMS[key] ?? null;
 }
 
-/** "1,5" → 1.5 · "1/2" → 0.5 · "" → null. Conservativo: una sola quantità positiva. */
+/**
+ * Quantità tollerante per la PREVIEW (il commit ri-valida in modo stretto via
+ * zod). Riconosce: "1,5" → 1.5 · "1/2" → 0.5 · "1 1/2" → 1.5 · "½"/"1½" ·
+ * intervalli "2-3" → estremo inferiore (2). Sempre una sola quantità positiva,
+ * altrimenti null (da inserire a mano).
+ */
 export function parseQuantity(raw: string | null | undefined): number | null {
   if (!raw) return null;
-  const s = raw.trim().replace(',', '.');
+  let s = raw.trim().replace(',', '.');
+  if (!s) return null;
+
+  // Intervallo "2-3" / "2–3": prendi l'estremo inferiore, l'utente affina dopo.
+  const range = s.match(/^(\d+(?:\.\d+)?)\s*[-–]\s*\d+(?:\.\d+)?$/);
+  if (range) s = range[1];
+
+  // Frazione unicode, eventualmente con intero davanti: "½", "1½".
+  const uni = s.match(new RegExp(`^(\\d+)?\\s*([${UNI_FRAC}])$`));
+  if (uni) {
+    const v = (uni[1] ? Number(uni[1]) : 0) + (UNICODE_FRACTIONS[uni[2]] ?? 0);
+    return v > 0 ? round3(v) : null;
+  }
+
+  // Numero misto "1 1/2".
+  const mixed = s.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/);
+  if (mixed) {
+    const d = Number(mixed[3]);
+    const v = d ? Number(mixed[1]) + Number(mixed[2]) / d : NaN;
+    return Number.isFinite(v) && v > 0 ? round3(v) : null;
+  }
+
+  // Frazione semplice "1/2".
   const frac = s.match(/^(\d+)\s*\/\s*(\d+)$/);
   if (frac) {
     const d = Number(frac[2]);
-    return d ? Number(frac[1]) / d : null;
+    const v = d ? Number(frac[1]) / d : NaN;
+    return Number.isFinite(v) && v > 0 ? round3(v) : null;
   }
+
   const n = Number(s);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 const LIST_PREFIX = /^\s*(?:[-*•·–—]|\d+[.)])\s*/;
-const QTY = String.raw`(\d+(?:[.,]\d+)?(?:\s*\/\s*\d+)?)`;
+// QTY riconosce: intero/decimale, frazione "1/2", numero misto "1 1/2",
+// frazione unicode "½" e intero+unicode "1½".
+const QTY = `(\\d+\\s*[${UNI_FRAC}]|[${UNI_FRAC}]|(?:\\d+\\s+)?\\d+(?:[.,]\\d+)?(?:\\s*/\\s*\\d+)?)`;
 
 /**
  * Riconosce una riga ingrediente. Ritorna name/quantity/unit, oppure null se la
@@ -58,15 +119,19 @@ export function parseIngredientLine(
   rawLine: string,
 ): { name: string; quantity: number | null; unit: UnitOfMeasure | null } | null {
   const line = rawLine.replace(LIST_PREFIX, '').trim();
-  if (!line || !/\d/.test(line)) return null;
+  if (!line || !new RegExp(`[\\d${UNI_FRAC}]`).test(line)) return null;
 
   // Pattern A — quantità in testa: "500 g farina", "2 uova", "1/2 kg burro"
   const a = line.match(new RegExp(`^${QTY}\\s*([\\p{L}.]+)?\\s+(?:di\\s+)?(.{2,})$`, 'u'));
   if (a) {
     const quantity = parseQuantity(a[1]);
     const unit = normalizeUnit(a[2]);
-    // Se il token dopo la quantità non è un'unità, fa parte del nome ("2 uova").
-    const name = unit ? a[3] : `${a[2] ? a[2] + ' ' : ''}${a[3]}`;
+    // a[2] = token tra quantità e nome. Se è un'unità canonica → unità. Se è una
+    // parola-misura nota (cucchiaio, tazza…) la togliamo dal nome ma lasciamo
+    // l'unità da confermare. Altrimenti fa parte del nome ("2 uova").
+    const measureToken = a[2] ? stripDiacriticsLower(a[2]).replace(/\.$/, '') : '';
+    const dropFromName = !!unit || MEASURE_WORDS.has(measureToken);
+    const name = dropFromName ? a[3] : `${a[2] ? a[2] + ' ' : ''}${a[3]}`;
     if (quantity !== null) return { name: cleanName(name), quantity, unit };
   }
 
@@ -260,60 +325,175 @@ type ColRole = 'recipe' | 'ingredient' | 'quantity' | 'unit' | 'portions' | 'cat
 
 function headerRole(cell: string): ColRole | null {
   const h = stripDiacriticsLower(cell.trim());
-  if (/ricett|recipe|dolce|preparazion/.test(h)) return 'recipe';
-  if (/ingredient|materia|prodotto/.test(h)) return 'ingredient';
-  if (/quantit|qta|qty|dose|peso/.test(h)) return 'quantity';
-  if (/unit|misura|^um$|\bum\b/.test(h)) return 'unit';
-  if (/porzion|resa|dosi|pezzi/.test(h)) return 'portions';
-  if (/categor|tipo/.test(h)) return 'category';
-  if (/note|notes/.test(h)) return 'notes';
+  // Sinonimi larghi e tolleranti: l'obiettivo è riconoscere intestazioni reali
+  // da Excel/Google Sheets in italiano e inglese, anche abbreviate.
+  if (/ricett|recipe|dolce|preparazion|titolo|piatto/.test(h)) return 'recipe';
+  if (/ingredient|materia|prodotto|voce|componente|articolo|item/.test(h)) return 'ingredient';
+  if (/quantit|q\.?ta|qty|dose|peso|amount|gramm/.test(h)) return 'quantity';
+  if (/unit|misura|measure|^um$|\bum\b|udm|u\.?m/.test(h)) return 'unit';
+  if (/porzion|resa|rese|dosi|pezzi|person|serv|yield/.test(h)) return 'portions';
+  if (/categor|tipo|reparto|famiglia/.test(h)) return 'category';
+  if (/note|notes|descriz|appunt|commento/.test(h)) return 'notes';
   if (h === 'nome' || h === 'name') return 'ingredient'; // ambiguo → ingrediente
   return null;
 }
 
+function roleToField(role: ColRole | null): ImportColumnField | null {
+  switch (role) {
+    case 'recipe':     return 'recipe';
+    case 'ingredient': return 'ingredient';
+    case 'quantity':   return 'quantity';
+    case 'unit':       return 'unit';
+    case 'portions':   return 'portions';
+    case 'category':   return 'category';
+    case 'notes':      return 'notes';
+    default:           return null;
+  }
+}
+
+interface ColIndex {
+  recipe: number;
+  ingredient: number;
+  quantity: number;
+  unit: number;
+  portions: number;
+  category: number;
+  notes: number;
+  allergens: number[];
+}
+
+function fieldsToColIndex(fields: ImportColumnField[]): ColIndex {
+  const first = (f: ImportColumnField) => fields.indexOf(f);
+  return {
+    recipe: first('recipe'),
+    ingredient: first('ingredient'),
+    quantity: first('quantity'),
+    unit: first('unit'),
+    portions: first('portions'),
+    category: first('category'),
+    notes: first('notes'),
+    allergens: fields.flatMap((f, i) => (f === 'allergens' ? [i] : [])),
+  };
+}
+
+function csvRows(input: string): string[][] {
+  const firstLine = input.replace(/\r\n?/g, '\n').split('\n').find((l) => l.trim()) ?? '';
+  return parseCsvRows(input, detectDelimiter(firstLine));
+}
+
+/** Natura del contenuto di una colonna dai campioni (per i suggerimenti). */
+function columnKind(samples: string[]): 'unit' | 'number' | 'text' | 'empty' {
+  const nonEmpty = samples.map((s) => s.trim()).filter(Boolean);
+  if (nonEmpty.length === 0) return 'empty';
+  const units = nonEmpty.filter((s) => normalizeUnit(s) !== null).length;
+  if (units / nonEmpty.length >= 0.5) return 'unit';
+  const nums = nonEmpty.filter((s) => parseQuantity(s) !== null).length;
+  if (nums / nonEmpty.length >= 0.5) return 'number';
+  return 'text';
+}
+
 /**
- * Parser CSV: una riga = un ingrediente; raggruppa per colonna ricetta (se
- * presente), altrimenti tutto in un'unica ricetta da rinominare.
+ * Suggerimento di campo per colonna: prima i sinonimi dell'intestazione, poi il
+ * contenuto (unità/numero), infine garantisce i due campi obbligatori se c'è una
+ * colonna plausibile ancora libera. Tutto il resto resta 'ignore'.
  */
-export function parseCsv(input: string): ParsedRecipe[] {
+function suggestFields(header: string[], hasHeader: boolean, samplesByCol: string[][], ncol: number): ImportColumnField[] {
+  const fields: (ImportColumnField | null)[] = [];
+  for (let i = 0; i < ncol; i++) {
+    fields.push(hasHeader ? roleToField(headerRole(header[i] ?? '')) : null);
+  }
+  for (let i = 0; i < ncol; i++) {
+    if (fields[i]) continue;
+    const kind = columnKind(samplesByCol[i] ?? []);
+    if (kind === 'unit' && !fields.includes('unit')) fields[i] = 'unit';
+    else if (kind === 'number' && !fields.includes('quantity')) fields[i] = 'quantity';
+  }
+  if (!fields.includes('ingredient')) {
+    const i = fields.findIndex((f, j) => !f && columnKind(samplesByCol[j] ?? []) === 'text');
+    if (i >= 0) fields[i] = 'ingredient';
+  }
+  if (!fields.includes('quantity')) {
+    const i = fields.findIndex((f, j) => !f && columnKind(samplesByCol[j] ?? []) === 'number');
+    if (i >= 0) fields[i] = 'quantity';
+  }
+  return fields.map((f) => f ?? 'ignore');
+}
+
+const SAMPLE_ROWS = 4;
+
+/**
+ * Ispeziona un CSV per il passo di MAPPING: colonne visibili, campioni,
+ * abbinamento suggerito, presenza intestazione e "confidenza". Puro e
+ * deterministico (gira anche client-side). `hasHeaderOverride` forza
+ * l'interpretazione della prima riga (toggle utente).
+ */
+export function inspectCsv(input: string, hasHeaderOverride?: boolean): CsvInspection {
   const firstLine = input.replace(/\r\n?/g, '\n').split('\n').find((l) => l.trim()) ?? '';
   const delimiter = detectDelimiter(firstLine);
   const rows = parseCsvRows(input, delimiter);
-  if (rows.length < 2) return [];
+  if (rows.length === 0) return { delimiter, hasHeader: true, columns: [], confident: false };
 
-  const header = rows[0];
-  const roles = header.map(headerRole);
-  const col = (role: ColRole) => roles.indexOf(role);
-  const iRecipe = col('recipe');
-  const iIngredient = col('ingredient');
-  const iQty = col('quantity');
-  const iUnit = col('unit');
-  const iPortions = col('portions');
-  const iCategory = col('category');
-  const iNotes = col('notes');
+  const headerRow = rows[0];
+  const anyRole = headerRow.some((c) => headerRole(c) !== null);
+  const looksLikeData = headerRow.some((c) => parseQuantity(c) !== null);
+  // La prima riga è intestazione se riconosciamo un ruolo o se non sembra un dato.
+  const hasHeader = hasHeaderOverride ?? (anyRole || !looksLikeData);
 
-  // Senza colonne minime riconoscibili non procediamo (fallback gestito a monte).
-  if (iIngredient < 0 && iRecipe < 0) return [];
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+  const ncol = rows.reduce((m, r) => Math.max(m, r.length), 0);
 
+  const samplesByCol: string[][] = [];
+  for (let i = 0; i < ncol; i++) {
+    samplesByCol.push(dataRows.slice(0, SAMPLE_ROWS).map((r) => (r[i] ?? '').trim()).filter(Boolean));
+  }
+  const suggested = suggestFields(headerRow, hasHeader, samplesByCol, ncol);
+
+  const columns: CsvColumn[] = [];
+  for (let i = 0; i < ncol; i++) {
+    columns.push({
+      index: i,
+      header: hasHeader ? (headerRow[i]?.trim() ?? '') : '',
+      sample: samplesByCol[i],
+      suggested: suggested[i],
+    });
+  }
+
+  const idx = fieldsToColIndex(suggested);
+  const confident = hasHeader && idx.ingredient >= 0 && idx.quantity >= 0;
+  return { delimiter, hasHeader, columns, confident };
+}
+
+function buildNotes(row: string[], idx: ColIndex): string | null {
+  const parts: string[] = [];
+  if (idx.notes >= 0 && row[idx.notes]?.trim()) parts.push(row[idx.notes].trim());
+  if (idx.allergens.length) {
+    const a = idx.allergens.map((i) => row[i]?.trim()).filter(Boolean).join(', ');
+    if (a) parts.push(`Allergeni: ${a}`);
+  }
+  return parts.length ? parts.join(' · ') : null;
+}
+
+/** Core condiviso: righe-dati + mappa colonne → ricette raggruppate. */
+function buildRecipes(dataRows: string[][], idx: ColIndex): ParsedRecipe[] {
   const groups = new Map<string, ParsedRecipe>();
 
-  for (const row of rows.slice(1)) {
-    const recipeName = (iRecipe >= 0 ? row[iRecipe] : '')?.trim() || 'Ricetta importata';
-    const ingName = cleanName((iIngredient >= 0 ? row[iIngredient] : '') ?? '');
+  for (const row of dataRows) {
+    const recipeName = (idx.recipe >= 0 ? row[idx.recipe] : '')?.trim() || 'Ricetta importata';
+    const ingName = cleanName((idx.ingredient >= 0 ? row[idx.ingredient] : '') ?? '');
     if (!ingName) continue; // riga senza ingrediente → saltata
 
     let recipe = groups.get(recipeName);
     if (!recipe) {
       recipe = {
         name: recipeName,
-        basePortions: iPortions >= 0 ? parsePortionsCell(row[iPortions]) : null,
-        category: iCategory >= 0 ? row[iCategory]?.trim() || null : null,
-        notes: iNotes >= 0 ? row[iNotes]?.trim() || null : null,
+        basePortions: idx.portions >= 0 ? parsePortionsCell(row[idx.portions]) : null,
+        category: idx.category >= 0 ? row[idx.category]?.trim() || null : null,
+        notes: buildNotes(row, idx),
         ingredients: [],
         warnings: [],
       };
       if (recipeName === 'Ricetta importata') {
-        recipe.warnings.push('Nome ricetta non presente nel CSV: rinominala prima di importare.');
+        recipe.warnings.push('Nome ricetta non presente nel file: rinominala prima di importare.');
       }
       groups.set(recipeName, recipe);
     }
@@ -321,8 +501,8 @@ export function parseCsv(input: string): ParsedRecipe[] {
     recipe.ingredients.push({
       rawText: row.join(' | '),
       name: ingName,
-      quantity: iQty >= 0 ? parseQuantity(row[iQty]) : null,
-      unit: iUnit >= 0 ? normalizeUnit(row[iUnit]) : null,
+      quantity: idx.quantity >= 0 ? parseQuantity(row[idx.quantity]) : null,
+      unit: idx.unit >= 0 ? normalizeUnit(row[idx.unit]) : null,
       matchedProductId: null,
       matchedProductName: null,
       suggestions: [],
@@ -335,6 +515,35 @@ export function parseCsv(input: string): ParsedRecipe[] {
     addAmbiguityWarnings(r.ingredients, r.warnings);
   }
   return recipes;
+}
+
+/**
+ * Parser CSV AUTO (header auto-rilevati). Comportamento storico, ora costruito
+ * sul core condiviso. Usato quando l'auto-detect è sufficiente.
+ */
+export function parseCsv(input: string): ParsedRecipe[] {
+  const rows = csvRows(input);
+  if (rows.length < 2) return [];
+  const fields = rows[0].map((h) => roleToField(headerRole(h)) ?? 'ignore');
+  const idx = fieldsToColIndex(fields);
+  if (idx.ingredient < 0 && idx.recipe < 0) return [];
+  return buildRecipes(rows.slice(1), idx);
+}
+
+/**
+ * Parser CSV guidato dalla MAPPATURA utente (preview-layer). `hasHeader=false`
+ * tratta la prima riga come dato (file senza intestazioni).
+ */
+export function parseCsvWithMapping(
+  input: string,
+  fields: ImportColumnField[],
+  hasHeader: boolean,
+): ParsedRecipe[] {
+  const rows = csvRows(input);
+  if (rows.length === 0) return [];
+  const idx = fieldsToColIndex(fields);
+  if (idx.ingredient < 0) return []; // l'ingrediente è il minimo assoluto
+  return buildRecipes(hasHeader ? rows.slice(1) : rows, idx);
 }
 
 /** Avvisi non bloccanti su unità/quantità mancanti e ingredienti duplicati. */

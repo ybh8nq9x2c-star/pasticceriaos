@@ -6,6 +6,8 @@ import {
   parsePortions,
   parseText,
   parseCsv,
+  inspectCsv,
+  parseCsvWithMapping,
 } from '../parse';
 
 describe('parseQuantity', () => {
@@ -19,6 +21,16 @@ describe('parseQuantity', () => {
     expect(parseQuantity('abc')).toBeNull();
     expect(parseQuantity('0')).toBeNull();
   });
+  it('numero misto e frazioni unicode', () => {
+    expect(parseQuantity('1 1/2')).toBe(1.5);
+    expect(parseQuantity('½')).toBe(0.5);
+    expect(parseQuantity('1½')).toBe(1.5);
+    expect(parseQuantity('¾')).toBe(0.75);
+  });
+  it('intervallo → estremo inferiore', () => {
+    expect(parseQuantity('2-3')).toBe(2);
+    expect(parseQuantity('2–3')).toBe(2); // en dash
+  });
 });
 
 describe('normalizeUnit', () => {
@@ -30,6 +42,11 @@ describe('normalizeUnit', () => {
     expect(normalizeUnit('litri')).toBe('l');
     expect(normalizeUnit('pezzi')).toBe('pz');
     expect(normalizeUnit('g.')).toBe('g');
+  });
+  it('sinonimi aggiuntivi (cc, chilogrammo, busta)', () => {
+    expect(normalizeUnit('cc')).toBe('ml');
+    expect(normalizeUnit('chilogrammo')).toBe('kg');
+    expect(normalizeUnit('busta')).toBe('bustina');
   });
   it('sconosciuta/ambigua → null', () => {
     expect(normalizeUnit('cucchiaio')).toBeNull();
@@ -45,6 +62,10 @@ describe('parseIngredientLine', () => {
   });
   it('quantità senza unità ("2 uova")', () => {
     expect(parseIngredientLine('2 uova')).toEqual({ name: 'uova', quantity: 2, unit: null });
+  });
+  it('parola-misura non canonica → tolta dal nome, unità da confermare', () => {
+    expect(parseIngredientLine('2 cucchiai di zucchero')).toEqual({ name: 'zucchero', quantity: 2, unit: null });
+    expect(parseIngredientLine('½ tazza panna')).toEqual({ name: 'panna', quantity: 0.5, unit: null });
   });
   it('quantità in coda', () => {
     expect(parseIngredientLine('Farina 00: 500 g')).toEqual({ name: 'Farina 00', quantity: 500, unit: 'g' });
@@ -143,7 +164,79 @@ describe('parseCsv', () => {
     expect(out[0].warnings.join(' ')).toMatch(/rinominala/i);
   });
 
+  it('intestazioni con sinonimi larghi (piatto/componente/peso/misura)', () => {
+    const out = parseCsv(
+      ['piatto,componente,peso,misura', 'Torta,Farina,200,g', 'Torta,Burro,100,g'].join('\n'),
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].name).toBe('Torta');
+    expect(out[0].ingredients).toHaveLength(2);
+    expect(out[0].ingredients[0]).toMatchObject({ name: 'Farina', quantity: 200, unit: 'g' });
+  });
+
   it('CSV vuoto/insufficiente → nessuna ricetta', () => {
     expect(parseCsv('solo una riga')).toHaveLength(0);
+  });
+});
+
+describe('inspectCsv', () => {
+  it('header ambiguo (manca la quantità) → non confident, ma suggerisce ingrediente', () => {
+    const insp = inspectCsv('Dolce,Ingrediente,Extra\nTiramisu,Mascarpone,vetro\nTiramisu,Uova,plastica');
+    expect(insp.hasHeader).toBe(true);
+    expect(insp.confident).toBe(false);
+    expect(insp.columns).toHaveLength(3);
+    expect(insp.columns[0].suggested).toBe('recipe');
+    expect(insp.columns[1].suggested).toBe('ingredient');
+  });
+
+  it('header riconosciuto e completo → confident (salta il mapping)', () => {
+    const insp = inspectCsv('ricetta,ingrediente,quantita,unita\nTorta,Farina,200,g');
+    expect(insp.confident).toBe(true);
+  });
+
+  it('file senza intestazioni → rilevato (hasHeader false, colonne numerate)', () => {
+    const insp = inspectCsv('Tiramisu,Mascarpone,500,g\nTiramisu,Uova,3,pz');
+    expect(insp.hasHeader).toBe(false);
+    expect(insp.confident).toBe(false);
+    expect(insp.columns).toHaveLength(4);
+    expect(insp.columns.every((c) => c.header === '')).toBe(true);
+  });
+});
+
+describe('parseCsvWithMapping', () => {
+  it('mappatura esplicita con intestazione', () => {
+    const out = parseCsvWithMapping(
+      'A,B,C,D\nTorta,Farina,200,g\nTorta,Burro,100,g',
+      ['recipe', 'ingredient', 'quantity', 'unit'],
+      true,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].name).toBe('Torta');
+    expect(out[0].ingredients).toHaveLength(2);
+    expect(out[0].ingredients[0]).toMatchObject({ name: 'Farina', quantity: 200, unit: 'g' });
+  });
+
+  it('senza intestazione → la prima riga è un dato', () => {
+    const out = parseCsvWithMapping(
+      'Torta,Farina,200,g',
+      ['recipe', 'ingredient', 'quantity', 'unit'],
+      false,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].ingredients).toHaveLength(1);
+    expect(out[0].ingredients[0]).toMatchObject({ name: 'Farina', quantity: 200, unit: 'g' });
+  });
+
+  it('allergeni confluiscono nelle note', () => {
+    const out = parseCsvWithMapping(
+      'r,i,q,a\nTorta,Farina,200,Glutine',
+      ['recipe', 'ingredient', 'quantity', 'allergens'],
+      true,
+    );
+    expect(out[0].notes).toContain('Glutine');
+  });
+
+  it('senza colonna ingrediente → nessuna ricetta', () => {
+    expect(parseCsvWithMapping('a,b\n1,2', ['quantity', 'unit'], true)).toHaveLength(0);
   });
 });

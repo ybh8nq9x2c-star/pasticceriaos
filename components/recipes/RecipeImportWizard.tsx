@@ -19,12 +19,16 @@ import {
   Plus,
   CheckCircle2,
   AlertTriangle,
+  Columns3,
+  ArrowRight,
+  Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Input, Select, Textarea } from '@/components/ui/Input';
+import { Input, Textarea } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { analyzeImportAction, importRecipesAction } from '@/modules/recipe-import/actions';
-import type { ImportSummary, ParsedRecipe } from '@/modules/recipe-import/types';
+import { inspectCsv } from '@/modules/recipe-import/parse';
+import type { ImportSummary, ParsedRecipe, CsvColumn, ImportColumnField } from '@/modules/recipe-import/types';
 import { IDLE_STATE, UNIT_LABELS, cn } from '@/lib/utils';
 import type { UnitOfMeasure } from '@/lib/database.types';
 
@@ -61,6 +65,15 @@ interface EditRecipe {
 
 let seq = 0;
 
+/** Somma cumulativa degli esiti di import parziali successivi. */
+function mergeSummary(a: ImportSummary | null, b: ImportSummary): ImportSummary {
+  return {
+    createdRecipes: (a?.createdRecipes ?? 0) + b.createdRecipes,
+    createdIngredients: (a?.createdIngredients ?? 0) + b.createdIngredients,
+    skipped: [...(a?.skipped ?? []), ...b.skipped],
+  };
+}
+
 function toEditRecipe(r: ParsedRecipe): EditRecipe {
   return {
     key: ++seq,
@@ -83,7 +96,40 @@ function toEditRecipe(r: ParsedRecipe): EditRecipe {
   };
 }
 
-const STEPS = ['Carica o incolla', 'Analizza', 'Controlla e correggi', 'Importa'];
+// ── Mapping colonne (preview-layer) ─────────────────────────────────────────
+
+interface MappingState {
+  columns: CsvColumn[];
+  fields: ImportColumnField[];
+  hasHeader: boolean;
+}
+
+/** Ordine e label dei campi mappabili (obbligatori in cima). */
+const FIELD_OPTIONS: { value: ImportColumnField; label: string; required?: boolean }[] = [
+  { value: 'ingredient', label: 'Ingrediente', required: true },
+  { value: 'quantity', label: 'Quantità', required: true },
+  { value: 'unit', label: 'Unità' },
+  { value: 'recipe', label: 'Nome ricetta' },
+  { value: 'portions', label: 'Porzioni / resa' },
+  { value: 'category', label: 'Categoria' },
+  { value: 'notes', label: 'Istruzioni / note' },
+  { value: 'allergens', label: 'Allergeni' },
+  { value: 'ignore', label: 'Ignora colonna' },
+];
+
+const FIELD_LABEL: Record<ImportColumnField, string> = {
+  ingredient: 'Ingrediente',
+  quantity: 'Quantità',
+  unit: 'Unità',
+  recipe: 'Nome ricetta',
+  portions: 'Porzioni',
+  category: 'Categoria',
+  notes: 'Note',
+  allergens: 'Allergeni',
+  ignore: 'Ignora',
+};
+
+const REQUIRED_FIELDS: ImportColumnField[] = ['ingredient', 'quantity'];
 
 export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }) {
   const [stepIdx, setStepIdx] = useState(0); // 0=input, 2=review, 3=done
@@ -94,40 +140,115 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
   const [analyzeErr, setAnalyzeErr] = useState<string | null>(null);
   const [importErr, setImportErr] = useState<string | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
+  const [partial, setPartial] = useState<ImportSummary | null>(null);
+  // Mapping colonne: testo CSV già letto + mappatura corrente (preview-layer).
+  const [csvText, setCsvText] = useState<string | null>(null);
+  const [mapping, setMapping] = useState<MappingState | null>(null);
   const [analyzing, startAnalyze] = useTransition();
   const [importing, startImport] = useTransition();
 
   const catalogByName = useMemo(() => new Map(catalog.map((c) => [c.id, c])), [catalog]);
 
-  function analyze() {
-    setAnalyzeErr(null);
+  // Analisi server (auto o con mapping confermato) → porta alla review.
+  async function callAnalyze(args: {
+    kind: 'text' | 'csv' | 'pdf';
+    text?: string;
+    file?: File;
+    mapping?: { fields: ImportColumnField[]; hasHeader: boolean };
+  }) {
     const fd = new FormData();
-    let kind: 'text' | 'csv' | 'pdf' = 'text';
-    if (file) {
-      kind = file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'csv';
-      fd.set('file', file);
-    } else {
-      if (!pasted.trim()) {
-        setAnalyzeErr('Incolla del testo o carica un file (CSV o PDF).');
+    fd.set('kind', args.kind);
+    if (args.text != null) fd.set('text', args.text);
+    if (args.file) fd.set('file', args.file);
+    if (args.mapping) fd.set('mapping', JSON.stringify(args.mapping));
+    const res = await analyzeImportAction(IDLE_STATE, fd);
+    if (res.status === 'success' && res.result) {
+      if (res.result.recipes.length === 0) {
+        setAnalyzeErr(res.result.warnings[0] ?? 'Nessuna ricetta riconosciuta.');
         return;
       }
-      fd.set('text', pasted);
+      setRecipes(res.result.recipes.map(toEditRecipe));
+      setGlobalWarnings(res.result.warnings);
+      setStepIdx(2);
+    } else {
+      setAnalyzeErr(res.status === 'error' ? res.error : 'Analisi non riuscita.');
     }
-    fd.set('kind', kind);
-    startAnalyze(async () => {
-      const res = await analyzeImportAction(IDLE_STATE, fd);
-      if (res.status === 'success' && res.result) {
-        if (res.result.recipes.length === 0) {
-          setAnalyzeErr(res.result.warnings[0] ?? 'Nessuna ricetta riconosciuta.');
+  }
+
+  function analyze() {
+    setAnalyzeErr(null);
+    if (file) {
+      const lower = file.name.toLowerCase();
+      // I fogli di calcolo binari non sono leggibili come testo: invece di
+      // mandare "spazzatura" al parser, guidiamo l'utente al CSV (messaggio
+      // azionabile) — il supporto .xlsx nativo è un lavoro a parte (fase 2).
+      if (/\.(xlsx|xlsm|xlsb|xls|numbers|ods)$/.test(lower)) {
+        setAnalyzeErr(
+          'I fogli di calcolo (Excel/Numbers) non sono ancora supportati direttamente. Aprilo e salva/esporta come CSV (UTF-8), poi ricarica il CSV — oppure copia le righe e incollale qui sopra.',
+        );
+        return;
+      }
+      if (lower.endsWith('.pdf')) {
+        startAnalyze(() => callAnalyze({ kind: 'pdf', file }));
+        return;
+      }
+      // CSV: leggiamo il testo e ispezioniamo lato client. Se l'auto-detect non è
+      // sicuro (header ambigui / niente intestazioni), apriamo il passo di mapping.
+      startAnalyze(async () => {
+        const text = await file.text();
+        setCsvText(text);
+        const insp = inspectCsv(text);
+        if (insp.columns.length > 0 && !insp.confident) {
+          setMapping({
+            columns: insp.columns,
+            fields: insp.columns.map((c) => c.suggested),
+            hasHeader: insp.hasHeader,
+          });
+          setStepIdx(1);
           return;
         }
-        setRecipes(res.result.recipes.map(toEditRecipe));
-        setGlobalWarnings(res.result.warnings);
-        setStepIdx(2);
-      } else {
-        setAnalyzeErr(res.status === 'error' ? res.error : 'Analisi non riuscita.');
-      }
+        await callAnalyze({ kind: 'csv', text });
+      });
+      return;
+    }
+    if (!pasted.trim()) {
+      setAnalyzeErr('Incolla del testo o carica un file (CSV o PDF).');
+      return;
+    }
+    startAnalyze(() => callAnalyze({ kind: 'text', text: pasted }));
+  }
+
+  // ── mapping colonne ─────────────────────────────────────────────────────────
+  function changeField(index: number, field: ImportColumnField) {
+    setMapping((m) => {
+      if (!m) return m;
+      const fields = m.fields.slice();
+      fields[index] = field;
+      return { ...m, fields };
     });
+  }
+  function toggleHeader(next: boolean) {
+    if (!csvText) return;
+    const insp = inspectCsv(csvText, next);
+    setMapping((m) => {
+      // Conserva le scelte utente se il numero di colonne non cambia.
+      const fields =
+        m && insp.columns.length === m.fields.length ? m.fields : insp.columns.map((c) => c.suggested);
+      return { columns: insp.columns, fields, hasHeader: insp.hasHeader };
+    });
+  }
+  function continueMapping() {
+    if (!mapping || !csvText) return;
+    if (!REQUIRED_FIELDS.every((f) => mapping.fields.includes(f))) return;
+    setAnalyzeErr(null);
+    startAnalyze(() =>
+      callAnalyze({ kind: 'csv', text: csvText, mapping: { fields: mapping.fields, hasHeader: mapping.hasHeader } }),
+    );
+  }
+  function resetToInput() {
+    setMapping(null);
+    setCsvText(null);
+    setStepIdx(0);
   }
 
   // ── mutazioni preview ────────────────────────────────────────────────────────
@@ -161,12 +282,21 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
   const ingredientIssues = (r: EditRecipe) =>
     r.ingredients.length === 0 ||
     r.ingredients.some((i) => !i.quantity.trim() || (i.create ? !i.name.trim() : !i.productId));
-  const canImport = selected.length > 0 && selected.every((r) => r.name.trim() && !ingredientIssues(r));
+  const recipeReady = (r: EditRecipe) => r.name.trim() !== '' && !ingredientIssues(r);
+  // Import PARZIALE: importiamo subito le ricette pronte e isoliamo solo quelle
+  // ancora da sistemare. Niente "fail-all": una riga problematica non blocca le
+  // altre. Le bloccate restano in review per la correzione.
+  const readyRecipes = selected.filter(recipeReady);
+  const blockedRecipes = selected.filter((r) => !recipeReady(r));
+  const canImport = readyRecipes.length > 0;
 
   function runImport() {
     setImportErr(null);
+    const ready = recipes.filter((r) => r.selected && recipeReady(r));
+    if (ready.length === 0) return;
+    const sentKeys = new Set(ready.map((r) => r.key));
     const payload = {
-      recipes: selected.map((r) => ({
+      recipes: ready.map((r) => ({
         name: r.name.trim(),
         basePortions: r.basePortions || '1',
         category: r.category.trim() || null,
@@ -184,8 +314,17 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
     startImport(async () => {
       const res = await importRecipesAction(IDLE_STATE, fd);
       if (res.status === 'success' && res.summary) {
-        setSummary(res.summary);
-        setStepIdx(3);
+        const merged = mergeSummary(partial, res.summary);
+        const remaining = recipes.filter((r) => !sentKeys.has(r.key));
+        if (remaining.length === 0) {
+          setSummary(merged);
+          setStepIdx(3);
+        } else {
+          // Restano ricette (da sistemare o non selezionate): teniamo aperta la
+          // review e mostriamo l'esito parziale cumulativo.
+          setRecipes(remaining);
+          setPartial(merged);
+        }
       } else {
         setImportErr(res.status === 'error' ? res.error : 'Import non riuscito.');
       }
@@ -204,9 +343,12 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
         </p>
       </div>
 
-      <Stepper current={stepIdx} />
+      <Stepper
+        activeIndex={stepIdx >= 3 ? 3 : stepIdx === 2 ? 2 : mapping ? 1 : 0}
+        mappingInFlow={!!mapping}
+      />
 
-      {stepIdx <= 1 && (
+      {stepIdx <= 1 && !mapping && (
         <InputStep
           pasted={pasted}
           setPasted={setPasted}
@@ -218,8 +360,41 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
         />
       )}
 
+      {stepIdx === 1 && mapping && (
+        <MappingStep
+          state={mapping}
+          analyzing={analyzing}
+          error={analyzeErr}
+          onChangeField={changeField}
+          onToggleHeader={toggleHeader}
+          onBack={resetToInput}
+          onContinue={continueMapping}
+        />
+      )}
+
       {stepIdx === 2 && (
         <div className="space-y-4">
+          {partial && (
+            <div className="rounded-md bg-success-light px-3 py-2 text-sm text-success-strong">
+              <p className="font-medium inline-flex items-center gap-1">
+                <CheckCircle2 size={14} aria-hidden="true" />
+                {partial.createdRecipes} ricett{partial.createdRecipes === 1 ? 'a importata' : 'e importate'}
+                {partial.createdIngredients > 0 && ` · ${partial.createdIngredients} ingredienti nuovi a catalogo`}
+              </p>
+              <p className="mt-0.5">
+                Le ricette qui sotto non sono ancora state importate: completale e premi di nuovo Importa.
+              </p>
+              {partial.skipped.length > 0 && (
+                <ul className="mt-1 list-disc pl-4 text-xs">
+                  {partial.skipped.map((s, i) => (
+                    <li key={i}>
+                      «{s.name}» — {s.reason}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           {globalWarnings.length > 0 && (
             <div className="rounded-md bg-warning-light px-3 py-2 text-sm text-warning-strong space-y-0.5">
               {globalWarnings.map((w, i) => (
@@ -232,9 +407,16 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
               {recipes.length} ricett{recipes.length === 1 ? 'a' : 'e'} rilevat{recipes.length === 1 ? 'a' : 'e'} ·{' '}
               <span className="font-medium text-ink">{selected.length} selezionate</span>
             </p>
-            <Button variant="ghost" size="sm" onClick={() => setStepIdx(0)}>
-              ← Cambia input
-            </Button>
+            <div className="flex items-center gap-1.5">
+              {mapping && (
+                <Button variant="ghost" size="sm" onClick={() => setStepIdx(1)}>
+                  ← Colonne
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={resetToInput}>
+                ← Cambia input
+              </Button>
+            </div>
           </div>
 
           {recipes.map((r) => (
@@ -261,14 +443,20 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
             className="sticky bottom-0 -mx-4 px-4 py-3 bg-glass backdrop-blur border-t border-divider sm:mx-0 sm:px-0 sm:bg-transparent sm:backdrop-blur-0 sm:border-0"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
           >
-            {!canImport && selected.length > 0 && (
+            {readyRecipes.length === 0 && selected.length > 0 && (
               <p className="mb-1.5 text-xs text-ink-muted">
-                Completa quantità e associazione di ogni ingrediente (o creane uno nuovo) prima di importare.
+                Nessuna ricetta è ancora pronta: completa quantità e associazione degli ingredienti (o creane di nuovi) per importare.
+              </p>
+            )}
+            {readyRecipes.length > 0 && blockedRecipes.length > 0 && (
+              <p className="mb-1.5 text-xs text-ink-muted">
+                {blockedRecipes.length} ricett{blockedRecipes.length === 1 ? 'a' : 'e'} da sistemare{' '}
+                {blockedRecipes.length === 1 ? 'resta' : 'restano'} qui · le {readyRecipes.length} pronte vengono importate ora.
               </p>
             )}
             <Button fullWidth loading={importing} disabled={!canImport} onClick={runImport}>
               <CheckCircle2 size={16} aria-hidden="true" />
-              Importa {selected.length} ricett{selected.length === 1 ? 'a' : 'e'}
+              Importa {readyRecipes.length} ricett{readyRecipes.length === 1 ? 'a' : 'e'}
             </Button>
           </div>
         </div>
@@ -281,13 +469,13 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
 
 // ── Step indicator ─────────────────────────────────────────────────────────────
 
-function Stepper({ current }: { current: number }) {
-  // L'input copre gli step 0–1 (carica → analizza); review=2; importa=3.
-  const active = current <= 1 ? 1 : current;
+function Stepper({ activeIndex, mappingInFlow }: { activeIndex: number; mappingInFlow: boolean }) {
+  // Lo step 2 diventa "Mappa colonne" solo quando il mapping è nel flusso.
+  const labels = ['Carica o incolla', mappingInFlow ? 'Mappa colonne' : 'Analizza', 'Controlla e correggi', 'Importa'];
   return (
     <ol className="flex items-center gap-1 text-xs">
-      {STEPS.map((label, i) => {
-        const state = i < active ? 'done' : i === active ? 'current' : 'todo';
+      {labels.map((label, i) => {
+        const state = i < activeIndex ? 'done' : i === activeIndex ? 'current' : 'todo';
         return (
           <li key={label} className="flex items-center gap-1 flex-1 last:flex-none">
             <span
@@ -305,11 +493,168 @@ function Stepper({ current }: { current: number }) {
             <span className={cn('hidden sm:inline', state === 'current' ? 'text-ink font-medium' : 'text-ink-muted')}>
               {label}
             </span>
-            {i < STEPS.length - 1 && <span className="flex-1 h-px bg-surface-offset mx-1" />}
+            {i < labels.length - 1 && <span className="flex-1 h-px bg-surface-offset mx-1" />}
           </li>
         );
       })}
     </ol>
+  );
+}
+
+// ── Step 2: mappatura colonne ──────────────────────────────────────────────────
+
+function MappingStep({
+  state,
+  analyzing,
+  error,
+  onChangeField,
+  onToggleHeader,
+  onBack,
+  onContinue,
+}: {
+  state: MappingState;
+  analyzing: boolean;
+  error: string | null;
+  onChangeField: (index: number, field: ImportColumnField) => void;
+  onToggleHeader: (next: boolean) => void;
+  onBack: () => void;
+  onContinue: () => void;
+}) {
+  const hasIngredient = state.fields.includes('ingredient');
+  const hasQuantity = state.fields.includes('quantity');
+  const canContinue = hasIngredient && hasQuantity;
+
+  return (
+    <div className="space-y-4">
+      <section className="bg-surface-2 rounded-lg border border-border shadow-sm p-4 sm:p-5">
+        <h2 className="flex items-center gap-2 text-md font-semibold text-ink mb-1">
+          <Columns3 size={16} aria-hidden="true" className="text-ink-muted" />
+          Abbina le colonne
+        </h2>
+        <p className="text-sm text-ink-muted">
+          Non ho riconosciuto con certezza le colonne del file. Dimmi cosa contiene ognuna: bastano «Ingrediente»
+          e «Quantità» per continuare, il resto è opzionale. Niente viene salvato finché non controlli e confermi.
+        </p>
+      </section>
+
+      {/* Stato campi obbligatori */}
+      <div className="flex flex-wrap items-center gap-2">
+        <ReqChip ok={hasIngredient} label="Ingrediente" />
+        <ReqChip ok={hasQuantity} label="Quantità" />
+        <span className="text-xs text-ink-faint">obbligatori per continuare</span>
+      </div>
+
+      {/* La prima riga è intestazione? */}
+      <label className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-2 px-3 py-3 cursor-pointer">
+        <span className="text-sm text-ink">
+          La prima riga è un’intestazione
+          <span className="block text-xs text-ink-muted">
+            {state.hasHeader ? 'Sì: la uso per i nomi delle colonne.' : 'No: la tratto come primo dato.'}
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={state.hasHeader}
+          onChange={(e) => onToggleHeader(e.target.checked)}
+          className="h-5 w-5 rounded border-border accent-primary shrink-0"
+        />
+      </label>
+
+      {!state.hasHeader && (
+        <p className="rounded-md bg-warning-light px-3 py-2 text-xs text-warning-strong">
+          Il file non sembra avere intestazioni: le colonne sono numerate e la prima riga è trattata come dato.
+        </p>
+      )}
+
+      {/* Colonne */}
+      <div className="space-y-2">
+        {state.columns.map((col) => {
+          const field = state.fields[col.index];
+          return (
+            <div key={col.index} className="rounded-lg border border-border bg-surface-2 p-3">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-sm font-medium text-ink truncate">{col.header || `Colonna ${col.index + 1}`}</p>
+                <FieldBadge field={field} />
+              </div>
+              {col.sample.length > 0 && (
+                <p className="text-xs text-ink-muted mb-2 truncate">es. {col.sample.slice(0, 3).join(' · ')}</p>
+              )}
+              <select
+                aria-label={`Contenuto di ${col.header || `colonna ${col.index + 1}`}`}
+                value={field}
+                onChange={(e) => onChangeField(col.index, e.target.value as ImportColumnField)}
+                className="w-full min-h-[44px] rounded-md border border-border bg-surface px-3 text-sm text-ink"
+              >
+                {FIELD_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.required ? `${o.label} (obbligatorio)` : o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          );
+        })}
+      </div>
+
+      {error && (
+        <p role="alert" className="rounded-md bg-danger-light px-3 py-2 text-sm text-danger">
+          {error}
+        </p>
+      )}
+
+      <div
+        className="sticky bottom-0 -mx-4 px-4 py-3 bg-glass backdrop-blur border-t border-divider sm:mx-0 sm:px-0 sm:bg-transparent sm:backdrop-blur-0 sm:border-0"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      >
+        {!canContinue && (
+          <p className="mb-1.5 text-xs text-ink-muted">
+            Indica quale colonna contiene {!hasIngredient ? '«Ingrediente»' : ''}
+            {!hasIngredient && !hasQuantity ? ' e ' : ''}
+            {!hasQuantity ? '«Quantità»' : ''} per continuare.
+          </p>
+        )}
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={onBack}>
+            ← Indietro
+          </Button>
+          <Button fullWidth loading={analyzing} disabled={!canContinue} onClick={onContinue}>
+            Continua
+            <ArrowRight size={16} aria-hidden="true" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReqChip({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium',
+        ok ? 'bg-success-light text-success-strong' : 'bg-surface-offset text-ink-muted',
+      )}
+    >
+      {ok ? <Check size={12} aria-hidden="true" /> : <AlertTriangle size={12} aria-hidden="true" />}
+      {label}
+    </span>
+  );
+}
+
+function FieldBadge({ field }: { field: ImportColumnField }) {
+  if (field === 'ignore') {
+    return (
+      <Badge variant="neutral" size="sm">
+        ignorata
+      </Badge>
+    );
+  }
+  const required = field === 'ingredient' || field === 'quantity';
+  return (
+    <Badge variant={required ? 'primary' : 'info'} size="sm">
+      {FIELD_LABEL[field]}
+    </Badge>
   );
 }
 
@@ -358,10 +703,12 @@ function InputStep({
           <FileUp size={16} aria-hidden="true" className="text-ink-muted" />
           Oppure carica un file
         </h2>
-        <p className="text-sm text-ink-muted mb-3">CSV (es. esportato da Excel) o PDF testuale.</p>
+        <p className="text-sm text-ink-muted mb-3">
+          CSV o PDF testuale. I file Excel vanno prima salvati come CSV (in Excel: File → Salva come → CSV).
+        </p>
         <input
           type="file"
-          accept=".csv,text/csv,.pdf,application/pdf"
+          accept=".csv,text/csv,.pdf,application/pdf,.xlsx,.xls"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           className="block w-full text-sm text-ink-muted file:mr-3 file:min-h-[44px] file:px-4 file:rounded-md file:border-0 file:bg-primary file:text-primary-fg file:text-sm file:font-medium hover:file:bg-primary-hover file:cursor-pointer"
         />

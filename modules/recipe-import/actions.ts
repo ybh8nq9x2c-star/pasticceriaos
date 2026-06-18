@@ -10,7 +10,26 @@ import { revalidatePath } from 'next/cache';
 import { getErrorMessage } from '@/lib/errors';
 import { formField, type ActionState } from '@/lib/utils';
 import * as service from './service';
-import type { AnalyzeResult, ImportSourceKind, ImportSummary } from './types';
+import type {
+  AnalyzeResult,
+  ImportSourceKind,
+  ImportSummary,
+  ResolvedMapping,
+} from './types';
+
+/** Parsing difensivo della mappatura colonne dal form (JSON). */
+function parseMapping(raw: string | null | undefined): ResolvedMapping | undefined {
+  if (!raw) return undefined;
+  try {
+    const p = JSON.parse(raw);
+    if (Array.isArray(p?.fields) && p.fields.every((f: unknown) => typeof f === 'string')) {
+      return { fields: p.fields, hasHeader: !!p.hasHeader };
+    }
+  } catch {
+    // ignora: mappatura assente/non valida → auto-detect
+  }
+  return undefined;
+}
 
 export type AnalyzeState = ActionState & { result?: AnalyzeResult };
 
@@ -26,6 +45,7 @@ export async function analyzeImportAction(
       kind,
       text: formField(formData, 'text') ?? undefined,
       file: file instanceof File && file.size > 0 ? file : undefined,
+      mapping: parseMapping(formField(formData, 'mapping')),
     });
     return { status: 'success', result };
   } catch (err) {
