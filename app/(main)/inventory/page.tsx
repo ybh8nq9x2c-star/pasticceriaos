@@ -91,16 +91,19 @@ export default async function InventoryPage() {
             : `${levels.length} ingredienti tracciati`
         }
         action={
-          <div className="flex items-center gap-2">
+          // Mobile: i due CTA si impilano (il PageHeader tiene azioni e titolo
+          // sulla stessa riga non-wrappabile → due bottoni larghi sforerebbero).
+          // Da sm in su torna identico al layout desktop (riga affiancata).
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
             <Link
               href="/production/quick"
-              className="px-4 py-2.5 bg-surface-2 text-ink border border-border rounded-xl text-sm font-semibold hover:bg-surface-offset transition-colors"
+              className="px-4 py-2.5 bg-surface-2 text-ink border border-border rounded-xl text-sm font-semibold hover:bg-surface-offset transition-colors text-center whitespace-nowrap"
             >
               <Factory size={15} className="inline-block mr-1.5 -mt-0.5" aria-hidden="true" /> Scarica per ricetta
             </Link>
             <Link
               href="/inventory/movement"
-              className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
+              className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors text-center whitespace-nowrap"
             >
               + Registra movimento
             </Link>
