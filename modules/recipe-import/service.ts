@@ -18,7 +18,9 @@ import {
   type CatalogProductRef,
 } from '@/modules/goods-receipts/matching';
 import { BusinessRuleError, getErrorMessage } from '@/lib/errors';
-import { parseCsv, parseCsvWithMapping, parseText } from './parse';
+import { parseCsv, parseCsvWithMapping, parseText, inspectCsv } from './parse';
+import { isAiImportAvailable, aiUnderstandImport } from './ai/provider';
+import { adaptAiRecipes, adaptAiMapping } from './ai/adapter';
 import { importRecipesSchema, type ImportRecipesInput } from './schemas';
 import type {
   AnalyzeResult,
@@ -46,33 +48,34 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
   await requireOrgId(); // garantisce sessione + contesto org (catalogo RLS-scoped)
   const warnings: string[] = [];
   let recipes: ParsedRecipe[];
+  let sourceText = ''; // testo grezzo, riusato dall'eventuale rescue AI
 
   if (args.kind === 'pdf') {
     if (!args.file) throw new BusinessRuleError('Nessun PDF caricato.');
-    const text = await extractPdfText(args.file);
-    recipes = parseText(text);
+    sourceText = await extractPdfText(args.file);
+    recipes = parseText(sourceText);
     if (recipes.length === 0) {
       warnings.push(
         'Nessuna ricetta riconosciuta nel PDF. Verifica che contenga testo (non una scansione) oppure incolla il testo manualmente.',
       );
     }
   } else if (args.kind === 'csv') {
-    const text = args.text ?? (args.file ? await args.file.text() : '');
-    if (!text.trim()) throw new BusinessRuleError('Il CSV è vuoto.');
+    sourceText = args.text ?? (args.file ? await args.file.text() : '');
+    if (!sourceText.trim()) throw new BusinessRuleError('Il CSV è vuoto.');
     if (args.mapping) {
       // Mappatura confermata dall'utente: il parser usa esattamente quella.
-      recipes = parseCsvWithMapping(text, args.mapping.fields, args.mapping.hasHeader);
+      recipes = parseCsvWithMapping(sourceText, args.mapping.fields, args.mapping.hasHeader);
       if (recipes.length === 0) {
         warnings.push(
           'Con questa mappatura non risultano righe valide: assicurati di aver indicato la colonna dell’ingrediente.',
         );
       }
     } else {
-      recipes = parseCsv(text);
+      recipes = parseCsv(sourceText);
       if (recipes.length === 0) {
         // Forse non è davvero tabellare: prova come testo libero.
-        recipes = parseText(text);
-        if (recipes.length === 0) {
+        recipes = parseText(sourceText);
+        if (recipes.length === 0 && !isAiImportAvailable()) {
           warnings.push(
             'Non ho riconosciuto le colonne del file. Servono almeno una colonna con gli ingredienti e una con le quantità. Se esporti da Excel, salva come CSV (UTF-8). In alternativa, incolla le righe come testo.',
           );
@@ -80,14 +83,52 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
       }
     }
   } else {
-    const text = args.text ?? '';
-    if (!text.trim()) throw new BusinessRuleError('Incolla del testo da analizzare.');
-    recipes = parseText(text);
-    if (recipes.length === 0) warnings.push('Nessuna ricetta riconosciuta nel testo incollato.');
+    sourceText = args.text ?? '';
+    if (!sourceText.trim()) throw new BusinessRuleError('Incolla del testo da analizzare.');
+    recipes = parseText(sourceText);
+    if (recipes.length === 0 && !isAiImportAvailable()) {
+      warnings.push('Nessuna ricetta riconosciuta nel testo incollato.');
+    }
   }
 
-  // Arricchimento con il match sul catalogo dell'organizzazione.
+  // Catalogo dell'organizzazione (serve sia all'AI per gli hint, sia al match a valle).
   const catalog = await catalogRefs();
+
+  // ── Rescue AI-assistito (Phase AI-1) ────────────────────────────────────────
+  // Interviene SOLO quando il parser deterministico non ha trovato nulla e una
+  // API key è configurata. L'AI CAPISCE (mappatura colonne / estrazione da testo
+  // rumoroso); l'ESTRAZIONE finale resta deterministica dove possibile (CSV →
+  // parseCsvWithMapping su tutto il file). Output sempre convertito in candidati
+  // preview-layer, mai auto-confermato. Qualunque problema → resta il fallback.
+  if (recipes.length === 0 && sourceText.trim() && isAiImportAvailable() && !args.mapping) {
+    const ai = await aiUnderstandImport({
+      kind: args.kind,
+      text: args.kind === 'csv' ? undefined : sourceText,
+      columns: args.kind === 'csv' ? inspectCsv(sourceText).columns.map((c) => ({ header: c.header, samples: c.sample })) : undefined,
+      catalogNames: catalog.map((c) => c.name),
+    });
+    if (ai) {
+      const mapping = args.kind === 'csv' ? adaptAiMapping(ai) : null;
+      if (mapping) {
+        // CSV: l'AI ha mappato le colonne → estrazione deterministica del file intero.
+        recipes = parseCsvWithMapping(sourceText, mapping.fields, mapping.hasHeader);
+      }
+      if (recipes.length === 0) {
+        // Testo/PDF (o CSV senza mapping affidabile) → candidati dall'AI.
+        recipes = adaptAiRecipes(ai);
+      }
+      if (recipes.length > 0) {
+        warnings.push('Analisi assistita dall’AI: controlla i campi segnalati come incerti prima di importare.');
+      } else {
+        warnings.push('Non sono riuscito a riconoscere ricette in questo file, nemmeno con l’assistenza AI.');
+      }
+    } else {
+      warnings.push('Nessuna ricetta riconosciuta. Prova a incollare il testo o a salvare il file come CSV.');
+    }
+  }
+
+  // Arricchimento con il match sul catalogo dell'organizzazione (vale anche per i
+  // candidati prodotti dall'AI: i suggerimenti restano deterministici e verificati).
   for (const r of recipes) {
     for (const line of r.ingredients) {
       const m = matchProduct(catalog, { name: line.name });
