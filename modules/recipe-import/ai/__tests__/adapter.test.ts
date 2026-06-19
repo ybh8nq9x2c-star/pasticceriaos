@@ -100,18 +100,30 @@ describe('aiReadinessSummary', () => {
 });
 
 describe('isAiImportAvailable', () => {
-  const original = process.env.ANTHROPIC_API_KEY;
+  const orig = { a: process.env.ANTHROPIC_API_KEY, v: process.env.VENICE_API_KEY };
+  const restore = (k: 'ANTHROPIC_API_KEY' | 'VENICE_API_KEY', v: string | undefined) => {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  };
   afterEach(() => {
-    if (original === undefined) delete process.env.ANTHROPIC_API_KEY;
-    else process.env.ANTHROPIC_API_KEY = original;
+    restore('ANTHROPIC_API_KEY', orig.a);
+    restore('VENICE_API_KEY', orig.v);
   });
 
-  it('false senza API key (feature spenta → fallback deterministico)', () => {
+  it('false senza nessuna key (feature spenta → fallback deterministico)', () => {
     delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.VENICE_API_KEY;
     expect(isAiImportAvailable()).toBe(false);
   });
 
-  it('true con API key configurata', () => {
+  it('true con Venice key', () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    process.env.VENICE_API_KEY = 've-test';
+    expect(isAiImportAvailable()).toBe(true);
+  });
+
+  it('true con Anthropic key', () => {
+    delete process.env.VENICE_API_KEY;
     process.env.ANTHROPIC_API_KEY = 'sk-test';
     expect(isAiImportAvailable()).toBe(true);
   });
