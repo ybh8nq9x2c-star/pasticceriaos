@@ -131,7 +131,13 @@ const FIELD_LABEL: Record<ImportColumnField, string> = {
 
 const REQUIRED_FIELDS: ImportColumnField[] = ['ingredient', 'quantity'];
 
-export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }) {
+export function RecipeImportWizard({
+  catalog,
+  aiAvailable = false,
+}: {
+  catalog: CatalogIngredient[];
+  aiAvailable?: boolean;
+}) {
   const [stepIdx, setStepIdx] = useState(0); // 0=input, 2=review, 3=done
   const [pasted, setPasted] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -144,6 +150,11 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
   // Mapping colonne: testo CSV già letto + mappatura corrente (preview-layer).
   const [csvText, setCsvText] = useState<string | null>(null);
   const [mapping, setMapping] = useState<MappingState | null>(null);
+  // Assistenza AI: scelta dell'utente (toggle) + provenienza dei candidati.
+  const [aiAssist, setAiAssist] = useState(false);
+  const [aiAssisted, setAiAssisted] = useState(false);
+  // Review: mostra solo le ricette da confermare ("correggi solo l'incerto").
+  const [onlyNeedsConfirm, setOnlyNeedsConfirm] = useState(false);
   const [analyzing, startAnalyze] = useTransition();
   const [importing, startImport] = useTransition();
 
@@ -161,6 +172,7 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
     if (args.text != null) fd.set('text', args.text);
     if (args.file) fd.set('file', args.file);
     if (args.mapping) fd.set('mapping', JSON.stringify(args.mapping));
+    if (aiAssist && aiAvailable) fd.set('ai', '1');
     const res = await analyzeImportAction(IDLE_STATE, fd);
     if (res.status === 'success' && res.result) {
       if (res.result.recipes.length === 0) {
@@ -169,6 +181,7 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
       }
       setRecipes(res.result.recipes.map(toEditRecipe));
       setGlobalWarnings(res.result.warnings);
+      setAiAssisted(Boolean(res.result.aiAssisted));
       setStepIdx(2);
     } else {
       setAnalyzeErr(res.status === 'error' ? res.error : 'Analisi non riuscita.');
@@ -248,6 +261,7 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
   function resetToInput() {
     setMapping(null);
     setCsvText(null);
+    setOnlyNeedsConfirm(false);
     setStepIdx(0);
   }
 
@@ -283,6 +297,7 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
     r.ingredients.length === 0 ||
     r.ingredients.some((i) => !i.quantity.trim() || (i.create ? !i.name.trim() : !i.productId));
   const recipeReady = (r: EditRecipe) => r.name.trim() !== '' && !ingredientIssues(r);
+  const needsConfirmCount = recipes.filter((r) => !recipeReady(r)).length;
   // Import PARZIALE: importiamo subito le ricette pronte e isoliamo solo quelle
   // ancora da sistemare. Niente "fail-all": una riga problematica non blocca le
   // altre. Le bloccate restano in review per la correzione.
@@ -357,6 +372,9 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
           analyzing={analyzing}
           error={analyzeErr}
           onAnalyze={analyze}
+          aiAvailable={aiAvailable}
+          aiAssist={aiAssist}
+          setAiAssist={setAiAssist}
         />
       )}
 
@@ -402,6 +420,46 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
               ))}
             </div>
           )}
+
+          {/* Riepilogo: trovate N · M pronte · K da confermare (+ provenienza AI). */}
+          {recipes.length > 0 && (
+            <div className="rounded-lg border border-border bg-surface-2 p-3">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                {aiAssisted && (
+                  <Badge variant="primary" size="sm">
+                    <Sparkles size={11} aria-hidden="true" /> AI
+                  </Badge>
+                )}
+                <p className="text-sm text-ink">
+                  Trovate <span className="font-semibold">{recipes.length}</span>{' '}
+                  ricett{recipes.length === 1 ? 'a' : 'e'} ·{' '}
+                  <span className="font-semibold text-success-strong">{recipes.length - needsConfirmCount}</span>{' '}
+                  pront{recipes.length - needsConfirmCount === 1 ? 'a' : 'e'}
+                  {needsConfirmCount > 0 && (
+                    <>
+                      {' · '}
+                      <span className="font-semibold text-warning-strong">{needsConfirmCount}</span> da confermare
+                    </>
+                  )}
+                </p>
+              </div>
+              {aiAssisted && (
+                <p className="mt-1 text-xs text-ink-muted">
+                  Bozza generata dall’AI: i campi incerti sono evidenziati e restano da confermare. Niente viene salvato finché non importi.
+                </p>
+              )}
+              {needsConfirmCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setOnlyNeedsConfirm((v) => !v)}
+                  className="mt-2 inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-ink hover:bg-surface-offset transition-colors"
+                >
+                  {onlyNeedsConfirm ? 'Mostra tutte' : `Mostra solo da confermare (${needsConfirmCount})`}
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-ink-muted">
               {recipes.length} ricett{recipes.length === 1 ? 'a' : 'e'} rilevat{recipes.length === 1 ? 'a' : 'e'} ·{' '}
@@ -419,12 +477,13 @@ export function RecipeImportWizard({ catalog }: { catalog: CatalogIngredient[] }
             </div>
           </div>
 
-          {recipes.map((r) => (
+          {(onlyNeedsConfirm ? recipes.filter((r) => !recipeReady(r)) : recipes).map((r) => (
             <RecipeCard
               key={r.key}
               recipe={r}
               catalog={catalog}
               hasIssues={ingredientIssues(r)}
+              needsConfirm={!recipeReady(r)}
               onPatch={(p) => patchRecipe(r.key, p)}
               onPatchIngredient={(iKey, p) => patchIngredient(r.key, iKey, p)}
               onRemoveIngredient={(iKey) => removeIngredient(r.key, iKey)}
@@ -668,6 +727,9 @@ function InputStep({
   analyzing,
   error,
   onAnalyze,
+  aiAvailable,
+  aiAssist,
+  setAiAssist,
 }: {
   pasted: string;
   setPasted: (v: string) => void;
@@ -676,6 +738,9 @@ function InputStep({
   analyzing: boolean;
   error: string | null;
   onAnalyze: () => void;
+  aiAvailable: boolean;
+  aiAssist: boolean;
+  setAiAssist: (v: boolean) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -722,6 +787,28 @@ function InputStep({
         )}
       </section>
 
+      {aiAvailable && (
+        <label className="flex items-start justify-between gap-3 rounded-lg border border-border bg-surface-2 px-3 py-3 cursor-pointer">
+          <span className="text-sm text-ink">
+            <span className="inline-flex items-center gap-1.5 font-medium">
+              <Sparkles size={14} aria-hidden="true" className="text-primary" />
+              Assistenza AI
+            </span>
+            <span className="block text-xs text-ink-muted mt-0.5">
+              Per file molto disordinati (header strani, appunti, testo da OCR). Propone una bozza:
+              controlli e confermi sempre tu, niente viene salvato in automatico.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={aiAssist}
+            onChange={(e) => setAiAssist(e.target.checked)}
+            className="mt-0.5 h-5 w-5 rounded border-border accent-primary shrink-0"
+          />
+        </label>
+      )}
+
       {error && (
         <p role="alert" className="rounded-md bg-danger-light px-3 py-2 text-sm text-danger">
           {error}
@@ -730,7 +817,7 @@ function InputStep({
 
       <Button fullWidth loading={analyzing} onClick={onAnalyze}>
         <Sparkles size={16} aria-hidden="true" />
-        Analizza
+        {aiAvailable && aiAssist ? 'Analizza con AI' : 'Analizza'}
       </Button>
     </div>
   );
@@ -742,6 +829,7 @@ function RecipeCard({
   recipe,
   catalog,
   hasIssues,
+  needsConfirm,
   onPatch,
   onPatchIngredient,
   onRemoveIngredient,
@@ -751,6 +839,7 @@ function RecipeCard({
   recipe: EditRecipe;
   catalog: CatalogIngredient[];
   hasIssues: boolean;
+  needsConfirm: boolean;
   onPatch: (p: Partial<EditRecipe>) => void;
   onPatchIngredient: (iKey: number, p: Partial<EditIngredient>) => void;
   onRemoveIngredient: (iKey: number) => void;
@@ -760,8 +849,14 @@ function RecipeCard({
   return (
     <section
       className={cn(
-        'rounded-lg border bg-surface-2 shadow-sm',
+        'rounded-lg border bg-surface-2',
         recipe.selected ? 'border-border' : 'border-divider opacity-60',
+        // Evidenziazione "da confermare": accento ambra a sinistra finché ci sono
+        // campi incerti (utile soprattutto sulle bozze AI). Inset shadow per non
+        // entrare in conflitto col colore del bordo.
+        needsConfirm && recipe.selected
+          ? 'shadow-[inset_3px_0_0_var(--color-warning)]'
+          : 'shadow-sm',
       )}
     >
       <header className="flex items-center gap-2 px-3 py-2.5 border-b border-divider">

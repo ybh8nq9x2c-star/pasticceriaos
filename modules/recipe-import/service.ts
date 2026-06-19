@@ -42,6 +42,13 @@ export interface AnalyzeArgs {
   file?: File;
   /** Mappatura colonne risolta dall'utente (solo CSV, preview-layer). */
   mapping?: ResolvedMapping;
+  /** L'utente ha scelto l'assistenza AI (toggle UI). Default false. */
+  aiAssist?: boolean;
+}
+
+/** L'AI è disponibile per la UI? (espone la presenza della API key, non il valore). */
+export function isRecipeAiAvailable(): boolean {
+  return isAiImportAvailable();
 }
 
 export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeResult> {
@@ -49,6 +56,9 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
   const warnings: string[] = [];
   let recipes: ParsedRecipe[];
   let sourceText = ''; // testo grezzo, riusato dall'eventuale rescue AI
+  let aiAssisted = false;
+  // L'AI parte solo se l'utente l'ha scelta E una key è configurata.
+  const willTryAi = Boolean(args.aiAssist) && isAiImportAvailable();
 
   if (args.kind === 'pdf') {
     if (!args.file) throw new BusinessRuleError('Nessun PDF caricato.');
@@ -75,7 +85,7 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
       if (recipes.length === 0) {
         // Forse non è davvero tabellare: prova come testo libero.
         recipes = parseText(sourceText);
-        if (recipes.length === 0 && !isAiImportAvailable()) {
+        if (recipes.length === 0 && !willTryAi) {
           warnings.push(
             'Non ho riconosciuto le colonne del file. Servono almeno una colonna con gli ingredienti e una con le quantità. Se esporti da Excel, salva come CSV (UTF-8). In alternativa, incolla le righe come testo.',
           );
@@ -86,7 +96,7 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
     sourceText = args.text ?? '';
     if (!sourceText.trim()) throw new BusinessRuleError('Incolla del testo da analizzare.');
     recipes = parseText(sourceText);
-    if (recipes.length === 0 && !isAiImportAvailable()) {
+    if (recipes.length === 0 && !willTryAi) {
       warnings.push('Nessuna ricetta riconosciuta nel testo incollato.');
     }
   }
@@ -100,7 +110,7 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
   // rumoroso); l'ESTRAZIONE finale resta deterministica dove possibile (CSV →
   // parseCsvWithMapping su tutto il file). Output sempre convertito in candidati
   // preview-layer, mai auto-confermato. Qualunque problema → resta il fallback.
-  if (recipes.length === 0 && sourceText.trim() && isAiImportAvailable() && !args.mapping) {
+  if (recipes.length === 0 && sourceText.trim() && willTryAi && !args.mapping) {
     const ai = await aiUnderstandImport({
       kind: args.kind,
       text: args.kind === 'csv' ? undefined : sourceText,
@@ -118,12 +128,12 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
         recipes = adaptAiRecipes(ai);
       }
       if (recipes.length > 0) {
-        warnings.push('Analisi assistita dall’AI: controlla i campi segnalati come incerti prima di importare.');
+        aiAssisted = true;
       } else {
         warnings.push('Non sono riuscito a riconoscere ricette in questo file, nemmeno con l’assistenza AI.');
       }
     } else {
-      warnings.push('Nessuna ricetta riconosciuta. Prova a incollare il testo o a salvare il file come CSV.');
+      warnings.push('Assistenza AI non disponibile in questo momento. Prova a incollare il testo o a salvare il file come CSV.');
     }
   }
 
@@ -147,7 +157,7 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
     }
   }
 
-  return { source: args.kind, recipes, warnings };
+  return { source: args.kind, recipes, warnings, aiAssisted };
 }
 
 export async function importRecipes(raw: unknown): Promise<ImportSummary> {

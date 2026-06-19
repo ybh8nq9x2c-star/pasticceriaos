@@ -7,6 +7,7 @@
 
 import type { Metadata } from 'next';
 import { listIngredients } from '@/modules/catalog/service';
+import { isRecipeAiAvailable } from '@/modules/recipe-import/service';
 import { RecipeImportWizard } from '@/components/recipes/RecipeImportWizard';
 
 export const metadata: Metadata = { title: 'Importa ricette' };
@@ -15,5 +16,5 @@ export const dynamic = 'force-dynamic';
 export default async function RecipeImportPage() {
   const ingredients = await listIngredients(true);
   const catalog = ingredients.map((i) => ({ id: i.id, name: i.name, unit: i.unit }));
-  return <RecipeImportWizard catalog={catalog} />;
+  return <RecipeImportWizard catalog={catalog} aiAvailable={isRecipeAiAvailable()} />;
 }
