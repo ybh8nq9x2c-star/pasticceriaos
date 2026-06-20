@@ -95,8 +95,6 @@ export interface AnalyzeResult {
   recipes: ParsedRecipe[];
   /** Avvisi globali (es. "PDF poco leggibile", "nessuna ricetta rilevata"). */
   warnings: string[];
-  /** true se i candidati provengono dallo strato AI-assistito (provenienza UI). */
-  aiAssisted?: boolean;
 }
 
 /** Esito del commit batch, mostrato all'utente. */

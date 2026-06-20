@@ -40,13 +40,11 @@ export interface AnalyzeArgs {
   kind: ImportSourceKind;
   text?: string;
   file?: File;
-  /** Mappatura colonne risolta dall'utente (solo CSV, preview-layer). */
+  /** Mappatura colonne risolta dall'utente (solo CSV, edge-case recovery). */
   mapping?: ResolvedMapping;
-  /** L'utente ha scelto l'assistenza AI (toggle UI). Default false. */
-  aiAssist?: boolean;
 }
 
-/** L'AI è disponibile per la UI? (espone la presenza della API key, non il valore). */
+/** L'AI è disponibile? (presenza della key, non il valore). Usato dalla pagina. */
 export function isRecipeAiAvailable(): boolean {
   return isAiImportAvailable();
 }
@@ -56,9 +54,8 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
   const warnings: string[] = [];
   let recipes: ParsedRecipe[];
   let sourceText = ''; // testo grezzo, riusato dall'eventuale rescue AI
-  let aiAssisted = false;
-  // L'AI parte solo se l'utente l'ha scelta E una key è configurata.
-  const willTryAi = Boolean(args.aiAssist) && isAiImportAvailable();
+  // L'AI è SEMPRE attiva quando configurata (nessuna scelta esposta all'utente).
+  const willTryAi = isAiImportAvailable();
 
   if (args.kind === 'pdf') {
     if (!args.file) throw new BusinessRuleError('Nessun PDF caricato.');
@@ -127,13 +124,11 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
         // Testo/PDF (o CSV senza mapping affidabile) → candidati dall'AI.
         recipes = adaptAiRecipes(ai);
       }
-      if (recipes.length > 0) {
-        aiAssisted = true;
-      } else {
-        warnings.push('Non sono riuscito a riconoscere ricette in questo file, nemmeno con l’assistenza AI.');
+      if (recipes.length === 0) {
+        warnings.push('Non sono riuscito a leggere le ricette in questo file. Prova a incollare il testo, oppure (se è un foglio) salvalo come CSV.');
       }
     } else {
-      warnings.push('Assistenza AI non disponibile in questo momento. Prova a incollare il testo o a salvare il file come CSV.');
+      warnings.push('Non sono riuscito a leggere le ricette in questo file. Prova a incollare il testo, oppure (se è un foglio) salvalo come CSV.');
     }
   }
 
@@ -157,7 +152,7 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
     }
   }
 
-  return { source: args.kind, recipes, warnings, aiAssisted };
+  return { source: args.kind, recipes, warnings };
 }
 
 export async function importRecipes(raw: unknown): Promise<ImportSummary> {

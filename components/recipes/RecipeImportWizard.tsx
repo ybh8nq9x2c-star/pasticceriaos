@@ -12,7 +12,6 @@ import Link from 'next/link';
 import {
   FileUp,
   ClipboardPaste,
-  Sparkles,
   ChevronDown,
   ChevronRight,
   Trash2,
@@ -147,12 +146,12 @@ export function RecipeImportWizard({
   const [importErr, setImportErr] = useState<string | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [partial, setPartial] = useState<ImportSummary | null>(null);
-  // Mapping colonne: testo CSV già letto + mappatura corrente (preview-layer).
+  // Mapping colonne: testo CSV già letto (per l'eventuale recupero manuale).
   const [csvText, setCsvText] = useState<string | null>(null);
   const [mapping, setMapping] = useState<MappingState | null>(null);
-  // Assistenza AI: scelta dell'utente (toggle) + provenienza dei candidati.
-  const [aiAssist, setAiAssist] = useState(false);
-  const [aiAssisted, setAiAssisted] = useState(false);
+  // Edge case: file tabellare non interpretabile in automatico → offriamo il
+  // recupero manuale colonne SOLO come azione separata (non nel flusso normale).
+  const [recoverable, setRecoverable] = useState(false);
   // Review: mostra solo le ricette da confermare ("correggi solo l'incerto").
   const [onlyNeedsConfirm, setOnlyNeedsConfirm] = useState(false);
   const [analyzing, startAnalyze] = useTransition();
@@ -160,7 +159,8 @@ export function RecipeImportWizard({
 
   const catalogByName = useMemo(() => new Map(catalog.map((c) => [c.id, c])), [catalog]);
 
-  // Analisi server (auto o con mapping confermato) → porta alla review.
+  // Analisi server. L'AI, se configurata, viene usata in automatico dal server:
+  // il client non espone alcuna scelta. Porta direttamente alla review.
   async function callAnalyze(args: {
     kind: 'text' | 'csv' | 'pdf';
     text?: string;
@@ -172,16 +172,17 @@ export function RecipeImportWizard({
     if (args.text != null) fd.set('text', args.text);
     if (args.file) fd.set('file', args.file);
     if (args.mapping) fd.set('mapping', JSON.stringify(args.mapping));
-    if (aiAssist && aiAvailable) fd.set('ai', '1');
     const res = await analyzeImportAction(IDLE_STATE, fd);
     if (res.status === 'success' && res.result) {
       if (res.result.recipes.length === 0) {
-        setAnalyzeErr(res.result.warnings[0] ?? 'Nessuna ricetta riconosciuta.');
+        setAnalyzeErr(res.result.warnings[0] ?? 'Non sono riuscito a leggere le ricette in questo file.');
+        // Recupero manuale colonne disponibile solo se è un file tabellare e
+        // non c'è l'AI a interpretarlo automaticamente.
+        setRecoverable(args.kind === 'csv' && !aiAvailable && !args.mapping);
         return;
       }
       setRecipes(res.result.recipes.map(toEditRecipe));
       setGlobalWarnings(res.result.warnings);
-      setAiAssisted(Boolean(res.result.aiAssisted));
       setStepIdx(2);
     } else {
       setAnalyzeErr(res.status === 'error' ? res.error : 'Analisi non riuscita.');
@@ -190,6 +191,7 @@ export function RecipeImportWizard({
 
   function analyze() {
     setAnalyzeErr(null);
+    setRecoverable(false);
     if (file) {
       const lower = file.name.toLowerCase();
       // I fogli di calcolo binari non sono leggibili come testo: invece di
@@ -205,21 +207,12 @@ export function RecipeImportWizard({
         startAnalyze(() => callAnalyze({ kind: 'pdf', file }));
         return;
       }
-      // CSV: leggiamo il testo e ispezioniamo lato client. Se l'auto-detect non è
-      // sicuro (header ambigui / niente intestazioni), apriamo il passo di mapping.
+      // CSV: andiamo DIRETTI all'analisi (niente passo colonne nel flusso normale).
+      // Header strani / file disordinati li gestisce il server (AI se disponibile,
+      // altrimenti euristica). Teniamo il testo per l'eventuale recupero manuale.
       startAnalyze(async () => {
         const text = await file.text();
         setCsvText(text);
-        const insp = inspectCsv(text);
-        if (insp.columns.length > 0 && !insp.confident) {
-          setMapping({
-            columns: insp.columns,
-            fields: insp.columns.map((c) => c.suggested),
-            hasHeader: insp.hasHeader,
-          });
-          setStepIdx(1);
-          return;
-        }
         await callAnalyze({ kind: 'csv', text });
       });
       return;
@@ -229,6 +222,20 @@ export function RecipeImportWizard({
       return;
     }
     startAnalyze(() => callAnalyze({ kind: 'text', text: pasted }));
+  }
+
+  // ── recupero manuale colonne (edge case, fuori dal flusso normale) ──────────
+  function openManualMapping() {
+    if (!csvText) return;
+    const insp = inspectCsv(csvText);
+    setMapping({
+      columns: insp.columns,
+      fields: insp.columns.map((c) => c.suggested),
+      hasHeader: insp.hasHeader,
+    });
+    setAnalyzeErr(null);
+    setRecoverable(false);
+    setStepIdx(1);
   }
 
   // ── mapping colonne ─────────────────────────────────────────────────────────
@@ -262,6 +269,7 @@ export function RecipeImportWizard({
     setMapping(null);
     setCsvText(null);
     setOnlyNeedsConfirm(false);
+    setRecoverable(false);
     setStepIdx(0);
   }
 
@@ -358,10 +366,7 @@ export function RecipeImportWizard({
         </p>
       </div>
 
-      <Stepper
-        activeIndex={stepIdx >= 3 ? 3 : stepIdx === 2 ? 2 : mapping ? 1 : 0}
-        mappingInFlow={!!mapping}
-      />
+      <Stepper activeIndex={stepIdx >= 3 ? 2 : stepIdx === 2 ? 1 : 0} />
 
       {stepIdx <= 1 && !mapping && (
         <InputStep
@@ -372,9 +377,8 @@ export function RecipeImportWizard({
           analyzing={analyzing}
           error={analyzeErr}
           onAnalyze={analyze}
-          aiAvailable={aiAvailable}
-          aiAssist={aiAssist}
-          setAiAssist={setAiAssist}
+          showRecovery={recoverable && !!csvText}
+          onRecover={openManualMapping}
         />
       )}
 
@@ -421,31 +425,25 @@ export function RecipeImportWizard({
             </div>
           )}
 
-          {/* Riepilogo: trovate N · M pronte · K da confermare (+ provenienza AI). */}
+          {/* Riepilogo umano: trovate N · M pronte · K da confermare. */}
           {recipes.length > 0 && (
             <div className="rounded-lg border border-border bg-surface-2 p-3">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                {aiAssisted && (
-                  <Badge variant="primary" size="sm">
-                    <Sparkles size={11} aria-hidden="true" /> AI
-                  </Badge>
+              <p className="text-sm text-ink">
+                Trovate <span className="font-semibold">{recipes.length}</span>{' '}
+                ricett{recipes.length === 1 ? 'a' : 'e'} ·{' '}
+                <span className="font-semibold text-success-strong">{recipes.length - needsConfirmCount}</span>{' '}
+                pront{recipes.length - needsConfirmCount === 1 ? 'a' : 'e'} da importare
+                {needsConfirmCount > 0 && (
+                  <>
+                    {' · '}
+                    <span className="font-semibold text-warning-strong">{needsConfirmCount}</span> da confermare
+                  </>
                 )}
-                <p className="text-sm text-ink">
-                  Trovate <span className="font-semibold">{recipes.length}</span>{' '}
-                  ricett{recipes.length === 1 ? 'a' : 'e'} ·{' '}
-                  <span className="font-semibold text-success-strong">{recipes.length - needsConfirmCount}</span>{' '}
-                  pront{recipes.length - needsConfirmCount === 1 ? 'a' : 'e'}
-                  {needsConfirmCount > 0 && (
-                    <>
-                      {' · '}
-                      <span className="font-semibold text-warning-strong">{needsConfirmCount}</span> da confermare
-                    </>
-                  )}
-                </p>
-              </div>
-              {aiAssisted && (
+              </p>
+              {needsConfirmCount > 0 && (
                 <p className="mt-1 text-xs text-ink-muted">
-                  Bozza generata dall’AI: i campi incerti sono evidenziati e restano da confermare. Niente viene salvato finché non importi.
+                  Le ricette con un segno ambra hanno qualcosa da controllare (di solito una quantità o un
+                  ingrediente). Niente viene salvato finché non premi Importa.
                 </p>
               )}
               {needsConfirmCount > 0 && (
@@ -528,9 +526,9 @@ export function RecipeImportWizard({
 
 // ── Step indicator ─────────────────────────────────────────────────────────────
 
-function Stepper({ activeIndex, mappingInFlow }: { activeIndex: number; mappingInFlow: boolean }) {
-  // Lo step 2 diventa "Mappa colonne" solo quando il mapping è nel flusso.
-  const labels = ['Carica o incolla', mappingInFlow ? 'Mappa colonne' : 'Analizza', 'Controlla e correggi', 'Importa'];
+function Stepper({ activeIndex }: { activeIndex: number }) {
+  // Flusso semplice a 3 passi: l'analisi è automatica e invisibile (non è un passo).
+  const labels = ['Carica o incolla', 'Controlla', 'Importa'];
   return (
     <ol className="flex items-center gap-1 text-xs">
       {labels.map((label, i) => {
@@ -727,9 +725,8 @@ function InputStep({
   analyzing,
   error,
   onAnalyze,
-  aiAvailable,
-  aiAssist,
-  setAiAssist,
+  showRecovery,
+  onRecover,
 }: {
   pasted: string;
   setPasted: (v: string) => void;
@@ -738,9 +735,9 @@ function InputStep({
   analyzing: boolean;
   error: string | null;
   onAnalyze: () => void;
-  aiAvailable: boolean;
-  aiAssist: boolean;
-  setAiAssist: (v: boolean) => void;
+  /** Edge case file tabellare illeggibile: offre il recupero manuale colonne. */
+  showRecovery: boolean;
+  onRecover: () => void;
 }) {
   return (
     <div className="space-y-4">
@@ -787,37 +784,23 @@ function InputStep({
         )}
       </section>
 
-      {aiAvailable && (
-        <label className="flex items-start justify-between gap-3 rounded-lg border border-border bg-surface-2 px-3 py-3 cursor-pointer">
-          <span className="text-sm text-ink">
-            <span className="inline-flex items-center gap-1.5 font-medium">
-              <Sparkles size={14} aria-hidden="true" className="text-primary" />
-              Assistenza AI
-            </span>
-            <span className="block text-xs text-ink-muted mt-0.5">
-              Per file molto disordinati (header strani, appunti, testo da OCR). Propone una bozza:
-              controlli e confermi sempre tu, niente viene salvato in automatico.
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            role="switch"
-            checked={aiAssist}
-            onChange={(e) => setAiAssist(e.target.checked)}
-            className="mt-0.5 h-5 w-5 rounded border-border accent-primary shrink-0"
-          />
-        </label>
-      )}
-
       {error && (
-        <p role="alert" className="rounded-md bg-danger-light px-3 py-2 text-sm text-danger">
-          {error}
-        </p>
+        <div role="alert" className="rounded-md bg-danger-light px-3 py-2 text-sm text-danger">
+          <p>{error}</p>
+          {showRecovery && (
+            <button
+              type="button"
+              onClick={onRecover}
+              className="mt-1.5 inline-block text-xs font-medium underline hover:opacity-80"
+            >
+              Sistema le colonne a mano →
+            </button>
+          )}
+        </div>
       )}
 
       <Button fullWidth loading={analyzing} onClick={onAnalyze}>
-        <Sparkles size={16} aria-hidden="true" />
-        {aiAvailable && aiAssist ? 'Analizza con AI' : 'Analizza'}
+        Continua
       </Button>
     </div>
   );

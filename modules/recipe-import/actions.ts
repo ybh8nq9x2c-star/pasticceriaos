@@ -46,7 +46,6 @@ export async function analyzeImportAction(
       text: formField(formData, 'text') ?? undefined,
       file: file instanceof File && file.size > 0 ? file : undefined,
       mapping: parseMapping(formField(formData, 'mapping')),
-      aiAssist: formField(formData, 'ai') === '1',
     });
     return { status: 'success', result };
   } catch (err) {
