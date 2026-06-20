@@ -100,30 +100,30 @@ describe('aiReadinessSummary', () => {
 });
 
 describe('isAiImportAvailable', () => {
-  const orig = { a: process.env.ANTHROPIC_API_KEY, v: process.env.VENICE_API_KEY };
-  const restore = (k: 'ANTHROPIC_API_KEY' | 'VENICE_API_KEY', v: string | undefined) => {
+  const orig = { a: process.env.ANTHROPIC_API_KEY, g: process.env.GEMINI_API_KEY };
+  const restore = (k: 'ANTHROPIC_API_KEY' | 'GEMINI_API_KEY', v: string | undefined) => {
     if (v === undefined) delete process.env[k];
     else process.env[k] = v;
   };
   afterEach(() => {
     restore('ANTHROPIC_API_KEY', orig.a);
-    restore('VENICE_API_KEY', orig.v);
+    restore('GEMINI_API_KEY', orig.g);
   });
 
   it('false senza nessuna key (feature spenta → fallback deterministico)', () => {
     delete process.env.ANTHROPIC_API_KEY;
-    delete process.env.VENICE_API_KEY;
+    delete process.env.GEMINI_API_KEY;
     expect(isAiImportAvailable()).toBe(false);
   });
 
-  it('true con Venice key', () => {
+  it('true con Gemini key', () => {
     delete process.env.ANTHROPIC_API_KEY;
-    process.env.VENICE_API_KEY = 've-test';
+    process.env.GEMINI_API_KEY = 'gm-test';
     expect(isAiImportAvailable()).toBe(true);
   });
 
   it('true con Anthropic key', () => {
-    delete process.env.VENICE_API_KEY;
+    delete process.env.GEMINI_API_KEY;
     process.env.ANTHROPIC_API_KEY = 'sk-test';
     expect(isAiImportAvailable()).toBe(true);
   });

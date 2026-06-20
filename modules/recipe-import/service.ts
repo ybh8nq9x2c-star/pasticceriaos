@@ -104,7 +104,7 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
   // ── TEMP DIAGNOSTIC (rimuovere dopo la conferma): solo booleani/decisioni ────
   const diag = aiProviderDiag();
   console.info(
-    '[ai-diag] venice key present:', diag.veniceKey,
+    '[ai-diag] gemini key present:', diag.geminiKey,
     '| anthropic key present:', diag.anthropicKey,
     '| selected provider:', diag.provider,
     '| ai available:', willTryAi,
@@ -112,11 +112,10 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
   );
 
   // ── AI-assistito ────────────────────────────────────────────────────────────
-  // FIX: l'AI, se configurata, è il motore di comprensione PRIMARIO e gira a OGNI
-  // analisi — non più solo come rescue quando il parser deterministico trova 0
-  // ricette (era il motivo per cui Venice non veniva mai chiamato sui file che il
-  // parser interpretava). Il deterministico resta il FALLBACK: AI non configurata,
-  // errore/timeout, o output vuoto. Output sempre preview-layer, mai auto-confermato.
+  // L'AI, se configurata, è il motore di comprensione PRIMARIO e gira a OGNI
+  // analisi — non solo come rescue quando il parser deterministico trova 0 ricette.
+  // Il deterministico resta il FALLBACK: AI non configurata, errore/timeout, o
+  // output vuoto. Output sempre preview-layer, mai auto-confermato.
   const willInvokeAi = willTryAi && sourceText.trim() !== '' && !args.mapping;
   console.info('[ai-diag] willTryAi:', willTryAi, '| AI invoked:', willInvokeAi ? 'yes' : 'no'); // TEMP DIAGNOSTIC
   if (willInvokeAi) {
