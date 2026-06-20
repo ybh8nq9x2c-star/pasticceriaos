@@ -47,6 +47,18 @@ export function isAiImportAvailable(): boolean {
   return selectProvider() !== null;
 }
 
+/**
+ * TEMP DIAGNOSTIC (rimuovere dopo la conferma): solo BOOLEANI/decisioni, mai la
+ * chiave. Espone presenza chiavi e provider scelto per tracciare il gating.
+ */
+export function aiProviderDiag(): { veniceKey: boolean; anthropicKey: boolean; provider: Provider | 'none' } {
+  return {
+    veniceKey: Boolean(process.env.VENICE_API_KEY),
+    anthropicKey: Boolean(process.env.ANTHROPIC_API_KEY),
+    provider: selectProvider() ?? 'none',
+  };
+}
+
 const RULES = [
   'Sei un assistente che AIUTA a CAPIRE file di ricette disordinati di una pasticceria.',
   'Lavori su input reali e sporchi: header strani, colonne miste italiano/inglese,',
@@ -113,20 +125,30 @@ function buildUserContent(input: AiImportInput): string {
  */
 export async function aiUnderstandImport(input: AiImportInput): Promise<AiImportResult | null> {
   const provider = selectProvider();
-  if (!provider) return null;
+  if (!provider) {
+    console.info('[ai-diag] AI invoked: no (no provider/key)'); // TEMP DIAGNOSTIC
+    return null;
+  }
+  console.info('[ai-diag] AI invoked: yes | provider:', provider); // TEMP DIAGNOSTIC
   try {
     const raw = provider === 'venice' ? await callVenice(input) : await callAnthropic(input);
-    if (raw == null) return null;
+    if (raw == null) {
+      console.info('[ai-diag] AI returned result: no (empty/non-2xx)'); // TEMP DIAGNOSTIC
+      return null;
+    }
     const parsed = aiImportResultSchema.safeParse(raw);
+    console.info('[ai-diag] AI returned result:', parsed.success ? 'yes' : 'no (schema mismatch)'); // TEMP DIAGNOSTIC
     return parsed.success ? parsed.data : null;
   } catch {
     // Qualunque errore (auth, rete, rate limit, timeout, JSON) → fallback silenzioso.
+    console.info('[ai-diag] AI error/timeout path hit: yes'); // TEMP DIAGNOSTIC
     return null;
   }
 }
 
 /** Venice (OpenAI-compatible): JSON mode, robusto anche con modelli piccoli/economici. */
 async function callVenice(input: AiImportInput): Promise<unknown> {
+  console.info('[ai-diag] venice request: sending | model:', modelFor('venice')); // TEMP DIAGNOSTIC
   const res = await fetch(`${VENICE_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -147,7 +169,10 @@ async function callVenice(input: AiImportInput): Promise<unknown> {
     }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    console.info('[ai-diag] venice response not ok | status:', res.status); // TEMP DIAGNOSTIC
+    return null;
+  }
   const data = await res.json();
   const content = data?.choices?.[0]?.message?.content;
   if (typeof content !== 'string') return null;

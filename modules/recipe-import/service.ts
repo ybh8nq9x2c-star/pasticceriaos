@@ -19,7 +19,7 @@ import {
 } from '@/modules/goods-receipts/matching';
 import { BusinessRuleError, getErrorMessage } from '@/lib/errors';
 import { parseCsv, parseCsvWithMapping, parseText, inspectCsv } from './parse';
-import { isAiImportAvailable, aiUnderstandImport } from './ai/provider';
+import { isAiImportAvailable, aiUnderstandImport, aiProviderDiag } from './ai/provider';
 import { adaptAiRecipes, adaptAiMapping } from './ai/adapter';
 import { importRecipesSchema, type ImportRecipesInput } from './schemas';
 import type {
@@ -101,13 +101,26 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
   // Catalogo dell'organizzazione (serve sia all'AI per gli hint, sia al match a valle).
   const catalog = await catalogRefs();
 
-  // ── Rescue AI-assistito (Phase AI-1) ────────────────────────────────────────
-  // Interviene SOLO quando il parser deterministico non ha trovato nulla e una
-  // API key è configurata. L'AI CAPISCE (mappatura colonne / estrazione da testo
-  // rumoroso); l'ESTRAZIONE finale resta deterministica dove possibile (CSV →
-  // parseCsvWithMapping su tutto il file). Output sempre convertito in candidati
-  // preview-layer, mai auto-confermato. Qualunque problema → resta il fallback.
-  if (recipes.length === 0 && sourceText.trim() && willTryAi && !args.mapping) {
+  // ── TEMP DIAGNOSTIC (rimuovere dopo la conferma): solo booleani/decisioni ────
+  const diag = aiProviderDiag();
+  console.info(
+    '[ai-diag] venice key present:', diag.veniceKey,
+    '| anthropic key present:', diag.anthropicKey,
+    '| selected provider:', diag.provider,
+    '| ai available:', willTryAi,
+    '| parse produced recipes:', recipes.length,
+  );
+
+  // ── AI-assistito ────────────────────────────────────────────────────────────
+  // FIX: l'AI, se configurata, è il motore di comprensione PRIMARIO e gira a OGNI
+  // analisi — non più solo come rescue quando il parser deterministico trova 0
+  // ricette (era il motivo per cui Venice non veniva mai chiamato sui file che il
+  // parser interpretava). Il deterministico resta il FALLBACK: AI non configurata,
+  // errore/timeout, o output vuoto. Output sempre preview-layer, mai auto-confermato.
+  const willInvokeAi = willTryAi && sourceText.trim() !== '' && !args.mapping;
+  console.info('[ai-diag] willTryAi:', willTryAi, '| AI invoked:', willInvokeAi ? 'yes' : 'no'); // TEMP DIAGNOSTIC
+  if (willInvokeAi) {
+    const deterministic = recipes; // fallback se l'AI non produce nulla
     const ai = await aiUnderstandImport({
       kind: args.kind,
       text: args.kind === 'csv' ? undefined : sourceText,
@@ -115,19 +128,18 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
       catalogNames: catalog.map((c) => c.name),
     });
     if (ai) {
-      const mapping = args.kind === 'csv' ? adaptAiMapping(ai) : null;
-      if (mapping) {
-        // CSV: l'AI ha mappato le colonne → estrazione deterministica del file intero.
-        recipes = parseCsvWithMapping(sourceText, mapping.fields, mapping.hasHeader);
+      let aiRecipes: ParsedRecipe[] = [];
+      if (args.kind === 'csv') {
+        const mapping = adaptAiMapping(ai);
+        // CSV: l'AI mappa le colonne → estrazione deterministica del file intero.
+        if (mapping) aiRecipes = parseCsvWithMapping(sourceText, mapping.fields, mapping.hasHeader);
       }
-      if (recipes.length === 0) {
-        // Testo/PDF (o CSV senza mapping affidabile) → candidati dall'AI.
-        recipes = adaptAiRecipes(ai);
-      }
-      if (recipes.length === 0) {
-        warnings.push('Non sono riuscito a leggere le ricette in questo file. Prova a incollare il testo, oppure (se è un foglio) salvalo come CSV.');
-      }
-    } else {
+      if (aiRecipes.length === 0) aiRecipes = adaptAiRecipes(ai); // testo/PDF o CSV senza mapping
+      // L'AI vince quando produce ricette; altrimenti resta il deterministico.
+      recipes = aiRecipes.length > 0 ? aiRecipes : deterministic;
+    }
+    // ai === null (errore/timeout/non conforme) → resta il deterministico.
+    if (recipes.length === 0) {
       warnings.push('Non sono riuscito a leggere le ricette in questo file. Prova a incollare il testo, oppure (se è un foglio) salvalo come CSV.');
     }
   }
