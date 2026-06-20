@@ -148,12 +148,20 @@ export async function aiUnderstandImport(input: AiImportInput): Promise<AiImport
 
 /** Venice (OpenAI-compatible): JSON mode, robusto anche con modelli piccoli/economici. */
 async function callVenice(input: AiImportInput): Promise<unknown> {
-  console.info('[ai-diag] venice request: sending | model:', modelFor('venice')); // TEMP DIAGNOSTIC
+  const rawKey = process.env.VENICE_API_KEY ?? '';
+  // FIX difensivo: tolgo spazi/newline accidentali nell'env (causa comune di 401
+  // su Bearer quando la stessa chiave funziona via curl). Non altera una chiave pulita.
+  const key = rawKey.trim();
+  // TEMP DIAGNOSTIC — solo booleani/metadati, MAI la chiave né parti di essa.
+  console.info(
+    '[ai-diag] venice request: sending | model:', modelFor('venice'),
+    '| key had surrounding whitespace:', key !== rawKey,
+  );
   const res = await fetch(`${VENICE_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.VENICE_API_KEY}`,
+      Authorization: `Bearer ${key}`,
     },
     body: JSON.stringify({
       model: modelFor('venice'),
@@ -170,7 +178,13 @@ async function callVenice(input: AiImportInput): Promise<unknown> {
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!res.ok) {
-    console.info('[ai-diag] venice response not ok | status:', res.status); // TEMP DIAGNOSTIC
+    // Il CORPO dell'errore Venice dice il PERCHÉ del 401 (chiave non valida vs
+    // modello non disponibile vs …) e NON contiene la chiave. Tronco per sicurezza.
+    const errBody = await res.text().catch(() => '');
+    console.info(
+      '[ai-diag] venice response not ok | status:', res.status,
+      '| body:', errBody.slice(0, 300),
+    ); // TEMP DIAGNOSTIC
     return null;
   }
   const data = await res.json();
