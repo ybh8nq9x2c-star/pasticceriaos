@@ -20,7 +20,7 @@ import {
 import { BusinessRuleError, getErrorMessage } from '@/lib/errors';
 import { parseCsv, parseCsvWithMapping, parseText, inspectCsv } from './parse';
 import { isAiImportAvailable, aiUnderstandImport, aiProviderDiag } from './ai/provider';
-import { adaptAiRecipes, adaptAiMapping, pickMoreNormalized } from './ai/adapter';
+import { adaptAiRecipes, adaptAiMapping, mergeAiIntoBaseline } from './ai/adapter';
 import { importRecipesSchema, type ImportRecipesInput } from './schemas';
 import type {
   AnalyzeResult,
@@ -129,25 +129,33 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
     if (ai) {
       // Candidati AI NORMALIZZATI (name/qty/unit separati dal modello).
       const aiNormalized = adaptAiRecipes(ai);
-      let candidate = aiNormalized;
+      // BASELINE = COPERTURA massima. Per CSV la mappatura scala a TUTTO il file.
+      let base = deterministic;
+      let mappedCount = 0;
       if (args.kind === 'csv') {
         const mapping = adaptAiMapping(ai);
-        // CSV: la mappatura scala a TUTTO il file, ma se l'AI ha normalizzato meglio
-        // gli ingredienti (es. cella "Savoiardi 400 g" splittata in name/qty/unit)
-        // i candidati AI vincono. FIX: prima parseCsvWithMapping mascherava la
-        // normalizzazione AI quando produceva ≥1 ricetta.
         const mapped = mapping ? parseCsvWithMapping(sourceText, mapping.fields, mapping.hasHeader) : [];
-        candidate = pickMoreNormalized(aiNormalized, mapped);
+        mappedCount = mapped.length;
+        if (mapped.length > base.length) base = mapped;
       }
-      const merged = candidate.length > 0 ? candidate : deterministic;
+      // COPERTURA PRIMA: un set AI più piccolo (l'AI vede solo i campioni del CSV)
+      // NON sostituisce il baseline → lo ARRICCHISCE per-ricetta. Evita "4 buone,
+      // 26 perse". Se l'AI copre ≥ del baseline (es. testo) → vince il set AI.
+      const merged = mergeAiIntoBaseline(base, aiNormalized);
+      recipes = merged.length > 0 ? merged : deterministic;
 
-      // TEMP DIAGNOSTIC — 1 ricetta / 3 ingredienti, nessun payload grande, niente segreti.
+      // TEMP DIAGNOSTIC — conteggi + 1 ricetta/3 ingredienti, niente payload/segreti.
       const sample3 = (rs: ParsedRecipe[]) =>
         (rs[0]?.ingredients ?? []).slice(0, 3).map((l) => `${l.name}|q=${l.quantity ?? '∅'}|u=${l.unit ?? '∅'}`);
-      console.info('[ai-diag] AI recipes:', ai.recipes.length, '| AI r0 ingredients:', sample3(aiNormalized));
-      console.info('[ai-diag] merge → recipes:', merged.length, '| r0 ingredients:', sample3(merged));
-
-      recipes = merged;
+      console.info(
+        '[ai-diag] counts | deterministic:', deterministic.length,
+        '| ai-validated:', ai.recipes.length,
+        '| ai-adapted:', aiNormalized.length,
+        '| csv-mapped:', mappedCount,
+        '| baseline:', base.length,
+        '| final preview:', recipes.length,
+      );
+      console.info('[ai-diag] r0 ingredients:', sample3(recipes));
     }
     // ai === null (errore/timeout/non conforme) → resta il deterministico.
     if (recipes.length === 0) {

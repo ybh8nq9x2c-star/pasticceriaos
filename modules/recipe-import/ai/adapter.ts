@@ -110,12 +110,44 @@ export function quantityCoverage(recipes: ParsedRecipe[]): number {
   return recipes.reduce((n, r) => n + r.ingredients.filter((l) => l.quantity != null).length, 0);
 }
 
+function normName(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
 /**
- * Sceglie i candidati con ingredienti meglio normalizzati. `ai` (campi name/qty/
- * unit separati dal modello) vince SOLO se copre più quantità di `mapped` (così
- * un CSV pulito a colonne, che scala a tutto il file, resta preferito quando è
- * davvero migliore). Niente perdita di dati: a parità o se `ai` è peggiore → `mapped`.
+ * Arricchimento per-ricetta: per ogni ricetta del baseline (copertura piena), se
+ * l'AI ha la STESSA ricetta (match per nome) con ingredienti meglio normalizzati
+ * (più quantità), usa quelli. NESSUNA ricetta del baseline viene persa: l'AI
+ * migliora, non sostituisce la copertura.
  */
-export function pickMoreNormalized(ai: ParsedRecipe[], mapped: ParsedRecipe[]): ParsedRecipe[] {
-  return quantityCoverage(ai) > quantityCoverage(mapped) ? ai : mapped;
+export function enrichWithAi(baseline: ParsedRecipe[], aiNormalized: ParsedRecipe[]): ParsedRecipe[] {
+  if (aiNormalized.length === 0) return baseline;
+  const aiByName = new Map<string, ParsedRecipe>();
+  for (const r of aiNormalized) {
+    const k = normName(r.name);
+    if (k && !aiByName.has(k)) aiByName.set(k, r);
+  }
+  return baseline.map((r) => {
+    const match = aiByName.get(normName(r.name));
+    if (match && quantityCoverage([match]) > quantityCoverage([r])) {
+      return { ...r, ingredients: match.ingredients, warnings: [...new Set([...r.warnings, ...match.warnings])] };
+    }
+    return r;
+  });
+}
+
+/**
+ * Merge COPERTURA-FIRST. Un set AI più piccolo (tipico dei CSV: l'AI vede solo i
+ * campioni) NON sostituisce mai un baseline più grande. Se l'AI copre ≥ del
+ * baseline → set AI (completo + normalizzato); altrimenti baseline (copertura
+ * piena) + arricchimento per-ricetta. Mai "4 buone, 26 perse".
+ */
+export function mergeAiIntoBaseline(baseline: ParsedRecipe[], aiNormalized: ParsedRecipe[]): ParsedRecipe[] {
+  if (aiNormalized.length >= baseline.length) return aiNormalized.length > 0 ? aiNormalized : baseline;
+  return enrichWithAi(baseline, aiNormalized);
 }

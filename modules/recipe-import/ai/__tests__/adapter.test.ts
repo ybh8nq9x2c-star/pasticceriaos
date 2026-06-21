@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { adaptAiRecipes, adaptAiMapping, aiReadinessSummary, quantityCoverage, pickMoreNormalized } from '../adapter';
+import { adaptAiRecipes, adaptAiMapping, aiReadinessSummary, quantityCoverage, enrichWithAi, mergeAiIntoBaseline } from '../adapter';
 import { isAiImportAvailable } from '../provider';
 import type { AiImportResult } from '../contract';
 import type { ParsedRecipe } from '../../types';
@@ -100,9 +100,9 @@ describe('aiReadinessSummary', () => {
   });
 });
 
-function recipeWith(qtys: (number | null)[]): ParsedRecipe {
+function recipeNamed(name: string, qtys: (number | null)[]): ParsedRecipe {
   return {
-    name: 'R',
+    name,
     basePortions: null,
     category: null,
     notes: null,
@@ -118,28 +118,40 @@ function recipeWith(qtys: (number | null)[]): ParsedRecipe {
     })),
   };
 }
+const recipeWith = (qtys: (number | null)[]) => recipeNamed('R', qtys);
 
-describe('quantityCoverage / pickMoreNormalized (merge precedence ingredienti)', () => {
+describe('coverage-preserving merge (mergeAiIntoBaseline / enrichWithAi)', () => {
   it('quantityCoverage conta le quantità popolate', () => {
     expect(quantityCoverage([recipeWith([400, null, 200])])).toBe(2);
     expect(quantityCoverage([])).toBe(0);
   });
 
-  it('AI normalizzato (qty separate) batte la mappatura a colonne "mashed" (qty nulle)', () => {
-    const aiNormalized = [recipeWith([400, 200, 300])]; // l'AI ha splittato qty/unit
-    const csvMapped = [recipeWith([null, null, null]), recipeWith([null, null])]; // cella mashed → niente qty
-    expect(pickMoreNormalized(aiNormalized, csvMapped)).toBe(aiNormalized);
+  it('un set AI più PICCOLO non sostituisce un baseline più grande (copertura 30)', () => {
+    const baseline = Array.from({ length: 30 }, (_, i) => recipeNamed(`R${i}`, [null])); // 30 righe, qty nulle
+    const ai = [recipeNamed('R0', [400, 200]), recipeNamed('R1', [300])]; // l'AI ha visto solo 2 campioni
+    const merged = mergeAiIntoBaseline(baseline, ai);
+    expect(merged).toHaveLength(30); // ← nessuna delle 30 ricette viene persa
   });
 
-  it('CSV pulito (più qty, scala a tutto il file) resta preferito — niente perdita dati', () => {
-    const aiNormalized = [recipeWith([400, 200])]; // pochi (dai campioni)
-    const csvMapped = [recipeWith([1, 2, 3]), recipeWith([4, 5, 6])]; // molte righe con qty
-    expect(pickMoreNormalized(aiNormalized, csvMapped)).toBe(csvMapped);
+  it('arricchisce le ricette combacianti per nome (diacritici inclusi), le altre invariate', () => {
+    const baseline = [recipeNamed('Tiramisù', [null]), recipeNamed('Crostata', [null])];
+    const ai = [recipeNamed('Tiramisu', [500, 200, 300])]; // match per nome, ingredienti normalizzati
+    const merged = mergeAiIntoBaseline(baseline, ai);
+    expect(merged).toHaveLength(2); // copertura preservata
+    expect(quantityCoverage([merged[0]])).toBe(3); // Tiramisù arricchita dall'AI
+    expect(quantityCoverage([merged[1]])).toBe(0); // Crostata invariata (AI non l'ha coperta)
   });
 
-  it('mapped vuoto (nessuna mappatura affidabile) → vincono i candidati AI', () => {
-    const aiNormalized = [recipeWith([400])];
-    expect(pickMoreNormalized(aiNormalized, [])).toBe(aiNormalized);
+  it('non sostituisce ingredienti se l’AI è meno normalizzata del baseline', () => {
+    const baseline = [recipeNamed('A', [1, 2, 3])]; // già 3 qty
+    const ai = [recipeNamed('A', [1])]; // peggiore
+    expect(quantityCoverage(enrichWithAi(baseline, ai))).toBe(3);
+  });
+
+  it('AI completo (≥ baseline) → vince il set AI normalizzato', () => {
+    const baseline = [recipeNamed('A', [null]), recipeNamed('B', [null])];
+    const ai = [recipeNamed('A', [1]), recipeNamed('B', [2]), recipeNamed('C', [3])];
+    expect(mergeAiIntoBaseline(baseline, ai)).toBe(ai);
   });
 });
 

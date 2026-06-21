@@ -187,8 +187,15 @@ export async function aiUnderstandImport(input: AiImportInput): Promise<AiImport
       console.info('[ai-diag] AI returned result: no (empty/non-2xx)'); // TEMP DIAGNOSTIC
       return null;
     }
+    const rawRecipes = Array.isArray((raw as { recipes?: unknown }).recipes)
+      ? (raw as { recipes: unknown[] }).recipes.length
+      : -1;
     const parsed = aiImportResultSchema.safeParse(raw);
-    console.info('[ai-diag] AI returned result:', parsed.success ? 'yes' : 'no (schema mismatch)'); // TEMP DIAGNOSTIC
+    console.info('[ai-diag] AI raw recipes:', rawRecipes, '| schema valid:', parsed.success); // TEMP DIAGNOSTIC
+    if (!parsed.success) {
+      // Solo path+codice (niente valori/segreti): vede se zod scarta righe.
+      console.info('[ai-diag] schema issues:', parsed.error.issues.slice(0, 3).map((i) => `${i.path.join('.')}:${i.code}`));
+    }
     return parsed.success ? parsed.data : null;
   } catch {
     // Qualunque errore (auth, rete, rate limit, timeout, JSON) → fallback silenzioso.
@@ -213,7 +220,7 @@ async function callGemini(input: AiImportInput): Promise<unknown> {
       contents: [{ role: 'user', parts: [{ text: buildUserContent(input) }] }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 8192,
+        maxOutputTokens: 16384, // più margine: tante ricette in un'unica risposta
         responseMimeType: 'application/json',
         responseSchema: GEMINI_RESPONSE_SCHEMA,
       },
@@ -227,9 +234,14 @@ async function callGemini(input: AiImportInput): Promise<unknown> {
     return null;
   }
   const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const cand = data?.candidates?.[0];
+  // finishReason ≠ STOP (es. MAX_TOKENS) = output troncato → JSON parziale.
+  if (cand?.finishReason && cand.finishReason !== 'STOP') {
+    console.info('[ai-diag] gemini finishReason:', cand.finishReason); // TEMP DIAGNOSTIC
+  }
+  const text = cand?.content?.parts?.[0]?.text;
   if (typeof text !== 'string') {
-    console.info('[ai-diag] gemini: no text part | finishReason:', data?.candidates?.[0]?.finishReason); // TEMP DIAGNOSTIC
+    console.info('[ai-diag] gemini: no text part | finishReason:', cand?.finishReason); // TEMP DIAGNOSTIC
     return null;
   }
   return JSON.parse(text); // eventuale errore → catch upstream → fallback
