@@ -100,3 +100,22 @@ export function aiReadinessSummary(recipes: ParsedRecipe[]): {
   ).length;
   return { total: recipes.length, needConfirmation };
 }
+
+/**
+ * Quante righe ingrediente hanno una quantità popolata — proxy di "utilità": una
+ * ricetta è "pronta" solo se ogni ingrediente ha una quantità. Usato per decidere
+ * se i candidati AI (normalizzati) sono migliori dell'estrazione a colonne.
+ */
+export function quantityCoverage(recipes: ParsedRecipe[]): number {
+  return recipes.reduce((n, r) => n + r.ingredients.filter((l) => l.quantity != null).length, 0);
+}
+
+/**
+ * Sceglie i candidati con ingredienti meglio normalizzati. `ai` (campi name/qty/
+ * unit separati dal modello) vince SOLO se copre più quantità di `mapped` (così
+ * un CSV pulito a colonne, che scala a tutto il file, resta preferito quando è
+ * davvero migliore). Niente perdita di dati: a parità o se `ai` è peggiore → `mapped`.
+ */
+export function pickMoreNormalized(ai: ParsedRecipe[], mapped: ParsedRecipe[]): ParsedRecipe[] {
+  return quantityCoverage(ai) > quantityCoverage(mapped) ? ai : mapped;
+}
