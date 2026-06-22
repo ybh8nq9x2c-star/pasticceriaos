@@ -17,7 +17,9 @@ export type MovementType =
   | 'waste'
   | 'manual_adjustment'
   | 'initial_stock'
-  | 'return_to_supplier';
+  | 'return_to_supplier'
+  | 'sale_deduction'
+  | 'sale_reversal';
 
 export type OrderStatus = 'draft' | 'sent' | 'confirmed' | 'received' | 'cancelled';
 
@@ -81,6 +83,12 @@ export type CustomerOrderStatus =
   | 'ready'
   | 'delivered'
   | 'cancelled';
+
+// ── vendite / deduzione magazzino al momento vendita (migrations 041–042) ─────
+
+export type SaleStatus = 'processed' | 'partially_linked' | 'unlinked' | 'reversed' | 'void';
+
+export type SaleLineStatus = 'deducted' | 'unlinked' | 'no_bom' | 'unit_mismatch';
 
 // ── Database type ─────────────────────────────────────────────────────────────
 // NOTA: ogni tabella/vista richiede `Relationships` dal supabase-js v2.49+.
@@ -1108,6 +1116,140 @@ export interface Database {
           }
         ];
       };
+
+      sales: {
+        Row: {
+          id: string;
+          organization_id: string;
+          external_sale_id: string;
+          source: string;
+          sold_at: string;
+          status: SaleStatus;
+          total_amount: number | null;
+          customer_id: string | null;
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          external_sale_id: string;
+          source: string;
+          sold_at: string;
+          status?: SaleStatus;
+          total_amount?: number | null;
+          customer_id?: string | null;
+          notes?: string | null;
+          created_by?: string | null;
+        };
+        Update: {
+          status?: SaleStatus;
+          notes?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'sales_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+
+      sale_lines: {
+        Row: {
+          id: string;
+          sale_id: string;
+          organization_id: string;
+          external_line_id: string | null;
+          external_product_ref: string;
+          product_name_snapshot: string;
+          recipe_id: string | null;
+          quantity: number;
+          unit_price: number | null;
+          status: SaleLineStatus;
+          exception: string | null;
+          sort_order: number;
+        };
+        Insert: {
+          id?: string;
+          sale_id: string;
+          organization_id: string;
+          external_line_id?: string | null;
+          external_product_ref: string;
+          product_name_snapshot: string;
+          recipe_id?: string | null;
+          quantity: number;
+          unit_price?: number | null;
+          status?: SaleLineStatus;
+          exception?: string | null;
+          sort_order?: number;
+        };
+        Update: {
+          recipe_id?: string | null;
+          status?: SaleLineStatus;
+          exception?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'sale_lines_sale_id_fkey';
+            columns: ['sale_id'];
+            isOneToOne: false;
+            referencedRelation: 'sales';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'sale_lines_recipe_id_fkey';
+            columns: ['recipe_id'];
+            isOneToOne: false;
+            referencedRelation: 'recipes';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+
+      product_mappings: {
+        Row: {
+          id: string;
+          organization_id: string;
+          source: string;
+          external_product_ref: string;
+          recipe_id: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          source: string;
+          external_product_ref: string;
+          recipe_id: string;
+          created_by?: string | null;
+        };
+        Update: {
+          recipe_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'product_mappings_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'product_mappings_recipe_id_fkey';
+            columns: ['recipe_id'];
+            isOneToOne: false;
+            referencedRelation: 'recipes';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
     };
 
     Views: {
@@ -1690,6 +1832,14 @@ export interface Database {
         Args: { p_from: UnitOfMeasure; p_to: UnitOfMeasure };
         Returns: number | null;
       };
+      ingest_sale: {
+        Args: { p_payload: Json };
+        Returns: string;
+      };
+      reverse_sale: {
+        Args: { p_sale_id: string };
+        Returns: string;
+      };
     };
 
     Enums: {
@@ -1704,6 +1854,8 @@ export interface Database {
       receipt_mode: ReceiptMode;
       receipt_status: ReceiptStatus;
       receipt_line_status: ReceiptLineStatus;
+      sale_status: SaleStatus;
+      sale_line_status: SaleLineStatus;
     };
 
     CompositeTypes: Record<never, never>;

@@ -22,6 +22,7 @@ import {
   PackageCheck,
   Users,
   KeyRound,
+  Receipt,
 } from 'lucide-react';
 
 export type NavItem = { href: string; label: string; icon: LucideIcon };
@@ -34,6 +35,7 @@ export const CUSTOMER_NAV: NavSection[] = [
     items: [
       { href: '/dashboard',  label: 'Oggi',           icon: Home },
       { href: '/production', label: 'Produzione',     icon: ChefHat },
+      { href: '/sales',      label: 'Vendite',        icon: Receipt },
       { href: '/customers',  label: 'Ordini clienti', icon: Cake },
       { href: '/recipes',    label: 'Ricette',        icon: BookOpen },
     ],
