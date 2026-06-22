@@ -351,6 +351,27 @@ function roleToField(role: ColRole | null): ImportColumnField | null {
   }
 }
 
+/**
+ * 'nome'/'name' è ambiguo: headerRole lo manda a 'ingredient'. Ma in un CSV con
+ * una colonna ingredienti SEPARATA e nessuna colonna 'recipe', "nome"/"name" è in
+ * realtà il NOME RICETTA. Senza questa correzione, idx.recipe = -1 e buildRecipes
+ * raggruppa TUTTE le righe in un'unica "Ricetta importata" → 30 righe collassano
+ * in 1 (perdita di copertura). Riassegna la prima colonna nome/name a 'recipe'.
+ */
+function disambiguateRecipeNameColumn(header: string[], fields: ImportColumnField[]): ImportColumnField[] {
+  if (fields.includes('recipe')) return fields;
+  if (fields.filter((f) => f === 'ingredient').length < 2) return fields; // serve un ingrediente separato
+  const out = fields.slice();
+  for (let i = 0; i < out.length; i++) {
+    const key = stripDiacriticsLower((header[i] ?? '').trim());
+    if (out[i] === 'ingredient' && (key === 'nome' || key === 'name')) {
+      out[i] = 'recipe';
+      break;
+    }
+  }
+  return out;
+}
+
 interface ColIndex {
   recipe: number;
   ingredient: number;
@@ -416,7 +437,8 @@ function suggestFields(header: string[], hasHeader: boolean, samplesByCol: strin
     const i = fields.findIndex((f, j) => !f && columnKind(samplesByCol[j] ?? []) === 'number');
     if (i >= 0) fields[i] = 'quantity';
   }
-  return fields.map((f) => f ?? 'ignore');
+  const resolved = fields.map((f) => f ?? 'ignore');
+  return hasHeader ? disambiguateRecipeNameColumn(header, resolved) : resolved;
 }
 
 const SAMPLE_ROWS = 4;
@@ -524,7 +546,10 @@ function buildRecipes(dataRows: string[][], idx: ColIndex): ParsedRecipe[] {
 export function parseCsv(input: string): ParsedRecipe[] {
   const rows = csvRows(input);
   if (rows.length < 2) return [];
-  const fields = rows[0].map((h) => roleToField(headerRole(h)) ?? 'ignore');
+  const fields = disambiguateRecipeNameColumn(
+    rows[0],
+    rows[0].map((h) => roleToField(headerRole(h)) ?? 'ignore'),
+  );
   const idx = fieldsToColIndex(fields);
   if (idx.ingredient < 0 && idx.recipe < 0) return [];
   return buildRecipes(rows.slice(1), idx);

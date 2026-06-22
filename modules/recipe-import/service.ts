@@ -147,6 +147,7 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
       // TEMP DIAGNOSTIC — conteggi + 1 ricetta/3 ingredienti, niente payload/segreti.
       const sample3 = (rs: ParsedRecipe[]) =>
         (rs[0]?.ingredients ?? []).slice(0, 3).map((l) => `${l.name}|q=${l.quantity ?? '∅'}|u=${l.unit ?? '∅'}`);
+      const names5 = (rs: ParsedRecipe[]) => rs.slice(0, 5).map((r) => r.name);
       console.info(
         '[ai-diag] counts | deterministic:', deterministic.length,
         '| ai-validated:', ai.recipes.length,
@@ -155,6 +156,7 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
         '| baseline:', base.length,
         '| final preview:', recipes.length,
       );
+      console.info('[ai-diag] names | det:', names5(deterministic), '| base:', names5(base), '| final:', names5(recipes));
       console.info('[ai-diag] r0 ingredients:', sample3(recipes));
     }
     // ai === null (errore/timeout/non conforme) → resta il deterministico.

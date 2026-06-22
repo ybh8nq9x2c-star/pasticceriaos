@@ -179,6 +179,30 @@ describe('parseCsv', () => {
   });
 });
 
+describe('parseCsv — copertura colonna nome/name come ricetta (no collasso 30→1)', () => {
+  const csv30 = (header: string) => {
+    const rows = [header];
+    for (let i = 1; i <= 30; i++) rows.push(`Ricetta ${i},Dolci,8,"500 g farina, 3 uova",Cuoci,Glutine`);
+    return rows.join('\n');
+  };
+
+  it('header "nome" con colonna ingredienti separata → 30 ricette, non 1', () => {
+    const out = parseCsv(csv30('nome,categoria,porzioni,ingredienti,istruzioni,allergeni'));
+    expect(out).toHaveLength(30);
+    expect(out.slice(0, 2).map((r) => r.name)).toEqual(['Ricetta 1', 'Ricetta 2']);
+  });
+
+  it('header "name" → 30 ricette', () => {
+    expect(parseCsv(csv30('name,category,servings,ingredients,instructions,allergens'))).toHaveLength(30);
+  });
+
+  it('lista ingredienti "nome,quantità" (nessun ingrediente separato) → resta 1 ricetta', () => {
+    const rows = ['nome,quantità'];
+    for (let i = 1; i <= 5; i++) rows.push(`Farina ${i},500`);
+    expect(parseCsv(rows.join('\n'))).toHaveLength(1);
+  });
+});
+
 describe('inspectCsv', () => {
   it('header ambiguo (manca la quantità) → non confident, ma suggerisce ingrediente', () => {
     const insp = inspectCsv('Dolce,Ingrediente,Extra\nTiramisu,Mascarpone,vetro\nTiramisu,Uova,plastica');
