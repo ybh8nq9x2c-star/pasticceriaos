@@ -4,6 +4,7 @@
 // =============================================================================
 
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { requireSession, getFiscalProfile } from '@/modules/identity/service';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { FiscalProfileForm } from '@/components/settings/FiscalProfileForm';
@@ -101,6 +102,19 @@ export default async function SettingsPage() {
               ? 'l\'invio email automatico è configurato; l\'esito viene registrato nello storico stato di ogni ordine.'
               : 'l\'invio email automatico non è configurato: segnando un ordine come "inviato" la trasmissione resta manuale e lo storico stato lo riporta esplicitamente.'}
           </p>
+        </div>
+      </SectionCard>
+
+      {/* Cassa / POS */}
+      <SectionCard title="Cassa (POS)">
+        <div className="py-4 space-y-2">
+          <p className="text-sm text-ink-muted">
+            Collega i prodotti del registratore di cassa alle ricette: ogni scontrino emesso scarica
+            automaticamente il magazzino in base alla distinta base.
+          </p>
+          <Link href="/settings/pos" className="inline-block text-sm font-semibold text-primary hover:underline">
+            Gestisci mappature POS →
+          </Link>
         </div>
       </SectionCard>
     </div>

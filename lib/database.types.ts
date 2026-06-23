@@ -1219,6 +1219,8 @@ export interface Database {
           source: string;
           external_product_ref: string;
           recipe_id: string;
+          pos_item_name: string | null;
+          portions_per_unit: number;
           created_by: string | null;
           created_at: string;
         };
@@ -1228,10 +1230,14 @@ export interface Database {
           source: string;
           external_product_ref: string;
           recipe_id: string;
+          pos_item_name?: string | null;
+          portions_per_unit?: number;
           created_by?: string | null;
         };
         Update: {
           recipe_id?: string;
+          pos_item_name?: string | null;
+          portions_per_unit?: number;
         };
         Relationships: [
           {
@@ -1246,6 +1252,93 @@ export interface Database {
             columns: ['recipe_id'];
             isOneToOne: false;
             referencedRelation: 'recipes';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+
+      pos_configs: {
+        Row: {
+          id: string;
+          organization_id: string;
+          provider: string;
+          api_key_encrypted: string | null;
+          merchant_code: string | null;
+          store_id: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          provider: string;
+          api_key_encrypted?: string | null;
+          merchant_code?: string | null;
+          store_id?: string | null;
+          is_active?: boolean;
+        };
+        Update: {
+          api_key_encrypted?: string | null;
+          merchant_code?: string | null;
+          store_id?: string | null;
+          is_active?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'pos_configs_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+
+      pos_events: {
+        Row: {
+          id: string;
+          organization_id: string;
+          provider: string;
+          external_receipt_id: string;
+          raw_payload: Json;
+          status: string;
+          sale_id: string | null;
+          unlinked: Json | null;
+          error_text: string | null;
+          received_at: string;
+          processed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          provider: string;
+          external_receipt_id: string;
+          raw_payload: Json;
+          status?: string;
+          sale_id?: string | null;
+          unlinked?: Json | null;
+          error_text?: string | null;
+        };
+        Update: {
+          status?: string;
+          sale_id?: string | null;
+          unlinked?: Json | null;
+          error_text?: string | null;
+          processed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'pos_events_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'pos_events_sale_id_fkey';
+            columns: ['sale_id'];
+            isOneToOne: false;
+            referencedRelation: 'sales';
             referencedColumns: ['id'];
           }
         ];
@@ -1838,6 +1931,14 @@ export interface Database {
       };
       reverse_sale: {
         Args: { p_sale_id: string };
+        Returns: string;
+      };
+      ingest_sale_system: {
+        Args: { p_org: string; p_payload: Json };
+        Returns: string;
+      };
+      reverse_sale_system: {
+        Args: { p_org: string; p_sale_id: string };
         Returns: string;
       };
     };

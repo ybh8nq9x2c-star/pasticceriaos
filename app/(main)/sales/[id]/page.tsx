@@ -8,7 +8,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowRight, AlertTriangle } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { getSale, getSaleLines } from '@/modules/sales/service';
 import type { SaleLineStatus } from '@/modules/sales/bom';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
@@ -80,8 +80,11 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
                         </Link>
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 text-danger">
-                        <AlertTriangle className="size-3.5" aria-hidden="true" /> Nessuna ricetta collegata
+                      <span className="inline-flex flex-wrap items-center gap-2">
+                        <Badge variant="warning" size="sm">Prodotto non collegato</Badge>
+                        <Link href="/settings/pos" className="text-xs font-semibold text-primary hover:underline">
+                          Collega →
+                        </Link>
                       </span>
                     )}
                   </td>

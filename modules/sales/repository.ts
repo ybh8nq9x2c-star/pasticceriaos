@@ -6,13 +6,23 @@
 // org-scoped via RLS (passiamo comunque orgId esplicito, come gli altri moduli).
 // =============================================================================
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { mapSupabaseError } from '@/lib/errors';
-import type { UnitOfMeasure, Json } from '@/lib/database.types';
+import type { UnitOfMeasure, Json, Database } from '@/lib/database.types';
 import type { Bom } from './bom';
 import type { SaleView, SaleLineView, UnlinkedProduct } from './types';
 
 const norm = (s: string) => s.trim().toLowerCase();
+
+/**
+ * Client DB iniettabile. Default = client di SESSIONE (createClient, RLS attiva).
+ * Il bordo POS (webhook, NESSUNA sessione) inietta un client SERVICE-ROLE: bypassa
+ * RLS, ma tutte le query filtrano comunque `organization_id` ESPLICITO (isolamento
+ * tenant garantito a livello applicativo).
+ */
+export type SalesDb = SupabaseClient<Database>;
+const resolveDb = async (client?: SalesDb): Promise<SalesDb> => client ?? ((await createClient()) as unknown as SalesDb);
 
 export interface ResolveRef {
   externalProductRef: string;
@@ -31,8 +41,11 @@ export async function resolveRecipeIds(
   orgId: string,
   source: string,
   refs: ResolveRef[],
+  client?: SalesDb,
+  opts?: { nameFallback?: boolean },
 ): Promise<Map<number, string | null>> {
-  const supabase = await createClient();
+  const supabase = await resolveDb(client);
+  const nameFallback = opts?.nameFallback ?? true; // POS: false (mapping ESPLICITO obbligatorio)
 
   const { data: maps, error: mapErr } = await supabase
     .from('product_mappings')
@@ -42,19 +55,24 @@ export async function resolveRecipeIds(
   if (mapErr) throw mapSupabaseError(mapErr);
   const byRef = new Map((maps ?? []).map((m) => [norm(m.external_product_ref), m.recipe_id as string]));
 
-  const { data: recs, error: recErr } = await supabase
-    .from('recipes')
-    .select('id, name')
-    .eq('organization_id', orgId)
-    .eq('is_active', true);
-  if (recErr) throw mapSupabaseError(recErr);
-  const byName = new Map((recs ?? []).map((r) => [norm(r.name), r.id as string]));
+  let byName = new Map<string, string>();
+  if (nameFallback) {
+    const { data: recs, error: recErr } = await supabase
+      .from('recipes')
+      .select('id, name')
+      .eq('organization_id', orgId)
+      .eq('is_active', true);
+    if (recErr) throw mapSupabaseError(recErr);
+    byName = new Map((recs ?? []).map((r) => [norm(r.name), r.id as string]));
+  }
 
   const out = new Map<number, string | null>();
   refs.forEach((r, i) => {
     const explicit = r.recipeId ?? null;
     const viaMap = byRef.get(norm(r.externalProductRef)) ?? null;
-    const viaName = byName.get(norm(r.externalProductRef)) ?? byName.get(norm(r.productName)) ?? null;
+    const viaName = nameFallback
+      ? byName.get(norm(r.externalProductRef)) ?? byName.get(norm(r.productName)) ?? null
+      : null;
     out.set(i, explicit ?? viaMap ?? viaName ?? null);
   });
   return out;
@@ -66,9 +84,9 @@ export async function resolveRecipeIds(
  * inattiva o senza ingredienti viene restituita con items=[] → explodeLine la
  * tratta come no_bom (nessuna deduzione, eccezione registrata).
  */
-export async function loadBoms(orgId: string, recipeIds: string[]): Promise<Map<string, Bom>> {
+export async function loadBoms(orgId: string, recipeIds: string[], client?: SalesDb): Promise<Map<string, Bom>> {
   if (recipeIds.length === 0) return new Map();
-  const supabase = await createClient();
+  const supabase = await resolveDb(client);
 
   const { data, error } = await supabase
     .from('recipes')
@@ -107,19 +125,51 @@ export async function loadBoms(orgId: string, recipeIds: string[]): Promise<Map<
 
 // ── RPC atomiche ──────────────────────────────────────────────────────────────
 
-/** Inserimento atomico+idempotente. Ritorna l'id vendita (nuovo o esistente). */
-export async function ingestSaleRpc(payload: Json): Promise<string> {
-  const supabase = await createClient();
+/** Inserimento atomico+idempotente (sessione). Ritorna l'id vendita (nuovo o esistente). */
+export async function ingestSaleRpc(payload: Json, client?: SalesDb): Promise<string> {
+  const supabase = await resolveDb(client);
   const { data, error } = await supabase.rpc('ingest_sale', { p_payload: payload });
   if (error) throw mapSupabaseError(error);
   return data as string;
 }
 
+/** Variante org-esplicita, attore di SISTEMA (bordo POS, no sessione). */
+export async function ingestSaleSystemRpc(orgId: string, payload: Json, client: SalesDb): Promise<string> {
+  const { data, error } = await client.rpc('ingest_sale_system', { p_org: orgId, p_payload: payload });
+  if (error) throw mapSupabaseError(error);
+  return data as string;
+}
+
 /** Storno atomico (movimenti inversi). Idempotente lato DB (status guard). */
-export async function reverseSaleRpc(saleId: string): Promise<void> {
-  const supabase = await createClient();
+export async function reverseSaleRpc(saleId: string, client?: SalesDb): Promise<void> {
+  const supabase = await resolveDb(client);
   const { error } = await supabase.rpc('reverse_sale', { p_sale_id: saleId });
   if (error) throw mapSupabaseError(error);
+}
+
+/** Storno org-esplicito, attore di SISTEMA (bordo POS). Idempotente. */
+export async function reverseSaleSystemRpc(orgId: string, saleId: string, client: SalesDb): Promise<void> {
+  const { error } = await client.rpc('reverse_sale_system', { p_org: orgId, p_sale_id: saleId });
+  if (error) throw mapSupabaseError(error);
+}
+
+/** Cerca una vendita per chiave esterna (per lo storno di un void POS). null se assente. */
+export async function findSaleIdByExternal(
+  orgId: string,
+  source: string,
+  externalSaleId: string,
+  client?: SalesDb,
+): Promise<string | null> {
+  const supabase = await resolveDb(client);
+  const { data, error } = await supabase
+    .from('sales')
+    .select('id')
+    .eq('organization_id', orgId)
+    .eq('source', source)
+    .eq('external_sale_id', externalSaleId)
+    .maybeSingle();
+  if (error) throw mapSupabaseError(error);
+  return (data?.id as string) ?? null;
 }
 
 /** Crea/aggiorna il mapping POS→ricetta (risolve i "non collegati" futuri). */

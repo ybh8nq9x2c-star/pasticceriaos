@@ -34,18 +34,28 @@ export async function ingestSale(source: string, raw: unknown): Promise<IngestSu
   return ingestCanonicalSale(session.organizationId, sale);
 }
 
-/** Cuore dell'orchestrazione (separato per riuso/test futuri lato server). */
-export async function ingestCanonicalSale(orgId: string, sale: CanonicalSale): Promise<IngestSummary> {
+/**
+ * Cuore dell'orchestrazione. `opts.client` inietta un client DB (il bordo POS usa
+ * service-role, senza sessione); `opts.system` instrada sulla RPC org-esplicita
+ * `ingest_sale_system`. Default = percorso di sessione (RLS, ingest_sale).
+ */
+export async function ingestCanonicalSale(
+  orgId: string,
+  sale: CanonicalSale,
+  opts?: { client?: repo.SalesDb; system?: boolean; nameFallback?: boolean },
+): Promise<IngestSummary> {
   // 1) Risolvi ogni riga in una ricetta (mapping esplicito → tabella → nome).
   const resolved = await repo.resolveRecipeIds(
     orgId,
     sale.source,
     sale.lines.map((l) => ({ externalProductRef: l.externalProductRef, productName: l.productName, recipeId: l.recipeId })),
+    opts?.client,
+    { nameFallback: opts?.nameFallback },
   );
 
   // 2) Carica i BOM delle ricette risolte (una sola query).
   const recipeIds = [...new Set([...resolved.values()].filter((v): v is string => !!v))];
-  const boms = await repo.loadBoms(orgId, recipeIds);
+  const boms = await repo.loadBoms(orgId, recipeIds, opts?.client);
 
   // 3) Esplodi ogni riga (logica pura): movimenti + stato + eccezione.
   const exploded = sale.lines.map((line, i) => {
@@ -83,7 +93,9 @@ export async function ingestCanonicalSale(orgId: string, sale: CanonicalSale): P
   };
 
   // 5) Scrittura atomica + idempotente (ON CONFLICT impedisce doppia deduzione).
-  const saleId = await repo.ingestSaleRpc(payload as unknown as Json);
+  const saleId = opts?.system
+    ? await repo.ingestSaleSystemRpc(orgId, payload as unknown as Json, opts.client!)
+    : await repo.ingestSaleRpc(payload as unknown as Json, opts?.client);
 
   const linesDeducted = exploded.filter((e) => e.result.status === 'deducted').length;
   return {
@@ -102,6 +114,33 @@ export async function reverseSale(raw: unknown): Promise<{ saleId: string }> {
   const { saleId } = reverseSaleSchema.parse(raw);
   await repo.reverseSaleRpc(saleId);
   return { saleId };
+}
+
+// ── Percorso di SISTEMA (bordo POS: webhook, nessuna sessione) ────────────────
+// Stesso motore (risoluzione + esplosione BOM + RPC idempotente), ma org esplicita
+// e client service-role iniettato. Gli invarianti restano qui.
+
+export async function ingestSaleAsSystem(
+  orgId: string,
+  sale: CanonicalSale,
+  client: repo.SalesDb,
+): Promise<IngestSummary> {
+  // nameFallback FALSE: per il POS il collegamento prodotto→ricetta è SOLO via
+  // product_mappings esplicito (niente auto-link per nome ricetta).
+  return ingestCanonicalSale(orgId, sale, { client, system: true, nameFallback: false });
+}
+
+export async function reverseSaleAsSystem(orgId: string, saleId: string, client: repo.SalesDb): Promise<void> {
+  await repo.reverseSaleSystemRpc(orgId, saleId, client);
+}
+
+export async function findSaleIdForExternal(
+  orgId: string,
+  source: string,
+  externalSaleId: string,
+  client: repo.SalesDb,
+): Promise<string | null> {
+  return repo.findSaleIdByExternal(orgId, source, externalSaleId, client);
 }
 
 /**
