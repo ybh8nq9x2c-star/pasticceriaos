@@ -13,7 +13,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Badge } from '@/components/ui/Badge';
 import { STOCK_STATUS_BADGE } from '@/lib/status';
-import { Warehouse, Factory } from 'lucide-react';
+import { Warehouse, Factory, AlertTriangle } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Magazzino' };
 
@@ -24,6 +24,7 @@ export const metadata: Metadata = { title: 'Magazzino' };
 // Badge → <Badge variant={STOCK_STATUS_BADGE[...]}> (canonico). Qui restano solo
 // il colore della barra e l'eventuale tinta riga (non-badge) + la label.
 const STATUS_CFG = {
+  negative:     { bar: 'bg-danger',  label: 'Sotto zero', rowBg: 'bg-danger-light' },
   out_of_stock: { bar: 'bg-danger',  label: 'Esaurito', rowBg: 'bg-danger-light' },
   critical:     { bar: 'bg-warning', label: 'Critico',  rowBg: 'bg-warning-light/50' },
   low:          { bar: 'bg-primary', label: 'Basso',    rowBg: 'bg-primary-light' },
@@ -74,7 +75,11 @@ export default async function InventoryPage() {
   // che un magazzino mostrato (falsamente) vuoto.
   const levels: InventoryStockFull[] = await getInventoryStockFull();
 
-  const alertItems = levels.filter((l) => l.stockStatus !== 'ok');
+  // Giacenza NEGATIVA (sotto zero) = eccezione operativa distinta da "esaurito" (=0):
+  // una vendita/scarico ha superato il carico registrato. Va isolata e resa visibile
+  // (audit R5), non confusa con un semplice esaurimento.
+  const negativeItems = levels.filter((l) => l.currentQuantity < 0);
+  const alertItems = levels.filter((l) => l.stockStatus !== 'ok' && l.currentQuantity >= 0);
   const okItems    = levels.filter((l) => l.stockStatus === 'ok');
   const stockValue = levels.reduce((sum, l) => sum + (l.stockValue ?? 0), 0);
   // Coerenza catalogo↔magazzino: il catalogo mostra solo gli attivi. Qui restano
@@ -124,11 +129,14 @@ export default async function InventoryPage() {
             value: alertItems.length,
             color: alertItems.length > 0 ? 'text-danger' : 'text-success-strong',
           },
-          {
-            label: 'Esauriti',
-            value: levels.filter((l) => l.stockStatus === 'out_of_stock').length,
-            color: levels.some((l) => l.stockStatus === 'out_of_stock') ? 'text-danger' : 'text-ink',
-          },
+          // Quando c'è giacenza sotto zero la mostriamo qui (più urgente di "esaurito").
+          negativeItems.length > 0
+            ? { label: 'Sotto zero', value: negativeItems.length, color: 'text-danger' }
+            : {
+                label: 'Esauriti',
+                value: levels.filter((l) => l.stockStatus === 'out_of_stock').length,
+                color: levels.some((l) => l.stockStatus === 'out_of_stock') ? 'text-danger' : 'text-ink',
+              },
           {
             label: 'Valore stimato',
             value: stockValue > 0 ? formatCurrency(stockValue) : '—',
@@ -142,6 +150,22 @@ export default async function InventoryPage() {
         ))}
       </div>
 
+      {/* ── Banner giacenza sotto zero (eccezione operativa, audit R5) ──── */}
+      {negativeItems.length > 0 && (
+        <div className="rounded-2xl border border-danger-soft bg-danger-light p-4 flex items-start gap-3">
+          <AlertTriangle className="size-5 text-danger shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="font-semibold text-danger">
+              {negativeItems.length} ingredient{negativeItems.length === 1 ? 'e' : 'i'} sotto zero
+            </p>
+            <p className="text-sm text-ink-muted mt-0.5">
+              Il magazzino mostra una giacenza <strong>negativa</strong>: una vendita o uno scarico ha superato il
+              carico registrato. Conta la giacenza reale e <strong>rettifica</strong> per riallineare.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Empty state globale */}
       {levels.length === 0 && (
         <EmptyState
@@ -151,6 +175,59 @@ export default async function InventoryPage() {
           ctaHref="/ingredients/new"
           ctaLabel="Aggiungi ingrediente"
         />
+      )}
+
+      {/* ── Sezione SOTTO ZERO (eccezione urgente, in cima) ─────────────── */}
+      {negativeItems.length > 0 && (
+        <div>
+          <h2 className="font-semibold text-sm text-danger uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <AlertTriangle className="size-4" aria-hidden="true" /> Sotto zero ({negativeItems.length})
+          </h2>
+          <div className="bg-surface-2 rounded-2xl border border-danger-soft overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-bg border-b border-border">
+                <tr>
+                  <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Ingrediente</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Scorta</th>
+                  <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Soglia</th>
+                  <th className="text-center px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Stato</th>
+                  <th className="px-6 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-divider">
+                {negativeItems.map((lv) => (
+                  <tr key={lv.ingredientProductId} className="bg-danger-light">
+                    <td className="px-6 py-3.5">
+                      <p className="font-medium text-ink">
+                        {lv.ingredientName}
+                        {!lv.isActive && (
+                          <Badge variant="neutral" size="sm" className="ml-2 align-middle">Disattivato</Badge>
+                        )}
+                      </p>
+                      {lv.supplierName && <p className="text-xs text-ink-muted mt-0.5">{lv.supplierName}</p>}
+                    </td>
+                    <td className="px-6 py-3.5 text-right font-mono font-semibold text-danger">
+                      {formatQty(lv.currentQuantity)}{' '}
+                      <span className="text-xs font-sans">{UNIT_LABELS[lv.unit]}</span>
+                    </td>
+                    <td className="px-6 py-3.5 text-right font-mono text-ink-muted">
+                      {formatQty(lv.minThreshold)}{' '}
+                      <span className="text-xs font-sans">{UNIT_LABELS[lv.unit]}</span>
+                    </td>
+                    <td className="px-6 py-3.5 text-center">
+                      <Badge variant="danger" size="sm">Sotto zero</Badge>
+                    </td>
+                    <td className="px-6 py-3.5 text-right">
+                      <Link href="/inventory/movement" className="text-xs font-semibold text-primary hover:underline whitespace-nowrap">
+                        Conta e rettifica
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {/* ── Sezione alert ─────────────────────────────────────────────── */}
