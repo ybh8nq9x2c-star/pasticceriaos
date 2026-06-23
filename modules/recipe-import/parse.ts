@@ -106,8 +106,10 @@ export function parseQuantity(raw: string | null | undefined): number | null {
 
 const LIST_PREFIX = /^\s*(?:[-*•·–—]|\d+[.)])\s*/;
 // QTY riconosce: intero/decimale, frazione "1/2", numero misto "1 1/2",
-// frazione unicode "½" e intero+unicode "1½".
-const QTY = `(\\d+\\s*[${UNI_FRAC}]|[${UNI_FRAC}]|(?:\\d+\\s+)?\\d+(?:[.,]\\d+)?(?:\\s*/\\s*\\d+)?)`;
+// frazione unicode "½" e intero+unicode "1½". Il prefisso intero del numero misto
+// è legato ALLA frazione ("1 1/2"): senza, un numero nel nome ("Farina 00 500 g")
+// non viene inghiottito dalla quantità (il backtracking sceglie l'ultimo numero).
+const QTY = `(\\d+\\s*[${UNI_FRAC}]|[${UNI_FRAC}]|\\d+\\s+\\d+\\s*/\\s*\\d+|\\d+(?:[.,]\\d+)?(?:\\s*/\\s*\\d+)?)`;
 
 /**
  * Riconosce una riga ingrediente. Ritorna name/quantity/unit, oppure null se la
@@ -564,12 +566,17 @@ function buildRecipes(dataRows: string[][], idx: ColIndex): ParsedRecipe[] {
     }
 
     if (pieces.length === 1) {
-      // Singolo ingrediente: comportamento storico (qty/unit dalle colonne separate).
+      // Singolo ingrediente. Se C'È una colonna quantità → modalità colonnare
+      // storica (qty/unit dalle colonne, nome = cella intera, invariato). Se NON
+      // c'è → qty/unit possono essere EMBEDDED nella cella ("Savoiardi 400 g",
+      // quantity-last): le estraiamo con parseIngredientLine così non restano nel nome.
+      const cell = pieces[0];
+      const embedded = idx.quantity < 0 ? parseIngredientLine(cell) : null;
       recipe.ingredients.push({
         rawText: row.join(' | '),
-        name: cleanName(pieces[0]),
-        quantity: idx.quantity >= 0 ? parseQuantity(row[idx.quantity]) : null,
-        unit: idx.unit >= 0 ? normalizeUnit(row[idx.unit]) : null,
+        name: embedded ? embedded.name : cleanName(cell),
+        quantity: idx.quantity >= 0 ? parseQuantity(row[idx.quantity]) : embedded?.quantity ?? null,
+        unit: idx.unit >= 0 ? normalizeUnit(row[idx.unit]) : embedded?.unit ?? null,
         matchedProductId: null,
         matchedProductName: null,
         suggestions: [],
