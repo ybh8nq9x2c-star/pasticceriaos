@@ -127,6 +127,11 @@ export async function getSaleLines(saleId: string) {
   return repo.listSaleLines(session.organizationId, saleId);
 }
 
+export async function getSale(saleId: string) {
+  const session = await requireSession();
+  return repo.getSale(session.organizationId, saleId);
+}
+
 export async function listUnlinkedProducts() {
   const session = await requireSession();
   return repo.listUnlinkedProducts(session.organizationId);

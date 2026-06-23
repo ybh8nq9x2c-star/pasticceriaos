@@ -143,7 +143,9 @@ export default async function SalesPage() {
                   return (
                     <tr key={s.id} className="bg-surface-2">
                       <td className="px-4 py-3">
-                        <span className="font-mono text-ink">{s.externalSaleId}</span>
+                        <Link href={`/sales/${s.id}`} className="font-mono text-primary hover:underline">
+                          {s.externalSaleId}
+                        </Link>
                         <span className="block text-xs text-ink-faint">{s.source}</span>
                       </td>
                       <td className="px-4 py-3 text-ink-muted hidden sm:table-cell">

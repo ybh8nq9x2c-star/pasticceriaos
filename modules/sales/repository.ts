@@ -179,7 +179,7 @@ export async function listSaleLines(orgId: string, saleId: string): Promise<Sale
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('sale_lines')
-    .select('id, external_product_ref, product_name_snapshot, recipe_id, quantity, status, exception, sort_order')
+    .select('id, external_product_ref, product_name_snapshot, recipe_id, quantity, status, exception, sort_order, recipes(name)')
     .eq('organization_id', orgId)
     .eq('sale_id', saleId)
     .order('sort_order');
@@ -193,17 +193,51 @@ export async function listSaleLines(orgId: string, saleId: string): Promise<Sale
       quantity: number;
       status: SaleLineView['status'];
       exception: string | null;
+      recipes: { name: string } | { name: string }[] | null;
     };
+    const recipeName = Array.isArray(row.recipes) ? row.recipes[0]?.name ?? null : row.recipes?.name ?? null;
     return {
       id: row.id,
       externalProductRef: row.external_product_ref,
       productName: row.product_name_snapshot,
       recipeId: row.recipe_id,
+      recipeName,
       quantity: Number(row.quantity),
       status: row.status,
       exception: row.exception,
     };
   });
+}
+
+/** Header di una singola vendita (per la pagina di dettaglio). null se non trovata. */
+export async function getSale(orgId: string, saleId: string): Promise<SaleView | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('sales')
+    .select('id, external_sale_id, source, sold_at, status, total_amount, sale_lines(count)')
+    .eq('organization_id', orgId)
+    .eq('id', saleId)
+    .maybeSingle();
+  if (error) throw mapSupabaseError(error);
+  if (!data) return null;
+  const row = data as unknown as {
+    id: string;
+    external_sale_id: string;
+    source: string;
+    sold_at: string;
+    status: string;
+    total_amount: number | null;
+    sale_lines: { count: number }[];
+  };
+  return {
+    id: row.id,
+    externalSaleId: row.external_sale_id,
+    source: row.source,
+    soldAt: row.sold_at,
+    status: row.status,
+    totalAmount: row.total_amount,
+    lineCount: row.sale_lines?.[0]?.count ?? 0,
+  };
 }
 
 /** Prodotti venduti ma non collegati a una ricetta (alert admin, deduplicati). */

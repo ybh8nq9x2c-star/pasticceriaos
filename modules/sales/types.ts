@@ -52,6 +52,7 @@ export interface SaleLineView {
   externalProductRef: string;
   productName: string;
   recipeId: string | null;
+  recipeName: string | null; // ricetta (BOM) da cui è stato dedotto — null = non collegato
   quantity: number;
   status: SaleLineStatus;
   exception: string | null;
