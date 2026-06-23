@@ -8,7 +8,7 @@
 // =============================================================================
 
 import { requireOrgId } from '@/modules/identity/service';
-import { listIngredients, createIngredient, createRecipe } from '@/modules/catalog/service';
+import { listIngredients, listRecipes, createIngredient, createRecipe } from '@/modules/catalog/service';
 import { extractPdfText } from '@/modules/goods-receipts/pdf-text';
 import {
   AUTO_MATCH_THRESHOLD,
@@ -22,6 +22,7 @@ import { parseCsv, parseCsvWithMapping, parseText, inspectCsv } from './parse';
 import { isAiImportAvailable, aiUnderstandImport, aiNormalizeRecipes } from './ai/provider';
 import { adaptAiRecipes, adaptAiMapping } from './ai/adapter';
 import { enrichBaselineWithAiChunks } from './ai/enrich';
+import { partitionByDuplicateName } from './dedupe';
 import { importRecipesSchema, type ImportRecipesInput } from './schemas';
 import type {
   AnalyzeResult,
@@ -185,7 +186,16 @@ export async function importRecipes(raw: unknown): Promise<ImportSummary> {
   // Dedup degli ingredienti creati in questo batch (stesso nome → un solo prodotto).
   const createdByName = new Map<string, string>();
 
-  for (const recipe of input.recipes) {
+  // IDEMPOTENZA (R6): scarta i doppioni (re-import o nomi rinominati per accenti/
+  // maiuscole/spazi) confrontando con le ricette ESISTENTI (attive E disattivate:
+  // il UNIQUE(org,name) vale comunque) e con i nomi già visti nel batch.
+  const existingRecipes = await listRecipes(false);
+  const { toCreate, duplicates } = partitionByDuplicateName(input.recipes, existingRecipes.map((r) => r.name));
+  for (const dup of duplicates) {
+    summary.skipped.push({ name: dup.name, reason: 'Già presente: saltata per non creare un doppione.' });
+  }
+
+  for (const recipe of toCreate) {
     try {
       const resolved: { ingredientProductId: string; quantity: string; unit: (typeof recipe.ingredients)[number]['unit']; sortOrder: number }[] = [];
 
