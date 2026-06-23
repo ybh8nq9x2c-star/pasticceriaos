@@ -108,6 +108,31 @@ describe('storno (reverse)', () => {
   });
 });
 
+// INVARIANTE UNITÀ CANONICA (audit, rischio #1): la deduzione vendita DEVE
+// emettere i movimenti SOLO nell'unità di MAGAZZINO (stockUnit). È la proprietà
+// che mantiene le vendite coerenti con inventory_levels (il trigger somma i delta
+// SENZA conversione: un movimento in un'unità diversa corromperebbe il saldo).
+describe('invariante: i movimenti escono solo in stockUnit', () => {
+  const mixed: Bom = {
+    basePortions: 2,
+    items: [
+      { ingredientProductId: 'farina', quantity: 1000, unit: 'g', stockUnit: 'kg' }, // g→kg
+      { ingredientProductId: 'latte', quantity: 500, unit: 'ml', stockUnit: 'l' }, // ml→l
+      { ingredientProductId: 'zucchero', quantity: 200, unit: 'g', stockUnit: 'g' }, // identità
+    ],
+  };
+  it('ogni movimento usa l’unità di magazzino dell’ingrediente', () => {
+    const r = explodeLine(mixed, 4);
+    expect(r.movements.map((m) => [m.ingredientProductId, m.unit])).toEqual([
+      ['farina', 'kg'],
+      ['latte', 'l'],
+      ['zucchero', 'g'],
+    ]);
+    // magnitudini fisicamente corrette dopo conversione (per 4 unità, base 2):
+    expect(r.movements.map((m) => m.quantityDelta)).toEqual([-2, -1, -400]);
+  });
+});
+
 describe('stato vendita aggregato', () => {
   it('tutto dedotto → processed', () => {
     expect(aggregateSaleStatus(['deducted', 'deducted'])).toBe('processed');

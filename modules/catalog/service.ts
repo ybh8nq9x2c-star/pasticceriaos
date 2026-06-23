@@ -5,7 +5,10 @@
 // =============================================================================
 
 import { requireOrgId } from '@/modules/identity/service';
-import { getErrorMessage, NotFoundError } from '@/lib/errors';
+import { getErrorMessage, NotFoundError, BusinessRuleError } from '@/lib/errors';
+import { createClient } from '@/lib/supabase/server';
+import { isUnitConvertible } from '@/lib/units';
+import type { UnitOfMeasure } from '@/lib/database.types';
 import * as repo from './repository';
 import {
   createSupplierSchema,
@@ -108,14 +111,55 @@ export async function getRecipe(id: string): Promise<Recipe> {
   return repo.getRecipeById(id);
 }
 
+/**
+ * Valida che l'unità di OGNI ingrediente della ricetta sia CONVERTIBILE all'unità
+ * di magazzino del prodotto (ingredient_products.unit). Senza questo, una ricetta
+ * con grandezza incoerente (es. 'g' per un prodotto venduto a 'pz') produrrebbe
+ * deduzioni magazzino errate o silenziosamente saltate (audit R1). g↔kg / ml↔l
+ * sono ammessi (convertiti a valle); cross-grandezza è rifiutato qui, alla fonte.
+ */
+async function assertIngredientUnitsConvertible(
+  ingredients: { ingredientProductId: string; unit: UnitOfMeasure }[],
+): Promise<void> {
+  const ids = [...new Set(ingredients.map((i) => i.ingredientProductId))];
+  if (ids.length === 0) return;
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('ingredient_products').select('id, name, unit').in('id', ids);
+  if (error) {
+    const { mapSupabaseError } = await import('@/lib/errors');
+    throw mapSupabaseError(error);
+  }
+  const byId = new Map((data ?? []).map((p) => [p.id as string, { name: p.name as string, unit: p.unit as UnitOfMeasure }]));
+  const bad: string[] = [];
+  for (const ing of ingredients) {
+    const prod = byId.get(ing.ingredientProductId);
+    if (prod && !isUnitConvertible(ing.unit, prod.unit)) {
+      bad.push(`${prod.name} (ricetta in ${ing.unit}, magazzino in ${prod.unit})`);
+    }
+  }
+  if (bad.length > 0) {
+    throw new BusinessRuleError(
+      `Unità non compatibile con il magazzino per: ${bad.join('; ')}. ` +
+        `Usa la stessa grandezza del prodotto (peso, volume o pezzi): g/kg per i pesi, ml/l per i liquidi.`,
+    );
+  }
+}
+
 export async function createRecipe(raw: unknown): Promise<Recipe> {
   const orgId = await requireOrgId();
   const input: CreateRecipeInput = createRecipeSchema.parse(raw);
+  await assertIngredientUnitsConvertible(input.ingredients);
   return repo.insertRecipe(orgId, input);
 }
 
 export async function updateRecipe(id: string, raw: unknown): Promise<Recipe> {
   const input: UpdateRecipeInput = updateRecipeSchema.parse(raw);
+
+  // Se si sostituiscono gli ingredienti, valida la convertibilità unità PRIMA di
+  // toccare il DB (niente ricette con unità incoerente → niente deduzioni errate).
+  if (input.ingredients && input.ingredients.length > 0) {
+    await assertIngredientUnitsConvertible(input.ingredients);
+  }
 
   // Aggiorna header ricetta
   await repo.patchRecipe(id, {

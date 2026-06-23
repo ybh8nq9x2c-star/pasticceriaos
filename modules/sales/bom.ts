@@ -11,6 +11,7 @@
 // =============================================================================
 
 import type { UnitOfMeasure } from '@/lib/database.types';
+import { unitConversionFactor } from '@/lib/units';
 
 export type SaleLineStatus = 'deducted' | 'unlinked' | 'no_bom' | 'unit_mismatch';
 export type SaleStatus = 'processed' | 'partially_linked' | 'unlinked';
@@ -41,17 +42,11 @@ export interface LineExplosion {
 }
 
 /**
- * Fattore di conversione metrica — mirror ESATTO della funzione DB
- * unit_conversion_factor (021): g↔kg, ml↔l, identità. `null` = non convertibile.
+ * Fattore di conversione metrica. Delega a `lib/units` (unica fonte di verità,
+ * mirror della funzione DB unit_conversion_factor 021). Mantenuto come re-export
+ * per i consumatori storici del modulo sales.
  */
-export function convertFactor(from: UnitOfMeasure, to: UnitOfMeasure): number | null {
-  if (from === to) return 1;
-  if (from === 'g' && to === 'kg') return 0.001;
-  if (from === 'kg' && to === 'g') return 1000;
-  if (from === 'ml' && to === 'l') return 0.001;
-  if (from === 'l' && to === 'ml') return 1000;
-  return null;
-}
+export const convertFactor = unitConversionFactor;
 
 const round4 = (n: number) => Math.round(n * 10000) / 10000; // NUMERIC(10,4)
 
