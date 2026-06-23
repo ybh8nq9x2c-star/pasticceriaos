@@ -10,7 +10,7 @@
 // =============================================================================
 
 import type { ParsedRecipe, ParsedIngredientLine, ResolvedMapping } from '../types';
-import { AI_UNITS, type AiImportResult } from './contract';
+import { AI_UNITS, type AiImportResult, type AiIngredient, type AiNormalizedRecipe } from './contract';
 
 /** Sopra questa confidenza pre-compiliamo il valore; sotto, lo segnaliamo. */
 const ACCEPT = 0.6;
@@ -20,6 +20,29 @@ const CANON = new Set<string>(AI_UNITS);
 function acceptedUnit(unit: string | null, conf: number): ParsedIngredientLine['unit'] {
   if (!unit || conf < ACCEPT) return null;
   return CANON.has(unit) ? (unit as ParsedIngredientLine['unit']) : null;
+}
+
+/**
+ * Una riga ingrediente AI → ParsedIngredientLine (preview-layer). Niente
+ * invenzioni: valori sotto soglia restano null + warning. Condiviso da
+ * adaptAiRecipes e dall'arricchimento per-chunk.
+ */
+function adaptAiIngredient(ing: AiIngredient, warnings: string[]): ParsedIngredientLine {
+  const ingName = ing.name?.trim() || ing.rawText?.trim() || '';
+  if (ingName && ing.nameConfidence < ACCEPT) warnings.push(`Ingrediente incerto ("${ingName}"): verifica il nome.`);
+  const quantity = ing.quantity != null && ing.quantityConfidence >= ACCEPT ? ing.quantity : null;
+  if (ing.quantity != null && ing.quantityConfidence < ACCEPT) warnings.push(`Quantità incerta per "${ingName}": inseriscila a mano.`);
+  const unit = acceptedUnit(ing.unit, ing.unitConfidence);
+  if (ing.unit && !unit) warnings.push(`Unità ambigua per "${ingName}": confermala.`);
+  return {
+    rawText: ing.rawText?.trim() || ingName,
+    name: ingName,
+    quantity,
+    unit,
+    matchedProductId: null,
+    matchedProductName: null,
+    suggestions: [],
+  };
 }
 
 /**
@@ -42,29 +65,7 @@ export function adaptAiRecipes(ai: AiImportResult): ParsedRecipe[] {
       }
     }
 
-    const ingredients: ParsedIngredientLine[] = r.ingredients.map((ing) => {
-      const ingName = ing.name?.trim() || ing.rawText?.trim() || '';
-      if (ingName && ing.nameConfidence < ACCEPT) {
-        warnings.push(`Ingrediente incerto ("${ingName}"): verifica il nome.`);
-      }
-      const quantity = ing.quantity != null && ing.quantityConfidence >= ACCEPT ? ing.quantity : null;
-      if (ing.quantity != null && ing.quantityConfidence < ACCEPT) {
-        warnings.push(`Quantità incerta per "${ingName}": inseriscila a mano.`);
-      }
-      const unit = acceptedUnit(ing.unit, ing.unitConfidence);
-      if (ing.unit && !unit) {
-        warnings.push(`Unità ambigua per "${ingName}": confermala.`);
-      }
-      return {
-        rawText: ing.rawText?.trim() || ingName,
-        name: ingName,
-        quantity,
-        unit,
-        matchedProductId: null,
-        matchedProductName: null,
-        suggestions: [],
-      };
-    });
+    const ingredients: ParsedIngredientLine[] = r.ingredients.map((ing) => adaptAiIngredient(ing, warnings));
 
     return {
       name,
@@ -142,12 +143,79 @@ export function enrichWithAi(baseline: ParsedRecipe[], aiNormalized: ParsedRecip
 }
 
 /**
- * Merge COPERTURA-FIRST. Un set AI più piccolo (tipico dei CSV: l'AI vede solo i
- * campioni) NON sostituisce mai un baseline più grande. Se l'AI copre ≥ del
- * baseline → set AI (completo + normalizzato); altrimenti baseline (copertura
- * piena) + arricchimento per-ricetta. Mai "4 buone, 26 perse".
+ * @deprecated Merge a livello di INSIEME: sostituiva il baseline quando l'AI
+ * restituiva ≥ ricette. Era il vettore del collasso 50→6 (un output AI troncato
+ * a 6 rimpiazzava l'intero baseline). Sostituito da `enrichByIndex` (per-indice,
+ * non sostituisce mai). Mantenuto solo per i test di unità esistenti.
  */
 export function mergeAiIntoBaseline(baseline: ParsedRecipe[], aiNormalized: ParsedRecipe[]): ParsedRecipe[] {
   if (aiNormalized.length >= baseline.length) return aiNormalized.length > 0 ? aiNormalized : baseline;
   return enrichWithAi(baseline, aiNormalized);
+}
+
+// ── Arricchimento PER-INDICE (coverage-first) ─────────────────────────────────
+// L'AI può solo AGGIUNGERE informazione a una ricetta baseline esistente: riempie
+// i buchi (quantità/unità mancanti), pulisce un nome con numeri dentro, completa
+// le porzioni. NON rimuove ricette, NON riduce le righe ingrediente, NON
+// sovrascrive un valore già estratto in modo affidabile dal parser.
+
+const GAP_WARNING_PREFIXES = ['Alcune quantità', 'Alcune unità', 'Da confermare', 'Porzioni non'];
+
+function gapWarnings(lines: ParsedIngredientLine[]): string[] {
+  const w: string[] = [];
+  if (lines.some((l) => l.quantity === null)) w.push('Alcune quantità non sono state riconosciute.');
+  if (lines.some((l) => l.unit === null)) w.push('Alcune unità sono ambigue o mancanti: confermale.');
+  return w;
+}
+
+/** Arricchisce UNA ricetta baseline con la normalizzazione AI corrispondente. */
+export function enrichRecipeByLine(base: ParsedRecipe, ai: AiNormalizedRecipe): ParsedRecipe {
+  const aiWarnings: string[] = [...(ai.ambiguityFlags ?? [])];
+  const adapted = ai.ingredients.map((ing) => adaptAiIngredient(ing, aiWarnings));
+
+  const ingredients = base.ingredients.map((bl, j) => {
+    const al = adapted[j];
+    if (!al) return bl; // l'AI ha meno righe → tieni la riga baseline (niente perdita)
+    const cleanerName = al.name && al.name.length > 1 && /\d/.test(bl.name) ? al.name : bl.name;
+    return {
+      ...bl,
+      name: bl.name ? cleanerName : al.name || bl.name,
+      quantity: bl.quantity ?? al.quantity, // riempi i buchi, non sovrascrivere
+      unit: bl.unit ?? al.unit,
+    };
+  });
+
+  const portions = base.basePortions ?? ai.portions ?? null;
+  const kept = base.warnings.filter((w) => !GAP_WARNING_PREFIXES.some((p) => w.startsWith(p)));
+  const warnings = [...new Set([...kept, ...gapWarnings(ingredients), ...aiWarnings])];
+  return { ...base, basePortions: portions, ingredients, warnings };
+}
+
+/** Ricetta il cui chunk AI è fallito: resta intatta, ma flaggata "da confermare". */
+export function markUnnormalized(base: ParsedRecipe): ParsedRecipe {
+  const hasGap = base.ingredients.some((l) => l.quantity === null || l.unit === null);
+  if (!hasGap || base.warnings.some((w) => w.startsWith('Da confermare'))) return base;
+  return {
+    ...base,
+    warnings: [...base.warnings, 'Da confermare: normalizzazione automatica non riuscita, controlla quantità e unità.'],
+  };
+}
+
+/**
+ * Merge COVERAGE-FIRST per-indice. `byIndex` = normalizzazioni AI valide, chiave
+ * = indice baseline. `failed` = indici i cui chunk sono falliti (→ "da
+ * confermare"). GARANZIA: output.length === baseline.length, nessuna ricetta
+ * persa, qualunque cosa l'AI restituisca (parziale, vuota, fuori ordine).
+ */
+export function enrichByIndex(
+  baseline: ParsedRecipe[],
+  byIndex: Map<number, AiNormalizedRecipe>,
+  failed: ReadonlySet<number> = new Set(),
+): ParsedRecipe[] {
+  return baseline.map((r, i) => {
+    const ai = byIndex.get(i);
+    if (ai) return enrichRecipeByLine(r, ai);
+    if (failed.has(i)) return markUnnormalized(r);
+    return r;
+  });
 }

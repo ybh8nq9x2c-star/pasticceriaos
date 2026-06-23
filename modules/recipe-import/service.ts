@@ -19,8 +19,9 @@ import {
 } from '@/modules/goods-receipts/matching';
 import { BusinessRuleError, getErrorMessage } from '@/lib/errors';
 import { parseCsv, parseCsvWithMapping, parseText, inspectCsv } from './parse';
-import { isAiImportAvailable, aiUnderstandImport, aiProviderDiag } from './ai/provider';
-import { adaptAiRecipes, adaptAiMapping, mergeAiIntoBaseline } from './ai/adapter';
+import { isAiImportAvailable, aiUnderstandImport, aiNormalizeRecipes, aiProviderDiag } from './ai/provider';
+import { adaptAiRecipes, adaptAiMapping } from './ai/adapter';
+import { enrichBaselineWithAiChunks } from './ai/enrich';
 import { importRecipesSchema, type ImportRecipesInput } from './schemas';
 import type {
   AnalyzeResult,
@@ -111,55 +112,65 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
     '| parse produced recipes:', recipes.length,
   );
 
-  // ── AI-assistito ────────────────────────────────────────────────────────────
-  // L'AI, se configurata, è il motore di comprensione PRIMARIO e gira a OGNI
-  // analisi — non solo come rescue quando il parser deterministico trova 0 ricette.
-  // Il deterministico resta il FALLBACK: AI non configurata, errore/timeout, o
-  // output vuoto. Output sempre preview-layer, mai auto-confermato.
+  // ── AI-assistito (COVERAGE-FIRST) ─────────────────────────────────────────────
+  // PRINCIPIO: il baseline DETERMINISTICO stabilisce QUANTE/QUALI ricette esistono
+  // (ancora di copertura). L'AI NON estrae più l'intero file in un'unica risposta
+  // (era la causa del troncamento → collasso 50→6): NORMALIZZA il baseline in
+  // piccoli CHUNK, con merge PER-INDICE. Risultato AI parziale/fallito → quelle
+  // ricette restano baseline. final.length === baseline.length, sempre.
   const willInvokeAi = willTryAi && sourceText.trim() !== '' && !args.mapping;
   console.info('[ai-diag] willTryAi:', willTryAi, '| AI invoked:', willInvokeAi ? 'yes' : 'no'); // TEMP DIAGNOSTIC
   if (willInvokeAi) {
-    const deterministic = recipes; // fallback se l'AI non produce nulla
-    const ai = await aiUnderstandImport({
-      kind: args.kind,
-      text: args.kind === 'csv' ? undefined : sourceText,
-      columns: args.kind === 'csv' ? inspectCsv(sourceText).columns.map((c) => ({ header: c.header, samples: c.sample })) : undefined,
-      catalogNames: catalog.map((c) => c.name),
-    });
-    if (ai) {
-      // Candidati AI NORMALIZZATI (name/qty/unit separati dal modello).
-      const aiNormalized = adaptAiRecipes(ai);
-      // BASELINE = COPERTURA massima. Per CSV la mappatura scala a TUTTO il file.
-      let base = deterministic;
-      let mappedCount = 0;
-      if (args.kind === 'csv') {
-        const mapping = adaptAiMapping(ai);
-        const mapped = mapping ? parseCsvWithMapping(sourceText, mapping.fields, mapping.hasHeader) : [];
-        mappedCount = mapped.length;
-        if (mapped.length > base.length) base = mapped;
-      }
-      // COPERTURA PRIMA: un set AI più piccolo (l'AI vede solo i campioni del CSV)
-      // NON sostituisce il baseline → lo ARRICCHISCE per-ricetta. Evita "4 buone,
-      // 26 perse". Se l'AI copre ≥ del baseline (es. testo) → vince il set AI.
-      const merged = mergeAiIntoBaseline(base, aiNormalized);
-      recipes = merged.length > 0 ? merged : deterministic;
+    let baseline = recipes; // deterministico = copertura piena
 
-      // TEMP DIAGNOSTIC — conteggi + 1 ricetta/3 ingredienti, niente payload/segreti.
-      const sample3 = (rs: ParsedRecipe[]) =>
-        (rs[0]?.ingredients ?? []).slice(0, 3).map((l) => `${l.name}|q=${l.quantity ?? '∅'}|u=${l.unit ?? '∅'}`);
-      const names5 = (rs: ParsedRecipe[]) => rs.slice(0, 5).map((r) => r.name);
-      console.info(
-        '[ai-diag] counts | deterministic:', deterministic.length,
-        '| ai-validated:', ai.recipes.length,
-        '| ai-adapted:', aiNormalized.length,
-        '| csv-mapped:', mappedCount,
-        '| baseline:', base.length,
-        '| final preview:', recipes.length,
-      );
-      console.info('[ai-diag] names | det:', names5(deterministic), '| base:', names5(base), '| final:', names5(recipes));
-      console.info('[ai-diag] r0 ingredients:', sample3(recipes));
+    // CSV: l'AI propone SOLO la mappatura colonne (payload piccolo: header+campioni)
+    // → ri-parsa TUTTO il file con quella mappatura = copertura piena. Niente più
+    // estrazione whole-file del modello.
+    if (args.kind === 'csv') {
+      const ai = await aiUnderstandImport({
+        kind: 'csv',
+        columns: inspectCsv(sourceText).columns.map((c) => ({ header: c.header, samples: c.sample })),
+        catalogNames: catalog.map((c) => c.name),
+      });
+      const mapping = ai ? adaptAiMapping(ai) : null;
+      const mapped = mapping ? parseCsvWithMapping(sourceText, mapping.fields, mapping.hasHeader) : [];
+      if (mapped.length > baseline.length) baseline = mapped;
+      console.info('[ai-diag] csv-mapping | mapped:', mapped.length, '| baseline:', baseline.length); // TEMP
     }
-    // ai === null (errore/timeout/non conforme) → resta il deterministico.
+
+    if (baseline.length === 0) {
+      // Nessun baseline da proteggere → estrazione AI diretta (può SOLO aggiungere
+      // copertura, non toglierne). Unico caso in cui l'AI estrae al posto del parser.
+      const ai = await aiUnderstandImport({
+        kind: args.kind,
+        text: args.kind === 'csv' ? undefined : sourceText,
+        columns: args.kind === 'csv' ? inspectCsv(sourceText).columns.map((c) => ({ header: c.header, samples: c.sample })) : undefined,
+        catalogNames: catalog.map((c) => c.name),
+      });
+      recipes = ai ? adaptAiRecipes(ai) : baseline;
+      console.info('[ai-diag] empty-baseline rescue | recipes:', recipes.length); // TEMP
+    } else {
+      // ARRICCHIMENTO COVERAGE-FIRST: chunk + merge per-indice. Mai meno del baseline.
+      const { recipes: enriched, diag } = await enrichBaselineWithAiChunks(baseline, aiNormalizeRecipes);
+      recipes = enriched;
+      // ── TEMP OBSERVABILITY (rimuovere dopo la conferma) ───────────────────────
+      console.info(
+        '[ai-diag] coverage |',
+        'baseline:', diag.baselineCount,
+        '| chunks:', diag.chunkCount,
+        '| chunkSizes:', JSON.stringify(diag.chunkSizes),
+        '| chunkOk:', `${diag.chunkResults.filter((c) => c.ok).length}/${diag.chunkCount}`,
+        '| validated:', diag.chunkResults.reduce((n, c) => n + c.validated, 0),
+        '| enriched:', diag.enrichedCount,
+        '| failed:', diag.failedCount,
+        '| final:', diag.finalCount,
+        '| dropped:', diag.droppedCount,
+      );
+      if (diag.droppedCount !== 0) {
+        console.error('[ai-diag] INVARIANT VIOLATION: dropped', diag.droppedCount, 'recipes'); // non deve mai accadere
+      }
+    }
+
     if (recipes.length === 0) {
       warnings.push('Non sono riuscito a leggere le ricette in questo file. Prova a incollare il testo, oppure (se è un foglio) salvalo come CSV.');
     }

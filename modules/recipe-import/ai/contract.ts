@@ -148,5 +148,114 @@ export const SUBMIT_RECIPES_INPUT_SCHEMA = {
   required: ['recipes', 'overallConfidence'],
 } as const;
 
+// ── Normalizzazione PER-CHUNK (coverage-first) ────────────────────────────────
+// Il baseline deterministico stabilisce QUALI e QUANTE ricette esistono (ancora
+// di copertura). L'AVENTE l'AI le NORMALIZZA in piccoli chunk: input = righe
+// grezze di poche ricette, output = ingredienti splittati name/qty/unit. Ogni
+// ricetta porta un `index` STABILE (echo dell'input): il merge è per-indice, così
+// un risultato parziale o fuori ordine non può MAI far sparire una ricetta.
+
+export interface AiNormalizeRecipeInput {
+  index: number; // chiave stabile: l'AI deve ri-emetterla identica
+  name: string;
+  rawLines: string[]; // righe ingrediente grezze viste dal parser
+}
+
+export interface AiNormalizeInput {
+  recipes: AiNormalizeRecipeInput[];
+}
+
+const aiNormalizedRecipeSchema = z.object({
+  index: z.number().int(), // STABLE KEY
+  name: z.string().nullable().default(null),
+  nameConfidence: confidence,
+  portions: z.number().int().positive().nullable().catch(null),
+  ingredients: z.array(aiIngredientSchema).default([]),
+  ambiguityFlags: z.array(z.string()).default([]),
+});
+
+export const aiNormalizeResultSchema = z.object({
+  recipes: z.array(aiNormalizedRecipeSchema).default([]),
+});
+
+export type AiNormalizeResult = z.infer<typeof aiNormalizeResultSchema>;
+export type AiNormalizedRecipe = z.infer<typeof aiNormalizedRecipeSchema>;
+
+/** Gemini responseSchema del chunk (piccolo → output corto, niente troncamento). */
+export const GEMINI_NORMALIZE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    recipes: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          index: { type: 'INTEGER' },
+          name: { type: 'STRING', nullable: true },
+          nameConfidence: { type: 'NUMBER' },
+          portions: { type: 'INTEGER', nullable: true },
+          ambiguityFlags: { type: 'ARRAY', items: { type: 'STRING' } },
+          ingredients: {
+            type: 'ARRAY',
+            items: {
+              type: 'OBJECT',
+              properties: {
+                rawText: { type: 'STRING' },
+                name: { type: 'STRING', nullable: true },
+                quantity: { type: 'NUMBER', nullable: true },
+                unit: { type: 'STRING', nullable: true },
+                nameConfidence: { type: 'NUMBER' },
+                quantityConfidence: { type: 'NUMBER' },
+                unitConfidence: { type: 'NUMBER' },
+              },
+              required: ['name', 'quantity', 'unit', 'nameConfidence', 'quantityConfidence', 'unitConfidence'],
+            },
+          },
+        },
+        required: ['index', 'name', 'nameConfidence', 'ingredients'],
+      },
+    },
+  },
+  required: ['recipes'],
+} as const;
+
+/** Anthropic tool input schema del chunk (parità col path Gemini). */
+export const NORMALIZE_TOOL_SCHEMA = {
+  type: 'object',
+  properties: {
+    recipes: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          index: { type: 'integer' },
+          name: { type: ['string', 'null'] },
+          nameConfidence: { type: 'number' },
+          portions: { type: ['integer', 'null'] },
+          ambiguityFlags: { type: 'array', items: { type: 'string' } },
+          ingredients: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                rawText: { type: 'string' },
+                name: { type: ['string', 'null'] },
+                quantity: { type: ['number', 'null'] },
+                unit: { type: ['string', 'null'], enum: [...AI_UNITS, null] },
+                nameConfidence: { type: 'number' },
+                quantityConfidence: { type: 'number' },
+                unitConfidence: { type: 'number' },
+              },
+              required: ['name', 'quantity', 'unit', 'nameConfidence', 'quantityConfidence', 'unitConfidence'],
+            },
+          },
+        },
+        required: ['index', 'name', 'nameConfidence', 'ingredients'],
+      },
+    },
+  },
+  required: ['recipes'],
+} as const;
+
 /** Ri-export tipo per comodità dei consumatori dell'adapter. */
 export type { ImportColumnField };

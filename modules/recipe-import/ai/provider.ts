@@ -15,10 +15,15 @@
 import Anthropic from '@anthropic-ai/sdk';
 import {
   aiImportResultSchema,
+  aiNormalizeResultSchema,
   SUBMIT_RECIPES_INPUT_SCHEMA,
+  GEMINI_NORMALIZE_SCHEMA,
+  NORMALIZE_TOOL_SCHEMA,
   AI_UNITS,
   type AiImportInput,
   type AiImportResult,
+  type AiNormalizeInput,
+  type AiNormalizeResult,
 } from './contract';
 
 const GEMINI_BASE_URL = process.env.GEMINI_BASE_URL ?? 'https://generativelanguage.googleapis.com/v1beta';
@@ -202,6 +207,102 @@ export async function aiUnderstandImport(input: AiImportInput): Promise<AiImport
     console.info('[ai-diag] AI error/timeout path hit: yes'); // TEMP DIAGNOSTIC
     return null;
   }
+}
+
+// ── Normalizzazione PER-CHUNK (coverage-first) ────────────────────────────────
+
+const NORMALIZE_RULES = [
+  'Normalizzi gli ingredienti di POCHE ricette di pasticceria già individuate.',
+  'Per OGNI ricetta in input ricevi: un "index" e le righe ingrediente GREZZE.',
+  '',
+  'REGOLE NON NEGOZIABILI:',
+  '- Ri-emetti SEMPRE lo stesso "index" ricevuto per ogni ricetta. NON cambiarlo,',
+  '  NON saltare ricette: restituisci una voce per OGNI ricetta in input.',
+  '- Per OGNI riga ingrediente separa i campi: "name" SOLO il nome (es. "Savoiardi"),',
+  '  "quantity" il numero, "unit" l\'unità. NON lasciare "Savoiardi 400 g" dentro "name".',
+  '- Mantieni l\'ORDINE delle righe ingrediente uguale all\'input (rawText = riga grezza).',
+  '- NON inventare: se un campo non è chiaro, mettilo a null e abbassa la confidenza.',
+  `- Unità ammesse SOLO: ${AI_UNITS.join(', ')}. Altrimenti unit=null + ambiguityFlags.`,
+  '- NON convertire le quantità tra unità.',
+].join('\n');
+
+const GEMINI_NORMALIZE_SYSTEM = `${NORMALIZE_RULES}\nRispondi rispettando esattamente lo schema JSON richiesto.`;
+const ANTHROPIC_NORMALIZE_SYSTEM = `${NORMALIZE_RULES}\nRestituisci il risultato SOLO chiamando il tool submit_normalized.`;
+
+function buildNormalizeContent(input: AiNormalizeInput): string {
+  const parts: string[] = ['RICETTE DA NORMALIZZARE (preserva ogni index):', ''];
+  for (const r of input.recipes) {
+    parts.push(`### index=${r.index} — ${r.name || '(senza nome)'}`);
+    r.rawLines.forEach((l) => parts.push(`- ${l}`));
+    parts.push('');
+  }
+  return parts.join('\n');
+}
+
+/**
+ * Normalizza un CHUNK di ricette baseline. Stesso confine di rete del path
+ * principale: key assente / errore / timeout / output non conforme → null (il
+ * chiamante mantiene il baseline per quelle ricette = nessuna perdita copertura).
+ */
+export async function aiNormalizeRecipes(input: AiNormalizeInput): Promise<AiNormalizeResult | null> {
+  const provider = selectProvider();
+  if (!provider || input.recipes.length === 0) return null;
+  try {
+    const raw = provider === 'gemini' ? await callGeminiNormalize(input) : await callAnthropicNormalize(input);
+    if (raw == null) return null;
+    const parsed = aiNormalizeResultSchema.safeParse(raw);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null; // fallback silenzioso: il chunk resta baseline
+  }
+}
+
+async function callGeminiNormalize(input: AiNormalizeInput): Promise<unknown> {
+  const key = (process.env.GEMINI_API_KEY ?? '').trim();
+  const model = modelFor('gemini');
+  const res = await fetch(`${GEMINI_BASE_URL}/models/${model}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: GEMINI_NORMALIZE_SYSTEM }] },
+      contents: [{ role: 'user', parts: [{ text: buildNormalizeContent(input) }] }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 8192, // chunk piccolo → ampiamente sufficiente
+        responseMimeType: 'application/json',
+        responseSchema: GEMINI_NORMALIZE_SCHEMA,
+      },
+    }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const cand = data?.candidates?.[0];
+  const text = cand?.content?.parts?.[0]?.text;
+  return typeof text === 'string' ? JSON.parse(text) : null;
+}
+
+async function callAnthropicNormalize(input: AiNormalizeInput): Promise<unknown> {
+  const client = new Anthropic();
+  const res = await client.messages.create(
+    {
+      model: modelFor('anthropic'),
+      max_tokens: 4000,
+      system: ANTHROPIC_NORMALIZE_SYSTEM,
+      tools: [
+        {
+          name: 'submit_normalized',
+          description: 'Restituisce le ricette normalizzate, una per ogni index ricevuto.',
+          input_schema: NORMALIZE_TOOL_SCHEMA as unknown as Anthropic.Tool.InputSchema,
+        },
+      ],
+      tool_choice: { type: 'tool', name: 'submit_normalized' },
+      messages: [{ role: 'user', content: buildNormalizeContent(input) }],
+    },
+    { timeout: TIMEOUT_MS },
+  );
+  const toolUse = res.content.find((b) => b.type === 'tool_use');
+  return toolUse && toolUse.type === 'tool_use' ? toolUse.input : null;
 }
 
 /** Gemini: generateContent + responseSchema (JSON strutturato prevedibile). */
