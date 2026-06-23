@@ -19,7 +19,7 @@ import {
 } from '@/modules/goods-receipts/matching';
 import { BusinessRuleError, getErrorMessage } from '@/lib/errors';
 import { parseCsv, parseCsvWithMapping, parseText, inspectCsv } from './parse';
-import { isAiImportAvailable, aiUnderstandImport, aiNormalizeRecipes, aiProviderDiag } from './ai/provider';
+import { isAiImportAvailable, aiUnderstandImport, aiNormalizeRecipes } from './ai/provider';
 import { adaptAiRecipes, adaptAiMapping } from './ai/adapter';
 import { enrichBaselineWithAiChunks } from './ai/enrich';
 import { importRecipesSchema, type ImportRecipesInput } from './schemas';
@@ -102,28 +102,6 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
   // Catalogo dell'organizzazione (serve sia all'AI per gli hint, sia al match a valle).
   const catalog = await catalogRefs();
 
-  // ── TEMP DIAGNOSTIC (rimuovere dopo la conferma): solo booleani/decisioni ────
-  const diag = aiProviderDiag();
-  console.info(
-    '[ai-diag] gemini key present:', diag.geminiKey,
-    '| anthropic key present:', diag.anthropicKey,
-    '| selected provider:', diag.provider,
-    '| ai available:', willTryAi,
-    '| parse produced recipes:', recipes.length,
-  );
-
-  // ── TEMP BLOB DIAGNOSTIC (rimuovere dopo la conferma) ────────────────────────
-  // Verifica che lo split deterministico del blob ingredienti abbia prodotto più
-  // righe nel BASELINE (prima dell'AI): conteggio righe + prime voci della 1ª ricetta.
-  const r0 = recipes[0];
-  if (r0) {
-    console.info(
-      '[blob-diag] r0:', r0.name,
-      '| ingredient rows:', r0.ingredients.length,
-      '| first lines:', r0.ingredients.slice(0, 5).map((l) => `${l.name}|q=${l.quantity ?? '∅'}|u=${l.unit ?? '∅'}`),
-    );
-  }
-
   // ── AI-assistito (COVERAGE-FIRST) ─────────────────────────────────────────────
   // PRINCIPIO: il baseline DETERMINISTICO stabilisce QUANTE/QUALI ricette esistono
   // (ancora di copertura). L'AI NON estrae più l'intero file in un'unica risposta
@@ -131,7 +109,6 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
   // piccoli CHUNK, con merge PER-INDICE. Risultato AI parziale/fallito → quelle
   // ricette restano baseline. final.length === baseline.length, sempre.
   const willInvokeAi = willTryAi && sourceText.trim() !== '' && !args.mapping;
-  console.info('[ai-diag] willTryAi:', willTryAi, '| AI invoked:', willInvokeAi ? 'yes' : 'no'); // TEMP DIAGNOSTIC
   if (willInvokeAi) {
     let baseline = recipes; // deterministico = copertura piena
 
@@ -147,7 +124,6 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
       const mapping = ai ? adaptAiMapping(ai) : null;
       const mapped = mapping ? parseCsvWithMapping(sourceText, mapping.fields, mapping.hasHeader) : [];
       if (mapped.length > baseline.length) baseline = mapped;
-      console.info('[ai-diag] csv-mapping | mapped:', mapped.length, '| baseline:', baseline.length); // TEMP
     }
 
     if (baseline.length === 0) {
@@ -160,26 +136,16 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
         catalogNames: catalog.map((c) => c.name),
       });
       recipes = ai ? adaptAiRecipes(ai) : baseline;
-      console.info('[ai-diag] empty-baseline rescue | recipes:', recipes.length); // TEMP
     } else {
       // ARRICCHIMENTO COVERAGE-FIRST: chunk + merge per-indice. Mai meno del baseline.
       const { recipes: enriched, diag } = await enrichBaselineWithAiChunks(baseline, aiNormalizeRecipes);
       recipes = enriched;
-      // ── TEMP OBSERVABILITY (rimuovere dopo la conferma) ───────────────────────
-      console.info(
-        '[ai-diag] coverage |',
-        'baseline:', diag.baselineCount,
-        '| chunks:', diag.chunkCount,
-        '| chunkSizes:', JSON.stringify(diag.chunkSizes),
-        '| chunkOk:', `${diag.chunkResults.filter((c) => c.ok).length}/${diag.chunkCount}`,
-        '| validated:', diag.chunkResults.reduce((n, c) => n + c.validated, 0),
-        '| enriched:', diag.enrichedCount,
-        '| failed:', diag.failedCount,
-        '| final:', diag.finalCount,
-        '| dropped:', diag.droppedCount,
-      );
+      // Guardia di correttezza PERMANENTE: la copertura non deve MAI ridursi
+      // (final === baseline). Se accade è un bug serio dell'enrichment → log azionabile.
       if (diag.droppedCount !== 0) {
-        console.error('[ai-diag] INVARIANT VIOLATION: dropped', diag.droppedCount, 'recipes'); // non deve mai accadere
+        console.error(
+          `[recipe-import] coverage invariant violated: ${diag.droppedCount} ricette perse durante l'enrichment AI (baseline ${diag.baselineCount} → ${diag.finalCount})`,
+        );
       }
     }
 

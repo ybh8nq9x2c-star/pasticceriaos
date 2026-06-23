@@ -54,18 +54,6 @@ export function isAiImportAvailable(): boolean {
   return selectProvider() !== null;
 }
 
-/**
- * TEMP DIAGNOSTIC (rimuovere dopo la conferma): solo BOOLEANI/decisioni, mai la
- * chiave. Espone presenza chiavi e provider scelto per tracciare il gating.
- */
-export function aiProviderDiag(): { geminiKey: boolean; anthropicKey: boolean; provider: Provider | 'none' } {
-  return {
-    geminiKey: Boolean(process.env.GEMINI_API_KEY),
-    anthropicKey: Boolean(process.env.ANTHROPIC_API_KEY),
-    provider: selectProvider() ?? 'none',
-  };
-}
-
 const RULES = [
   'Sei un assistente che AIUTA a CAPIRE file di ricette disordinati di una pasticceria.',
   'Lavori su input reali e sporchi: header strani, colonne miste italiano/inglese,',
@@ -181,30 +169,14 @@ function buildUserContent(input: AiImportInput): string {
  */
 export async function aiUnderstandImport(input: AiImportInput): Promise<AiImportResult | null> {
   const provider = selectProvider();
-  if (!provider) {
-    console.info('[ai-diag] AI invoked: no (no provider/key)'); // TEMP DIAGNOSTIC
-    return null;
-  }
-  console.info('[ai-diag] AI invoked: yes | provider:', provider); // TEMP DIAGNOSTIC
+  if (!provider) return null;
   try {
     const raw = provider === 'gemini' ? await callGemini(input) : await callAnthropic(input);
-    if (raw == null) {
-      console.info('[ai-diag] AI returned result: no (empty/non-2xx)'); // TEMP DIAGNOSTIC
-      return null;
-    }
-    const rawRecipes = Array.isArray((raw as { recipes?: unknown }).recipes)
-      ? (raw as { recipes: unknown[] }).recipes.length
-      : -1;
+    if (raw == null) return null;
     const parsed = aiImportResultSchema.safeParse(raw);
-    console.info('[ai-diag] AI raw recipes:', rawRecipes, '| schema valid:', parsed.success); // TEMP DIAGNOSTIC
-    if (!parsed.success) {
-      // Solo path+codice (niente valori/segreti): vede se zod scarta righe.
-      console.info('[ai-diag] schema issues:', parsed.error.issues.slice(0, 3).map((i) => `${i.path.join('.')}:${i.code}`));
-    }
     return parsed.success ? parsed.data : null;
   } catch {
     // Qualunque errore (auth, rete, rate limit, timeout, JSON) → fallback silenzioso.
-    console.info('[ai-diag] AI error/timeout path hit: yes'); // TEMP DIAGNOSTIC
     return null;
   }
 }
@@ -309,7 +281,6 @@ async function callAnthropicNormalize(input: AiNormalizeInput): Promise<unknown>
 async function callGemini(input: AiImportInput): Promise<unknown> {
   const key = (process.env.GEMINI_API_KEY ?? '').trim(); // immune a spazi/newline nell'env
   const model = modelFor('gemini');
-  console.info('[ai-diag] gemini request: sending | model:', model); // TEMP DIAGNOSTIC (mai la chiave)
   const res = await fetch(`${GEMINI_BASE_URL}/models/${model}:generateContent`, {
     method: 'POST',
     headers: {
@@ -328,23 +299,11 @@ async function callGemini(input: AiImportInput): Promise<unknown> {
     }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
-  if (!res.ok) {
-    // Corpo errore Gemini = motivo (chiave/quota/modello). NON contiene la chiave.
-    const errBody = await res.text().catch(() => '');
-    console.info('[ai-diag] gemini response not ok | status:', res.status, '| body:', errBody.slice(0, 300)); // TEMP DIAGNOSTIC
-    return null;
-  }
+  if (!res.ok) return null; // non-2xx → fallback deterministico (silenzioso, non-bloccante)
   const data = await res.json();
   const cand = data?.candidates?.[0];
-  // finishReason ≠ STOP (es. MAX_TOKENS) = output troncato → JSON parziale.
-  if (cand?.finishReason && cand.finishReason !== 'STOP') {
-    console.info('[ai-diag] gemini finishReason:', cand.finishReason); // TEMP DIAGNOSTIC
-  }
   const text = cand?.content?.parts?.[0]?.text;
-  if (typeof text !== 'string') {
-    console.info('[ai-diag] gemini: no text part | finishReason:', cand?.finishReason); // TEMP DIAGNOSTIC
-    return null;
-  }
+  if (typeof text !== 'string') return null;
   return JSON.parse(text); // eventuale errore → catch upstream → fallback
 }
 
