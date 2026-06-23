@@ -186,7 +186,7 @@ describe('enrichRecipeByLine', () => {
   const base: ParsedRecipe = {
     name: 'Tiramisù', basePortions: null, category: null, notes: null,
     ingredients: [{ rawText: 'Savoiardi 400', name: 'Savoiardi 400', quantity: null, unit: null, matchedProductId: null, matchedProductName: null, suggestions: [] }],
-    warnings: ['Alcune quantità non sono state riconosciute.', 'Porzioni non rilevate: impostate a 1, correggile se serve.'],
+    warnings: ['Alcune quantità non sono state riconosciute.', 'Porzioni non rilevate: indicale prima di importare.'],
   };
 
   it('riempie i buchi quantità/unità e pulisce il nome con numero dentro', () => {

@@ -44,7 +44,7 @@ interface EditIngredient {
   key: number;
   name: string;          // nome (del prodotto associato o del nuovo da creare)
   quantity: string;
-  unit: UnitOfMeasure;
+  unit: UnitOfMeasure | ''; // '' = non rilevata → l'utente DEVE sceglierla (no guess)
   productId: string | null;
   create: boolean;       // true = crea nuovo ingrediente "name"
   suggestions: { id: string; name: string; unit: UnitOfMeasure }[];
@@ -79,7 +79,10 @@ function toEditRecipe(r: ParsedRecipe): EditRecipe {
     selected: true,
     expanded: true,
     name: r.name,
-    basePortions: r.basePortions != null ? String(r.basePortions) : '1',
+    // Porzioni/unità NON rilevate restano VUOTE: vanno confermate, non indovinate
+    // (audit R2). Un valore indovinato (porzioni=1, unità=g) produrrebbe un BOM
+    // errato che la deduzione a vendita scaricherebbe dal magazzino.
+    basePortions: r.basePortions != null ? String(r.basePortions) : '',
     category: r.category ?? '',
     notes: r.notes ?? '',
     warnings: r.warnings,
@@ -87,7 +90,7 @@ function toEditRecipe(r: ParsedRecipe): EditRecipe {
       key: ++seq,
       name: l.matchedProductName ?? l.name,
       quantity: l.quantity != null ? String(l.quantity) : '',
-      unit: l.unit ?? 'g',
+      unit: l.unit ?? '',
       productId: l.matchedProductId,
       create: !l.matchedProductId,
       suggestions: l.suggestions.map((s) => ({ id: s.id, name: s.name, unit: s.unit })),
@@ -303,8 +306,12 @@ export function RecipeImportWizard({
   const selected = recipes.filter((r) => r.selected);
   const ingredientIssues = (r: EditRecipe) =>
     r.ingredients.length === 0 ||
-    r.ingredients.some((i) => !i.quantity.trim() || (i.create ? !i.name.trim() : !i.productId));
-  const recipeReady = (r: EditRecipe) => r.name.trim() !== '' && !ingredientIssues(r);
+    // Unità OBBLIGATORIA (audit R2): un'unità non scelta non viene indovinata,
+    // bloccherebbe un BOM errato a vendita.
+    r.ingredients.some((i) => !i.quantity.trim() || !i.unit || (i.create ? !i.name.trim() : !i.productId));
+  // Porzioni OBBLIGATORIE: niente default a 1 (scala il BOM e la deduzione).
+  const recipeReady = (r: EditRecipe) =>
+    r.name.trim() !== '' && r.basePortions.trim() !== '' && !ingredientIssues(r);
   const needsConfirmCount = recipes.filter((r) => !recipeReady(r)).length;
   // Import PARZIALE: importiamo subito le ricette pronte e isoliamo solo quelle
   // ancora da sistemare. Niente "fail-all": una riga problematica non blocca le
@@ -321,7 +328,7 @@ export function RecipeImportWizard({
     const payload = {
       recipes: ready.map((r) => ({
         name: r.name.trim(),
-        basePortions: r.basePortions || '1',
+        basePortions: r.basePortions.trim(), // confermato dall'utente (gate), niente default
         category: r.category.trim() || null,
         notes: r.notes.trim() || null,
         ingredients: r.ingredients.map((i) => ({
@@ -887,8 +894,10 @@ function RecipeCard({
               label="Porzioni"
               type="number"
               min={1}
+              placeholder="es. 8"
               value={recipe.basePortions}
               onChange={(e) => onPatch({ basePortions: e.target.value })}
+              error={recipe.basePortions.trim() === '' ? 'Indica le porzioni del batch' : undefined}
             />
             <Input label="Categoria (opz.)" value={recipe.category} onChange={(e) => onPatch({ category: e.target.value })} />
             <Input label="Note (opz.)" value={recipe.notes} onChange={(e) => onPatch({ notes: e.target.value })} />
@@ -941,9 +950,12 @@ function IngredientRow({
         <select
           aria-label="Unità"
           value={ing.unit}
-          onChange={(e) => onPatch({ unit: e.target.value as UnitOfMeasure })}
-          className="w-24 rounded-md border border-border bg-surface-2 px-2 min-h-[40px] text-sm text-ink"
+          onChange={(e) => onPatch({ unit: e.target.value as UnitOfMeasure | '' })}
+          className={`w-24 rounded-md border bg-surface-2 px-2 min-h-[40px] text-sm text-ink ${
+            ing.unit ? 'border-border' : 'border-warning ring-1 ring-warning' // non scelta → da confermare
+          }`}
         >
+          <option value="">— unità</option>
           {UNITS.map((u) => (
             <option key={u} value={u}>
               {UNIT_LABELS[u]}
@@ -958,7 +970,9 @@ function IngredientRow({
             if (v === CREATE) onPatch({ create: true, productId: null });
             else {
               const c = catalog.find((x) => x.id === v);
-              onPatch({ create: false, productId: v, name: c?.name ?? ing.name, unit: ing.unit });
+              // Associando un prodotto a catalogo, eredita la sua unità di magazzino
+              // (riduce la correzione manuale e allinea il BOM all'unità di deduzione).
+              onPatch({ create: false, productId: v, name: c?.name ?? ing.name, unit: c?.unit ?? ing.unit });
             }
           }}
           className="flex-1 min-w-0 rounded-md border border-border bg-surface-2 px-2 min-h-[40px] text-sm text-ink"

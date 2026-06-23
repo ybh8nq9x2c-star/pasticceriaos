@@ -311,7 +311,7 @@ export function parseText(input: string): ParsedRecipe[] {
       name = `Ricetta ${recipes.length + 1}`;
       warnings.push('Nome non rilevato: assegnato un nome provvisorio, rinominala.');
     }
-    if (portions === null) warnings.push('Porzioni non rilevate: impostate a 1, correggile se serve.');
+    if (portions === null) warnings.push('Porzioni non rilevate: indicale prima di importare.');
     addAmbiguityWarnings(ingredients, warnings);
 
     recipes.push({
@@ -590,7 +590,7 @@ function buildRecipes(dataRows: string[][], idx: ColIndex): ParsedRecipe[] {
 
   const recipes = [...groups.values()];
   for (const r of recipes) {
-    if (r.basePortions === null) r.warnings.push('Porzioni non presenti: impostate a 1, correggile se serve.');
+    if (r.basePortions === null) r.warnings.push('Porzioni non presenti: indicale prima di importare.');
     addAmbiguityWarnings(r.ingredients, r.warnings);
   }
   return recipes;
