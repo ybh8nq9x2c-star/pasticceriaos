@@ -204,6 +204,38 @@ function toLine(
 }
 
 /**
+ * Spezza un BLOB di ingredienti delimitato in pezzi puliti. Delimitatori: `|`,
+ * `;`, a-capo. Una cella senza delimitatori → array di un solo elemento (nessuna
+ * esplosione). Pezzi vuoti scartati. PURO e deterministico: non dipende dall'AI.
+ */
+export function splitIngredientBlob(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(/[|;\n]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Un pezzo di blob → riga ingrediente. Prova a estrarre quantità/unità/nome dal
+ * testo del pezzo; se il parse è parziale (nessuna quantità riconosciuta) crea
+ * COMUNQUE una riga separata col solo nome (mai ricollassare il blob in una riga).
+ */
+function ingredientFromPiece(piece: string): ParsedIngredientLine {
+  const parsed = parseIngredientLine(piece);
+  if (parsed) return toLine(parsed, piece);
+  return {
+    rawText: piece.trim(),
+    name: cleanName(piece),
+    quantity: null,
+    unit: null,
+    matchedProductId: null,
+    matchedProductName: null,
+    suggestions: [],
+  };
+}
+
+/**
  * Parser TESTO/PDF: blocchi separati da righe vuote. Un blocco con ≥1 riga
  * ingrediente è una ricetta; il titolo è la prima riga non-ingrediente (non
  * header) del blocco, oppure un titolo isolato nel blocco precedente.
@@ -226,6 +258,14 @@ export function parseText(input: string): ParsedRecipe[] {
     const ingredients: ParsedIngredientLine[] = [];
     const nonIngredient: string[] = [];
     for (const raw of block) {
+      // Una riga può essere un BLOB su una sola linea (es. "500 g burro | 6 uova").
+      // La esplodiamo SOLO se almeno un pezzo è un ingrediente riconoscibile: così
+      // un titolo/istruzione che contiene per caso un separatore non viene spezzato.
+      const pieces = splitIngredientBlob(raw);
+      if (pieces.length > 1 && pieces.some((p) => parseIngredientLine(p) !== null)) {
+        for (const piece of pieces) ingredients.push(ingredientFromPiece(piece));
+        continue;
+      }
       const ing = parseIngredientLine(raw);
       if (ing) ingredients.push(toLine(ing, raw));
       else nonIngredient.push(raw.trim());
@@ -501,8 +541,11 @@ function buildRecipes(dataRows: string[][], idx: ColIndex): ParsedRecipe[] {
 
   for (const row of dataRows) {
     const recipeName = (idx.recipe >= 0 ? row[idx.recipe] : '')?.trim() || 'Ricetta importata';
-    const ingName = cleanName((idx.ingredient >= 0 ? row[idx.ingredient] : '') ?? '');
-    if (!ingName) continue; // riga senza ingrediente → saltata
+    // La cella ingrediente può essere un BLOB delimitato (|, ;, a-capo) — tipico
+    // dell'export "ingredients_text" — e va esplosa in righe SEPARATE. Senza
+    // delimitatori → un solo pezzo (comportamento storico invariato).
+    const pieces = splitIngredientBlob((idx.ingredient >= 0 ? row[idx.ingredient] : '') ?? '');
+    if (pieces.length === 0) continue; // riga senza ingrediente → saltata
 
     let recipe = groups.get(recipeName);
     if (!recipe) {
@@ -520,15 +563,22 @@ function buildRecipes(dataRows: string[][], idx: ColIndex): ParsedRecipe[] {
       groups.set(recipeName, recipe);
     }
 
-    recipe.ingredients.push({
-      rawText: row.join(' | '),
-      name: ingName,
-      quantity: idx.quantity >= 0 ? parseQuantity(row[idx.quantity]) : null,
-      unit: idx.unit >= 0 ? normalizeUnit(row[idx.unit]) : null,
-      matchedProductId: null,
-      matchedProductName: null,
-      suggestions: [],
-    });
+    if (pieces.length === 1) {
+      // Singolo ingrediente: comportamento storico (qty/unit dalle colonne separate).
+      recipe.ingredients.push({
+        rawText: row.join(' | '),
+        name: cleanName(pieces[0]),
+        quantity: idx.quantity >= 0 ? parseQuantity(row[idx.quantity]) : null,
+        unit: idx.unit >= 0 ? normalizeUnit(row[idx.unit]) : null,
+        matchedProductId: null,
+        matchedProductName: null,
+        suggestions: [],
+      });
+    } else {
+      // BLOB: ogni pezzo è una riga; qty/unit estratte dal pezzo stesso (le colonne
+      // qty/unit della riga, se esistono, valgono per l'intera riga, non per pezzo).
+      for (const piece of pieces) recipe.ingredients.push(ingredientFromPiece(piece));
+    }
   }
 
   const recipes = [...groups.values()];

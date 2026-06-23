@@ -112,6 +112,18 @@ export async function analyzeRecipeImport(args: AnalyzeArgs): Promise<AnalyzeRes
     '| parse produced recipes:', recipes.length,
   );
 
+  // ── TEMP BLOB DIAGNOSTIC (rimuovere dopo la conferma) ────────────────────────
+  // Verifica che lo split deterministico del blob ingredienti abbia prodotto più
+  // righe nel BASELINE (prima dell'AI): conteggio righe + prime voci della 1ª ricetta.
+  const r0 = recipes[0];
+  if (r0) {
+    console.info(
+      '[blob-diag] r0:', r0.name,
+      '| ingredient rows:', r0.ingredients.length,
+      '| first lines:', r0.ingredients.slice(0, 5).map((l) => `${l.name}|q=${l.quantity ?? '∅'}|u=${l.unit ?? '∅'}`),
+    );
+  }
+
   // ── AI-assistito (COVERAGE-FIRST) ─────────────────────────────────────────────
   // PRINCIPIO: il baseline DETERMINISTICO stabilisce QUANTE/QUALI ricette esistono
   // (ancora di copertura). L'AI NON estrae più l'intero file in un'unica risposta

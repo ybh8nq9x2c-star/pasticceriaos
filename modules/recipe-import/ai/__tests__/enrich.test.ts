@@ -229,3 +229,39 @@ describe('enrichByIndex', () => {
     expect(out.map((r) => r.name)).toEqual(baseline.map((r) => r.name));
   });
 });
+
+// ── 5. Il fallimento AI non ricollassa le righe già esplose dal baseline ────────
+
+describe('blob già esploso nel baseline + AI', () => {
+  const blobCsv =
+    'Ricetta,Ingredienti\nTiramisù,"500 g mascarpone | 6 uova | 300 g savoiardi | 140 g zucchero | 350 ml caffè espresso"';
+
+  it('baseline 5 righe + normalizer che FALLISCE → restano 5 righe', async () => {
+    const baseline = parseCsv(blobCsv);
+    expect(baseline[0].ingredients).toHaveLength(5); // split deterministico
+    const { recipes, diag } = await enrichBaselineWithAiChunks(baseline, async () => null);
+    expect(recipes[0].ingredients).toHaveLength(5); // AI giù → split preservato
+    expect(diag.droppedCount).toBe(0);
+  });
+
+  it('baseline 5 righe + AI che restituisce MENO righe → restano 5 righe', async () => {
+    const baseline = parseCsv(blobCsv);
+    // L'AI normalizza solo le prime 2 righe della ricetta: non deve ridurne il numero.
+    const partialLines: ChunkNormalizer = async (input) =>
+      aiNormalizeResultSchema.parse({
+        recipes: input.recipes.map((r) => ({
+          index: r.index,
+          name: r.name,
+          nameConfidence: 0.9,
+          portions: null,
+          ambiguityFlags: [],
+          ingredients: r.rawLines.slice(0, 2).map((rl) => ({
+            rawText: rl, name: rl, quantity: 1, unit: 'g',
+            nameConfidence: 0.9, quantityConfidence: 0.9, unitConfidence: 0.9,
+          })),
+        })),
+      });
+    const { recipes } = await enrichBaselineWithAiChunks(baseline, partialLines);
+    expect(recipes[0].ingredients).toHaveLength(5);
+  });
+});
