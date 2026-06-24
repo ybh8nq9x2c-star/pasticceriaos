@@ -200,11 +200,14 @@ export default function IngredientDetailPage({ params }: { params: { id: string 
         </div>
       </form>
 
-      <StockAdjustPanel
-        ingredientId={ingredient.id}
-        ingredientName={ingredient.name}
-        unit={ingredient.unit}
-      />
+      {/* Ancora #rettifica: gli alert magazzino linkano qui (alert → correzione). */}
+      <div id="rettifica" className="scroll-mt-8">
+        <StockAdjustPanel
+          ingredientId={ingredient.id}
+          ingredientName={ingredient.name}
+          unit={ingredient.unit}
+        />
+      </div>
 
       {ingredient.isActive && (
         <div className="mt-8 border border-danger-soft rounded-2xl p-5">

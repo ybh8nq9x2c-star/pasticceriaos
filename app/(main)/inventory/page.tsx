@@ -218,7 +218,11 @@ export default async function InventoryPage() {
                       <Badge variant="danger" size="sm">Sotto zero</Badge>
                     </td>
                     <td className="px-6 py-3.5 text-right">
-                      <Link href="/inventory/movement" className="text-xs font-semibold text-primary hover:underline whitespace-nowrap">
+                      {/* Alert → correzione contestuale: porta dritto al pannello rettifica del prodotto. */}
+                      <Link
+                        href={`/ingredients/${lv.ingredientProductId}#rettifica`}
+                        className="text-xs font-semibold text-primary hover:underline whitespace-nowrap"
+                      >
                         Conta e rettifica
                       </Link>
                     </td>
