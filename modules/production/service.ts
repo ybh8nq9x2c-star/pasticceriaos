@@ -36,6 +36,74 @@ export async function getPlan(id: string): Promise<ProductionPlan> {
 // piano, senza step "calcola" intermedio.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Template ricorrenti (Task 2) — DERIVATI dai piani esistenti (nessuna nuova
+// tabella). Suggerisce: l'ultimo piano valido e il piano più recente dello STESSO
+// giorno della settimana → la produzione non parte mai da una tela bianca.
+// ---------------------------------------------------------------------------
+
+export interface PlanSuggestionItem {
+  recipeId: string;
+  recipeName: string;
+  batchCount: number;
+}
+export interface PlanSuggestion {
+  kind: 'last' | 'sameWeekday';
+  planDate: string;
+  label: string;
+  items: PlanSuggestionItem[];
+}
+
+const WEEKDAYS = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+const weekdayOf = (isoDate: string) => new Date(`${isoDate}T00:00:00`).getDay();
+
+export async function getPlanSuggestions(): Promise<PlanSuggestion[]> {
+  const orgId = await requireOrgId();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('production_plans')
+    .select('id, plan_date, production_plan_items(recipe_id, batch_count, recipes(name))')
+    .eq('organization_id', orgId)
+    .order('plan_date', { ascending: false })
+    .limit(40);
+  if (error) throw mapSupabaseError(error);
+
+  const plans = (data ?? [])
+    .map((p) => {
+      const row = p as unknown as {
+        plan_date: string;
+        production_plan_items: { recipe_id: string; batch_count: number; recipes: { name: string } | { name: string }[] | null }[];
+      };
+      const items: PlanSuggestionItem[] = (row.production_plan_items ?? [])
+        .filter((i) => i.recipe_id)
+        .map((i) => ({
+          recipeId: i.recipe_id,
+          recipeName: Array.isArray(i.recipes) ? i.recipes[0]?.name ?? '' : i.recipes?.name ?? '',
+          batchCount: Number(i.batch_count) || 1,
+        }));
+      return { planDate: row.plan_date, items };
+    })
+    .filter((p) => p.items.length > 0);
+
+  if (plans.length === 0) return [];
+
+  const out: PlanSuggestion[] = [];
+  const last = plans[0];
+  out.push({ kind: 'last', planDate: last.planDate, label: `Ultimo piano · ${last.planDate}`, items: last.items });
+
+  const todayWd = new Date().getDay();
+  const sameWeekday = plans.find((p, idx) => idx > 0 && weekdayOf(p.planDate) === todayWd);
+  if (sameWeekday) {
+    out.push({
+      kind: 'sameWeekday',
+      planDate: sameWeekday.planDate,
+      label: `${WEEKDAYS[todayWd]} scorso · ${sameWeekday.planDate}`,
+      items: sameWeekday.items,
+    });
+  }
+  return out;
+}
+
 export async function computePlanRequirements(
   items: { recipeId: string; batchCount: number }[],
 ): Promise<LiveRequirement[]> {

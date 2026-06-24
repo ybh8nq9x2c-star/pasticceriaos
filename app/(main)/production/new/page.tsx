@@ -26,6 +26,12 @@ interface LiveRequirement {
   shortage: number;
   status: 'ok' | 'warn' | 'danger';
 }
+interface PlanSuggestion {
+  kind: 'last' | 'sameWeekday';
+  planDate: string;
+  label: string;
+  items: { recipeId: string; recipeName: string; batchCount: number }[];
+}
 interface CustomerOrderForDate {
   id: string;
   customerName: string;
@@ -49,6 +55,7 @@ export default function NewProductionPage() {
   const [customerOrders, setCustomerOrders] = useState<CustomerOrderForDate[]>([]);
   const [requirements, setRequirements] = useState<LiveRequirement[]>([]);
   const [reqLoading, setReqLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<PlanSuggestion[]>([]);
 
   const [state, formAction] = useFormState(createPlanAction, IDLE_STATE);
 
@@ -66,6 +73,32 @@ export default function NewProductionPage() {
       .then((data) => setCustomerOrders(Array.isArray(data) ? data : []))
       .catch(() => setCustomerOrders([]));
   }, [planDate]);
+
+  // Template ricorrenti (Task 2): carica i suggerimenti e, se la vista è ancora
+  // vuota, PRECOMPILA con l'ultimo piano → non si parte da una tela bianca.
+  useEffect(() => {
+    fetch('/api/production/suggestions')
+      .then((r) => (r.ok ? r.json() : { suggestions: [] }))
+      .then((d) => {
+        const sugg: PlanSuggestion[] = Array.isArray(d.suggestions) ? d.suggestions : [];
+        setSuggestions(sugg);
+        if (sugg.length > 0) {
+          setRows((prev) =>
+            prev.length === 1 && prev[0].recipeId === '' // solo se l'utente non ha già toccato
+              ? sugg[0].items.map((it) => ({ key: ++keyCounter, recipeId: it.recipeId, batchCount: String(it.batchCount), notes: '' }))
+              : prev,
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  function applySuggestion(s: PlanSuggestion) {
+    setRows(s.items.map((it) => ({ key: ++keyCounter, recipeId: it.recipeId, batchCount: String(it.batchCount), notes: '' })));
+  }
+  function startBlank() {
+    setRows([{ key: ++keyCounter, recipeId: '', batchCount: '1', notes: '' }]);
+  }
 
   /** Aggiunge al piano le ricette degli ordini clienti (batch per coprire i pezzi). */
   function addFromCustomerOrders() {
@@ -245,6 +278,33 @@ export default function NewProductionPage() {
                 Gli articoli fuori ricettario non hanno distinta base: vanno pianificati a mano.
               </p>
             )}
+          </div>
+        )}
+
+        {/* Template ricorrenti (Task 2): riparti da un piano sensato, non da zero */}
+        {suggestions.length > 0 && (
+          <div className="rounded-2xl border border-border bg-surface-2 p-4">
+            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">Riparti da un piano</p>
+            <div className="flex flex-wrap gap-2">
+              {suggestions.map((s) => (
+                <button
+                  key={s.kind}
+                  type="button"
+                  onClick={() => applySuggestion(s)}
+                  className="px-3 py-1.5 rounded-full border border-border bg-bg text-xs font-semibold text-ink hover:bg-surface-offset transition-colors"
+                >
+                  {s.kind === 'last' ? '↺ ' : '📅 '}
+                  {s.label} · {s.items.length} ricett{s.items.length === 1 ? 'a' : 'e'}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={startBlank}
+                className="px-3 py-1.5 rounded-full border border-dashed border-border text-xs font-semibold text-ink-muted hover:text-ink transition-colors"
+              >
+                Da capo
+              </button>
+            </div>
           </div>
         )}
 
