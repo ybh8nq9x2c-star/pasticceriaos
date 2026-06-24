@@ -7,10 +7,14 @@ import { requireOrgId } from '@/modules/identity/service';
 import { createClient } from '@/lib/supabase/server';
 import { BusinessRuleError, mapSupabaseError } from '@/lib/errors';
 import { todayISODate } from '@/lib/utils';
+import type { UnitOfMeasure } from '@/lib/database.types';
 import * as repo from './repository';
+import { aggregateLiveRequirements, type RecipeBomForReq, type LiveRequirement } from './requirements';
 import { createPlanSchema, quickProduceSchema, updatePlanSchema } from './schemas';
 import type { ProductionPlan, ProductionPlanListItem } from './types';
 import type { CreatePlanInput, QuickProduceInput, UpdatePlanInput } from './schemas';
+
+export type { LiveRequirement };
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -23,6 +27,69 @@ export async function listPlans(): Promise<ProductionPlanListItem[]> {
 
 export async function getPlan(id: string): Promise<ProductionPlan> {
   return repo.getPlanById(id);
+}
+
+// ---------------------------------------------------------------------------
+// Fabbisogno LIVE (per il piano NON ancora salvato) — Task 1 "produzione live".
+// La matematica è in ./requirements (PURA, testata); qui solo l'I/O. Calcolato
+// per item EFFIMERI, così la UI mostra il fabbisogno mentre l'utente compone il
+// piano, senza step "calcola" intermedio.
+// ---------------------------------------------------------------------------
+
+export async function computePlanRequirements(
+  items: { recipeId: string; batchCount: number }[],
+): Promise<LiveRequirement[]> {
+  const orgId = await requireOrgId();
+
+  // Aggrega i batch per ricetta (l'utente può avere righe duplicate).
+  const batchByRecipe = new Map<string, number>();
+  for (const it of items) {
+    if (!it.recipeId || !(it.batchCount > 0)) continue;
+    batchByRecipe.set(it.recipeId, (batchByRecipe.get(it.recipeId) ?? 0) + it.batchCount);
+  }
+  const recipeIds = [...batchByRecipe.keys()];
+  if (recipeIds.length === 0) return [];
+
+  const supabase = await createClient();
+
+  const { data: recs, error } = await supabase
+    .from('recipes')
+    .select('id, recipe_ingredients(quantity, unit, ingredient_products(id, name, unit))')
+    .eq('organization_id', orgId)
+    .in('id', recipeIds);
+  if (error) throw mapSupabaseError(error);
+
+  const recipes: RecipeBomForReq[] = (recs ?? []).map((r) => {
+    const rec = r as unknown as {
+      id: string;
+      recipe_ingredients: {
+        quantity: number;
+        unit: UnitOfMeasure;
+        ingredient_products: { id: string; name: string; unit: UnitOfMeasure } | null;
+      }[];
+    };
+    return {
+      id: rec.id,
+      ingredients: (rec.recipe_ingredients ?? []).map((ri) => ({
+        quantity: Number(ri.quantity),
+        unit: ri.unit,
+        product: ri.ingredient_products,
+      })),
+    };
+  });
+
+  const productIds = recipes.flatMap((r) => r.ingredients.map((i) => i.product?.id).filter((x): x is string => !!x));
+  if (productIds.length === 0) return [];
+
+  const { data: levels, error: lvlErr } = await supabase
+    .from('inventory_levels')
+    .select('ingredient_product_id, current_quantity')
+    .eq('organization_id', orgId)
+    .in('ingredient_product_id', [...new Set(productIds)]);
+  if (lvlErr) throw mapSupabaseError(lvlErr);
+  const stockById = new Map((levels ?? []).map((l) => [l.ingredient_product_id as string, Number(l.current_quantity)]));
+
+  return aggregateLiveRequirements(recipes, batchByRecipe, stockById);
 }
 
 // ---------------------------------------------------------------------------

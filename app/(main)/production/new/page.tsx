@@ -10,12 +10,22 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Cake } from 'lucide-react';
-import { IDLE_STATE } from '@/lib/utils';
+import { IDLE_STATE, UNIT_LABELS } from '@/lib/utils';
 import { createPlanAction } from '@/modules/production/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
+import type { UnitOfMeasure } from '@/lib/database.types';
 
 interface RecipeOption { id: string; name: string; emoji: string | null; basePortions: number }
 interface PlanRow { key: number; recipeId: string; batchCount: string; notes: string }
+interface LiveRequirement {
+  ingredientProductId: string;
+  ingredientName: string;
+  unit: UnitOfMeasure;
+  totalRequired: number;
+  currentStock: number;
+  shortage: number;
+  status: 'ok' | 'warn' | 'danger';
+}
 interface CustomerOrderForDate {
   id: string;
   customerName: string;
@@ -37,6 +47,8 @@ export default function NewProductionPage() {
   ]);
   const [planDate, setPlanDate] = useState(today());
   const [customerOrders, setCustomerOrders] = useState<CustomerOrderForDate[]>([]);
+  const [requirements, setRequirements] = useState<LiveRequirement[]>([]);
+  const [reqLoading, setReqLoading] = useState(false);
 
   const [state, formAction] = useFormState(createPlanAction, IDLE_STATE);
 
@@ -92,6 +104,39 @@ export default function NewProductionPage() {
   useEffect(() => {
     if (state.status === 'success') router.push('/production');
   }, [state, router]);
+
+  // FABBISOGNO LIVE (Task 1): a ogni modifica righe/quantità ricalcola da solo —
+  // niente bottone "Calcola" separato. Debounce 350ms + abort della richiesta stale.
+  const itemsKey = rows.map((r) => `${r.recipeId}:${r.batchCount}`).join('|');
+  useEffect(() => {
+    const items = rows
+      .filter((r) => r.recipeId && (parseInt(r.batchCount) || 0) > 0)
+      .map((r) => ({ recipeId: r.recipeId, batchCount: parseInt(r.batchCount) || 1 }));
+    if (items.length === 0) {
+      setRequirements([]);
+      setReqLoading(false);
+      return;
+    }
+    const ctrl = new AbortController();
+    setReqLoading(true);
+    const t = setTimeout(() => {
+      fetch('/api/production/requirements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+        signal: ctrl.signal,
+      })
+        .then((r) => (r.ok ? r.json() : { requirements: [] }))
+        .then((d) => setRequirements(Array.isArray(d.requirements) ? d.requirements : []))
+        .catch(() => {})
+        .finally(() => setReqLoading(false));
+    }, 350);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsKey]);
 
   function addRow() {
     setRows((p) => [...p, { key: ++keyCounter, recipeId: '', batchCount: '1', notes: '' }]);
@@ -274,6 +319,50 @@ export default function NewProductionPage() {
             </p>
           )}
         </div>
+
+        {/* Fabbisogno LIVE — si aggiorna da solo mentre componi il piano (Task 1) */}
+        {(requirements.length > 0 || reqLoading) && (
+          <div className="bg-surface-2 rounded-2xl border border-border p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-bold text-ink">Fabbisogno ingredienti</h2>
+              <span className="text-xs text-ink-muted">{reqLoading ? 'Aggiorno…' : 'Aggiornato'}</span>
+            </div>
+            <div className="space-y-2">
+              {requirements.map((req) => {
+                const cfg =
+                  req.status === 'danger'
+                    ? { dot: 'bg-danger', txt: 'text-danger' }
+                    : req.status === 'warn'
+                      ? { dot: 'bg-warning', txt: 'text-warning-strong' }
+                      : { dot: 'bg-success', txt: 'text-success-strong' };
+                return (
+                  <div key={req.ingredientProductId} className="flex items-center gap-3 text-sm">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+                    <span className="flex-1 text-ink truncate">{req.ingredientName}</span>
+                    <span className="font-mono text-xs text-ink-muted">
+                      {req.totalRequired} / {req.currentStock} {UNIT_LABELS[req.unit]}
+                    </span>
+                    {req.shortage > 0 ? (
+                      <Link
+                        href={`/orders/new?ingredient=${req.ingredientProductId}&qty=${req.shortage}`}
+                        className={`shrink-0 text-xs font-semibold ${cfg.txt} hover:underline whitespace-nowrap`}
+                      >
+                        manca {req.shortage} {UNIT_LABELS[req.unit]} · Ordina →
+                      </Link>
+                    ) : (
+                      <span className="shrink-0 text-xs text-success-strong">OK</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {requirements.some((r) => r.shortage > 0) && (
+              <p className="mt-3 text-xs text-ink-muted">
+                Gli ingredienti in rosso/giallo non bastano per questo piano: ordina prima di produrre.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="flex gap-3">
           <Link
