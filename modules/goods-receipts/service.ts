@@ -535,6 +535,29 @@ export async function completeReceipt(id: string): Promise<ReceiptStatus> {
   return data as ReceiptStatus;
 }
 
+/**
+ * "Ricevuto tutto" in un tap (caso standard "il fornitore ha consegnato tutto"):
+ * imposta qty_received = qty_expected su ogni riga MATCHATA non ancora piena, poi
+ * completa riusando completeReceipt (stessi movimenti/idempotenza). Le righe non
+ * associate a un prodotto restano fuori → il ricevimento resta 'partial' (nessun
+ * blocco). Evita all'utente di compilare a mano ogni riga quando è tutto arrivato.
+ */
+export async function receiveAllAndComplete(id: string): Promise<ReceiptStatus> {
+  const orgId = await requireOrgId();
+  const receipt = await repo.getReceiptRow(id);
+  if (receipt.organization_id !== orgId) throw new NotFoundError('Ricevimento');
+  assertOpen(receipt.status);
+
+  const detail = await repo.getReceiptDetail(id);
+  const toFill = detail.lines.filter(
+    (l) => l.productId && l.qtyExpected !== null && l.qtyReceived < (l.qtyExpected ?? 0),
+  );
+  for (const l of toFill) {
+    await repo.patchLine(l.id, { qty_received: l.qtyExpected ?? 0, line_status: 'received' });
+  }
+  return completeReceipt(id);
+}
+
 export async function cancelReceipt(id: string): Promise<void> {
   const orgId = await requireOrgId();
   const receipt = await repo.getReceiptRow(id);

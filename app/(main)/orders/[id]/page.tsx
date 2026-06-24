@@ -14,6 +14,7 @@ import { RegisterBatchForm } from './RegisterBatchForm';
 import { IDLE_STATE, UNIT_LABELS, UNIT_SHORT } from '@/lib/utils';
 import type { OrderStatus } from '@/modules/ordering/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 
 export const metadata: Metadata = { title: 'Ordine' };
 
@@ -328,8 +329,8 @@ export default async function OrderDetailPage({ params }: { params: { id: string
           {nextAction && (
             <form action={handleAdvance}>
               <input type="hidden" name="status" value={nextAction.toStatus} />
-              <button
-                type="submit"
+              <SubmitButton
+                pendingLabel="Attendere…"
                 className={
                   canReceive
                     ? 'w-full py-3 rounded-xl text-sm font-semibold border border-border text-ink hover:bg-surface-offset transition-colors'
@@ -337,19 +338,19 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                 }
               >
                 {nextAction.label}
-              </button>
+              </SubmitButton>
             </form>
           )}
 
           {/* Annulla */}
           {canCancel && (
             <form action={handleCancel}>
-              <button
-                type="submit"
+              <SubmitButton
+                pendingLabel="Attendere…"
                 className="w-full py-3 border border-danger-soft text-danger rounded-xl text-sm font-semibold hover:bg-danger-light transition-colors"
               >
                 Annulla ordine
-              </button>
+              </SubmitButton>
             </form>
           )}
         </div>

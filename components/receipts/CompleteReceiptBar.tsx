@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { cancelReceiptAction, completeReceiptAction } from '@/modules/goods-receipts/actions';
+import { cancelReceiptAction, completeReceiptAction, receiveAllAndCompleteAction } from '@/modules/goods-receipts/actions';
 import {
   computeReceiptStatus,
   type ReceiptDetail,
@@ -39,6 +39,10 @@ export function CompleteReceiptBar({
   const preview = useMemo(() => computeReceiptStatus(receipt.lines), [receipt.lines]);
   const canComplete = editable && toPost.length > 0 && unmatched.length === 0;
   const canCancel = editable && receipt.lines.every((l) => l.qtyPosted === 0);
+  // "Ricevuto tutto" 1-tap: ci sono righe MATCHATE attese non ancora piene (caso
+  // standard "tutto arrivato" → niente compilazione riga per riga).
+  const fillable = receipt.lines.filter((l) => l.productId && l.qtyExpected !== null && l.qtyReceived < (l.qtyExpected ?? 0));
+  const canReceiveAll = editable && fillable.length > 0;
 
   function complete() {
     const fd = new FormData();
@@ -46,6 +50,17 @@ export function CompleteReceiptBar({
     fd.set('receiptId', receipt.id);
     startTransition(async () => {
       const res = await completeReceiptAction(IDLE_STATE, fd);
+      setState(res);
+      if (res.status === 'success') router.refresh();
+    });
+  }
+
+  function receiveAll() {
+    const fd = new FormData();
+    fd.set('mode', mode);
+    fd.set('receiptId', receipt.id);
+    startTransition(async () => {
+      const res = await receiveAllAndCompleteAction(IDLE_STATE, fd);
       setState(res);
       if (res.status === 'success') router.refresh();
     });
@@ -98,17 +113,36 @@ export function CompleteReceiptBar({
               <XCircle size={16} aria-hidden="true" /> Annulla
             </Button>
           )}
-          <Button
-            fullWidth
-            loading={pending}
-            disabled={!canComplete}
-            onClick={() => (preview === 'completed' ? complete() : setConfirmOpen(true))}
-          >
-            <CheckCircle2 size={16} aria-hidden="true" />
-            Conferma e aggiorna magazzino
-          </Button>
+          {!canComplete && canReceiveAll ? (
+            // Caso standard "tutto arrivato": un solo tap riempie e contabilizza.
+            <Button fullWidth loading={pending} onClick={receiveAll}>
+              <CheckCircle2 size={16} aria-hidden="true" />
+              Ricevuto tutto
+            </Button>
+          ) : (
+            <Button
+              fullWidth
+              loading={pending}
+              disabled={!canComplete}
+              onClick={() => (preview === 'completed' ? complete() : setConfirmOpen(true))}
+            >
+              <CheckCircle2 size={16} aria-hidden="true" />
+              Conferma e aggiorna magazzino
+            </Button>
+          )}
         </div>
-        {!canComplete && (
+        {!canComplete && canReceiveAll && (
+          <p className="mt-1.5 text-xs text-ink-muted">
+            Tutto arrivato? Un tap. Quantità diverse? Modifica le righe sopra e usa “Conferma”.
+          </p>
+        )}
+        {/* Hanno già inserito quantità manuali ma possono anche prendere tutto. */}
+        {canComplete && canReceiveAll && (
+          <button type="button" onClick={receiveAll} className="mt-1.5 text-xs font-semibold text-primary hover:underline">
+            Oppure: ricevuto tutto come da ordine →
+          </button>
+        )}
+        {!canComplete && !canReceiveAll && (
           <p className="mt-1.5 text-xs text-ink-muted">
             {toPost.length === 0
               ? 'Registra le quantità ricevute (scan o manuale) per completare.'

@@ -210,6 +210,28 @@ export async function completeReceiptAction(
   }
 }
 
+/** "Ricevuto tutto" 1-tap: riempie ricevuto=atteso sulle righe matchate e completa. */
+export async function receiveAllAndCompleteAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const mode = (formField(formData, 'mode') === 'supplier' ? 'supplier' : 'bakery') as ReceiptMode;
+  const receiptId = formField(formData, 'receiptId') ?? '';
+  try {
+    const status = await service.receiveAllAndComplete(receiptId);
+    revalidateReceipt(mode, receiptId);
+    return {
+      status: 'success',
+      message:
+        status === 'completed'
+          ? 'Ricevuto tutto: magazzino aggiornato.'
+          : 'Carico registrato: alcune righe restano da associare a un prodotto.',
+    };
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+}
+
 export async function cancelReceiptAction(
   _prev: ActionState,
   formData: FormData,
