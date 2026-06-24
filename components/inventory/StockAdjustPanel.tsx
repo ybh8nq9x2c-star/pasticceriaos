@@ -23,6 +23,10 @@ function fmt(n: number): string {
 
 type Mode = 'delta' | 'absolute';
 
+// Motivi predefiniti della rettifica → finiscono nella nota del movimento
+// manual_adjustment (audit trail semantico, zero campi obbligatori in più).
+const REASONS = ['Conteggio fisico', 'Spreco', 'Correzione'] as const;
+
 export function StockAdjustPanel({
   ingredientId,
   ingredientName,
@@ -37,6 +41,8 @@ export function StockAdjustPanel({
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<Mode>('delta');
   const [sign, setSign] = useState<1 | -1>(1); // delta: aggiungi (+) / togli (−)
+  const [reason, setReason] = useState<string>(REASONS[0]); // motivo rettifica (audit trail)
+  const [note, setNote] = useState(''); // nota libera, solo se serve
   const [value, setValue] = useState(''); // magnitudine (delta) o conteggio (absolute)
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -86,7 +92,7 @@ export function StockAdjustPanel({
       fd.set('movementType', 'manual_adjustment');
       fd.set('quantityDelta', String(delta));
       fd.set('unit', unit);
-      fd.set('notes', `Rettifica rapida: ${delta > 0 ? '+' : ''}${fmt(delta)} ${UNIT_LABELS[unit]}`);
+      fd.set('notes', `${reason}: ${delta > 0 ? '+' : ''}${fmt(delta)} ${UNIT_LABELS[unit]}${note.trim() ? ` — ${note.trim()}` : ''}`);
       res = await recordMovementAction(IDLE_STATE, fd);
     } else {
       fd.set('ingredientProductId', ingredientId);
@@ -160,42 +166,67 @@ export function StockAdjustPanel({
               </div>
 
               {mode === 'delta' ? (
-                <div className="flex items-stretch gap-2">
-                  <div className="flex rounded-xl border border-border overflow-hidden shrink-0">
+                <div className="space-y-2">
+                  <div className="flex items-stretch gap-2">
+                    <div className="flex rounded-xl border border-border overflow-hidden shrink-0">
+                      <button
+                        type="button"
+                        aria-label="Togli"
+                        onClick={() => setSign(-1)}
+                        className={`px-3 ${sign === -1 ? 'bg-danger text-white' : 'bg-surface-2 text-ink-muted hover:text-ink'}`}
+                      >
+                        <Minus size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Aggiungi"
+                        onClick={() => setSign(1)}
+                        className={`px-3 ${sign === 1 ? 'bg-success text-white' : 'bg-surface-2 text-ink-muted hover:text-ink'}`}
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                    <input
+                      value={value}
+                      onChange={(e) => setValue(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="0"
+                      aria-label="Quantità da aggiungere o togliere"
+                      className="w-28 rounded-xl border border-border px-3 py-2.5 text-sm font-mono text-center bg-surface-2 focus:outline-none focus:ring-2 focus:ring-primary-ring"
+                    />
+                    <span className="flex items-center px-1 text-sm text-ink-muted shrink-0">{UNIT_LABELS[unit]}</span>
                     <button
                       type="button"
-                      aria-label="Togli"
-                      onClick={() => setSign(-1)}
-                      className={`px-3 ${sign === -1 ? 'bg-danger text-white' : 'bg-surface-2 text-ink-muted hover:text-ink'}`}
+                      disabled={!willChange || pending}
+                      onClick={() => setConfirmOpen(true)}
+                      className="flex-1 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
                     >
-                      <Minus size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Aggiungi"
-                      onClick={() => setSign(1)}
-                      className={`px-3 ${sign === 1 ? 'bg-success text-white' : 'bg-surface-2 text-ink-muted hover:text-ink'}`}
-                    >
-                      <Plus size={16} />
+                      {pending ? 'Registro…' : 'Registra'}
                     </button>
                   </div>
-                  <input
-                    value={value}
-                    onChange={(e) => setValue(e.target.value)}
-                    inputMode="decimal"
-                    placeholder="0"
-                    aria-label="Quantità da aggiungere o togliere"
-                    className="w-28 rounded-xl border border-border px-3 py-2.5 text-sm font-mono text-center bg-surface-2 focus:outline-none focus:ring-2 focus:ring-primary-ring"
-                  />
-                  <span className="flex items-center px-1 text-sm text-ink-muted shrink-0">{UNIT_LABELS[unit]}</span>
-                  <button
-                    type="button"
-                    disabled={!willChange || pending}
-                    onClick={() => setConfirmOpen(true)}
-                    className="flex-1 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 transition-colors"
-                  >
-                    {pending ? 'Registro…' : 'Registra'}
-                  </button>
+
+                  {/* Motivo (audit trail) — chip predefinite + nota libera solo se serve */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {REASONS.map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setReason(r)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+                          reason === r ? 'bg-primary text-primary-fg' : 'bg-bg border border-border text-ink-muted hover:text-ink'
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                    <input
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="nota (opz.)"
+                      aria-label="Nota rettifica"
+                      className="flex-1 min-w-[6rem] rounded-full border border-border bg-surface-2 px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary-ring"
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-stretch gap-2">

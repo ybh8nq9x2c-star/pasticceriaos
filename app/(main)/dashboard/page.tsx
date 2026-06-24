@@ -21,6 +21,7 @@ import {
   getRecipeCosts,
   getIngredientPurchaseStats,
 } from '@/modules/reporting/service';
+import type { DashboardSummary } from '@/modules/reporting/types';
 import { getLowStockAlerts, getExpiringBatches } from '@/modules/inventory/service';
 import { listReceipts } from '@/modules/goods-receipts/service';
 import { listDocuments } from '@/modules/documents/service';
@@ -73,23 +74,46 @@ export default async function TodayPage() {
   const session = await requireSession();
   const today = todayISODate();
 
-  const [summary, openOrders, stockAlerts, recipeCosts, expiring, documents, customerOrders, topSpend, openReceiptsRaw] =
-    await Promise.all([
-      getDashboardSummary(),
-      getOpenOrders(),
-      getLowStockAlerts(),
-      getRecipeCosts(),
-      getExpiringBatches(3),
-      listDocuments(),
-      listCustomerOrders(),
-      getIngredientPurchaseStats(3),
-      listReceipts({ status: ['draft', 'expected', 'partial'] }),
-    ]);
+  // RESILIENZA (P3): allSettled + fallback per sorgente → se una query fallisce, il
+  // resto della dashboard resta utile (niente crash totale). Le sezioni con dati
+  // mancanti degradano al loro stato vuoto; un avviso discreto segnala il degrado.
+  const results = await Promise.allSettled([
+    getDashboardSummary(),
+    getOpenOrders(),
+    getLowStockAlerts(),
+    getRecipeCosts(),
+    getExpiringBatches(3),
+    listDocuments(),
+    listCustomerOrders(),
+    getIngredientPurchaseStats(3),
+    listReceipts({ status: ['draft', 'expected', 'partial'] }),
+  ]);
+  const val = <T,>(r: PromiseSettledResult<T>, fb: T): T => (r.status === 'fulfilled' ? r.value : fb);
+  const emptySummary: DashboardSummary = {
+    lowStockCount: 0, outOfStockCount: 0, openOrdersCount: 0, openOrdersTotalValue: null,
+    activePlansCount: 0, todayPlan: null, monthSpend: 0, monthOrdersReceived: 0,
+  };
+  const summary = val(results[0] as PromiseSettledResult<DashboardSummary>, emptySummary);
+  const openOrders = val(results[1] as PromiseSettledResult<Awaited<ReturnType<typeof getOpenOrders>>>, []);
+  const stockAlerts = val(results[2] as PromiseSettledResult<Awaited<ReturnType<typeof getLowStockAlerts>>>, []);
+  const recipeCosts = val(results[3] as PromiseSettledResult<Awaited<ReturnType<typeof getRecipeCosts>>>, []);
+  const expiring = val(results[4] as PromiseSettledResult<Awaited<ReturnType<typeof getExpiringBatches>>>, []);
+  const documents = val(results[5] as PromiseSettledResult<Awaited<ReturnType<typeof listDocuments>>>, []);
+  const customerOrders = val(results[6] as PromiseSettledResult<Awaited<ReturnType<typeof listCustomerOrders>>>, []);
+  const topSpend = val(results[7] as PromiseSettledResult<Awaited<ReturnType<typeof getIngredientPurchaseStats>>>, []);
+  const openReceiptsRaw = val(results[8] as PromiseSettledResult<Awaited<ReturnType<typeof listReceipts>>>, []);
+  const dataDegraded = results.some((r) => r.status === 'rejected');
 
-  // Fabbisogno del piano di oggi (se esiste): copertura stock reale.
-  const todayRequirements = summary.todayPlan
-    ? await getIngredientRequirements(summary.todayPlan.id)
-    : [];
+  // Fabbisogno del piano di oggi (se esiste): copertura stock reale. Isolato: un
+  // suo errore non deve togliere il resto della dashboard.
+  let todayRequirements: Awaited<ReturnType<typeof getIngredientRequirements>> = [];
+  if (summary.todayPlan) {
+    try {
+      todayRequirements = await getIngredientRequirements(summary.todayPlan.id);
+    } catch {
+      todayRequirements = [];
+    }
+  }
   const todayShortages = todayRequirements.filter((r) => r.estimatedShortage > 0);
 
   // ── SEZIONE 2: richiede attenzione ─────────────────────────────────────────
@@ -238,6 +262,14 @@ export default async function TodayPage() {
         </h1>
         <p className="text-sm text-ink-muted mt-1 capitalize">{todayLabel()}</p>
       </div>
+
+      {/* Degraded mode (P3): una sorgente non risponde → il resto resta utilizzabile. */}
+      {dataDegraded && (
+        <div className="rounded-2xl border border-warning-soft bg-warning-light/50 px-5 py-3 text-sm text-ink-muted">
+          Alcuni dati non sono disponibili in questo momento: le sezioni interessate potrebbero risultare vuote.
+          Riprova tra poco — il resto della dashboard è aggiornato.
+        </div>
+      )}
 
       {/* ── 1 · SITUAZIONE DI OGGI ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">

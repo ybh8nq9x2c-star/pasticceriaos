@@ -13,6 +13,7 @@ import { completePlanAction, cancelPlanAction } from '@/modules/production/actio
 import { DraftOrdersButton } from './DraftOrdersButton';
 import type { PlanStatus } from '@/modules/production/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 import { UNIT_LABELS } from '@/lib/utils';
 
 export const metadata: Metadata = { title: 'Piano di produzione' };
@@ -254,23 +255,24 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
 
           {canComplete && (
             <form action={handleComplete}>
-              <button
-                type="submit"
+              {/* SubmitButton: disabilita + spinner durante l'invio → niente doppio click. */}
+              <SubmitButton
+                pendingLabel="Completamento…"
                 className="w-full py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
               >
                 ✓ Segna come completato
-              </button>
+              </SubmitButton>
             </form>
           )}
 
           {canCancel && (
             <form action={handleCancel}>
-              <button
-                type="submit"
+              <SubmitButton
+                pendingLabel="Annullamento…"
                 className="w-full py-3 border border-danger-soft text-danger rounded-xl text-sm font-semibold hover:bg-danger-light transition-colors"
               >
                 Annulla piano
-              </button>
+              </SubmitButton>
             </form>
           )}
 

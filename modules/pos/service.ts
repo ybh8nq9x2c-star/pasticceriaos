@@ -9,6 +9,8 @@ import { AuthError, mapSupabaseError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { listRecipes } from '@/modules/catalog/service';
 import { listUnlinkedProducts } from '@/modules/sales/service';
+import { suggestProducts, type CatalogProductRef } from '@/modules/goods-receipts/matching';
+import type { UnlinkedProduct } from '@/modules/sales/types';
 import { upsertPosMappingSchema } from './schemas';
 
 const norm = (s: string) => s.trim().toLowerCase();
@@ -57,10 +59,32 @@ export async function listPosMappings(): Promise<PosMappingView[]> {
   });
 }
 
-/** Prodotti POS visti in vendita ma NON ancora mappati (da collegare). */
-export async function listUnmappedPosProducts() {
-  const unlinked = await listUnlinkedProducts();
-  return unlinked.filter((u) => u.source.startsWith('pos:'));
+export interface UnmappedPosProduct extends UnlinkedProduct {
+  /** Ricetta interna più probabile (match fuzzy sul nome) — pre-selezionata in UI. */
+  suggestedRecipeId: string | null;
+  suggestedRecipeName: string | null;
+}
+
+/**
+ * Prodotti POS visti in vendita ma NON ancora mappati. Per ognuno propone la
+ * ricetta interna più probabile (riusa il matcher fuzzy esistente): l'utente
+ * collega in UN tap invece di cercare nella tendina.
+ */
+export async function listUnmappedPosProducts(): Promise<UnmappedPosProduct[]> {
+  const unlinked = (await listUnlinkedProducts()).filter((u) => u.source.startsWith('pos:'));
+  if (unlinked.length === 0) return [];
+
+  const recipes = await listRecipeOptions();
+  const catalog: CatalogProductRef[] = recipes.map((r) => ({ id: r.id, name: r.name, sku: null, barcode: null, unit: 'pz' }));
+
+  return unlinked.map((u) => {
+    const best = suggestProducts(catalog, u.productName, 1)[0] ?? null;
+    return {
+      ...u,
+      suggestedRecipeId: best?.product.id ?? null,
+      suggestedRecipeName: best?.product.name ?? null,
+    };
+  });
 }
 
 /** Ricette attive per la tendina di selezione. */

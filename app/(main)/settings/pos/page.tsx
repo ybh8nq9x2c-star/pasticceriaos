@@ -61,15 +61,21 @@ export default async function PosSettingsPage({ searchParams }: { searchParams: 
                 id={rowId(u.externalProductRef)}
                 className={`rounded-xl border border-warning-soft bg-warning-light/40 p-3 ${hiClass(u.externalProductRef)}`}
               >
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
                   <Badge variant="warning" size="sm">Non collegato</Badge>
                   <span className="text-sm font-semibold text-ink">{u.productName}</span>
                   <span className="text-xs font-mono text-ink-muted">{u.externalProductRef}</span>
+                  {u.suggestedRecipeName && (
+                    <span className="text-xs text-ink-muted">
+                      · suggerito: <span className="font-semibold text-primary">{u.suggestedRecipeName}</span>
+                    </span>
+                  )}
                 </div>
                 <PosMappingForm
                   source={u.source}
                   posItemId={u.externalProductRef}
                   posItemName={u.productName}
+                  recipeId={u.suggestedRecipeId}
                   recipes={recipes}
                   submitLabel="Collega"
                 />
