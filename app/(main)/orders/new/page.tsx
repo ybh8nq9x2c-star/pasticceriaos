@@ -20,7 +20,7 @@ function formatQty(n: number): string {
 export default async function NewOrderPage({
   searchParams,
 }: {
-  searchParams: { plan?: string };
+  searchParams: { plan?: string; ingredient?: string; qty?: string };
 }) {
   const [suppliers, ingredients] = await Promise.all([
     listSuppliers(),
@@ -30,6 +30,22 @@ export default async function NewOrderPage({
   let initialRows: PrefillRow[] | undefined;
   let initialSupplierId: string | undefined;
   let prefillNote: string | undefined;
+
+  // Riordino rapido di UN ingrediente (da "Ordina subito" sugli alert scorte).
+  if (searchParams.ingredient && !searchParams.plan) {
+    const ing = ingredients.find((i) => i.id === searchParams.ingredient);
+    if (ing) {
+      const qty = searchParams.qty && Number(searchParams.qty) > 0 ? formatQty(Number(searchParams.qty)) : '';
+      initialRows = [{
+        ingredientProductId: ing.id,
+        quantity:            qty,
+        unitSnapshot:        ing.unit,
+        unitPriceSnapshot:   ing.unitPrice !== null ? String(ing.unitPrice) : '',
+      }];
+      initialSupplierId = ing.supplierId ?? undefined; // preseleziona il fornitore dell'ingrediente
+      prefillNote = `Riordino rapido: ${ing.name}.${qty ? ' Quantità suggerita per coprire la soglia — verifica e correggi.' : ' Inserisci la quantità da ordinare.'}`;
+    }
+  }
 
   if (searchParams.plan) {
     const requirements = await getIngredientRequirements(searchParams.plan);

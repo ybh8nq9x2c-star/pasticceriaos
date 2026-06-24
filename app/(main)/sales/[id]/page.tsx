@@ -82,8 +82,11 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
                     ) : (
                       <span className="inline-flex flex-wrap items-center gap-2">
                         <Badge variant="warning" size="sm">Prodotto non collegato</Badge>
-                        <Link href="/settings/pos" className="text-xs font-semibold text-primary hover:underline">
-                          Collega →
+                        <Link
+                          href={`/settings/pos?highlight=${encodeURIComponent(l.externalProductRef)}`}
+                          className="text-xs font-semibold text-primary hover:underline"
+                        >
+                          Collega «{l.externalProductRef}» →
                         </Link>
                       </span>
                     )}

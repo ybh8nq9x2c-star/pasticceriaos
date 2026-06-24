@@ -449,13 +449,21 @@ export default async function TodayPage() {
             <p className="px-5 py-8 text-sm text-ink-muted text-center">Tutte le scorte sono sopra soglia. ✓</p>
           ) : (
             <div className="divide-y divide-divider">
-              {stockAlerts.slice(0, 5).map((a) => (
-                <div key={a.ingredientProductId} className="flex items-center gap-3 px-5 py-3">
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${a.alertLevel === 'out_of_stock' ? 'bg-danger' : a.alertLevel === 'critical' ? 'bg-warning' : 'bg-primary'}`} />
-                  <span className="flex-1 text-sm text-ink truncate">{a.ingredientName}</span>
-                  <span className="text-xs font-mono text-ink-muted">{a.currentQuantity}/{a.minThreshold} {a.unit}</span>
-                </div>
-              ))}
+              {stockAlerts.slice(0, 5).map((a) => {
+                // Riordino suggerito: riporta la scorta a 2× la soglia (editabile nel form ordine).
+                const reorder = Math.round((a.minThreshold * 2 - a.currentQuantity) * 1000) / 1000;
+                const orderHref = `/orders/new?ingredient=${a.ingredientProductId}` + (reorder > 0 ? `&qty=${reorder}` : '');
+                return (
+                  <div key={a.ingredientProductId} className="flex items-center gap-3 px-5 py-3">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${a.alertLevel === 'out_of_stock' ? 'bg-danger' : a.alertLevel === 'critical' ? 'bg-warning' : 'bg-primary'}`} />
+                    <span className="flex-1 text-sm text-ink truncate">{a.ingredientName}</span>
+                    <span className="text-xs font-mono text-ink-muted">{a.currentQuantity}/{a.minThreshold} {a.unit}</span>
+                    <Link href={orderHref} className="shrink-0 text-xs font-semibold text-primary hover:underline whitespace-nowrap">
+                      Ordina subito →
+                    </Link>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

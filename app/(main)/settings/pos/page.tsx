@@ -13,18 +13,33 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Badge } from '@/components/ui/Badge';
 import { PosMappingForm } from './PosMappingForm';
+import { HighlightScroll } from './HighlightScroll';
 
 export const metadata: Metadata = { title: 'Mappature POS' };
 
-export default async function PosSettingsPage() {
+// id DOM stabile per la riga di un prodotto POS (per evidenziazione + scroll).
+const rowId = (ref: string) => `pos-row-${ref.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+
+export default async function PosSettingsPage({ searchParams }: { searchParams: { highlight?: string } }) {
   const [mappings, unmapped, recipes] = await Promise.all([
     listPosMappings(),
     listUnmappedPosProducts(),
     listRecipeOptions(),
   ]);
 
+  const highlight = searchParams.highlight?.trim().toLowerCase() ?? null;
+  const isHi = (ref: string) => highlight !== null && ref.trim().toLowerCase() === highlight;
+  const hiClass = (ref: string) => (isHi(ref) ? 'ring-2 ring-primary ring-offset-2 ring-offset-bg' : '');
+  const highlightTargetId =
+    highlight !== null
+      ? [...unmapped.map((u) => u.externalProductRef), ...mappings.map((m) => m.posItemId)].find(
+          (ref) => ref.trim().toLowerCase() === highlight,
+        )
+      : undefined;
+
   return (
     <div className="p-8 max-w-3xl mx-auto space-y-8">
+      {highlightTargetId && <HighlightScroll targetId={rowId(highlightTargetId)} />}
       <PageHeader
         title="Mappature POS"
         subtitle="Collega ogni prodotto della cassa a una ricetta: alla vendita il magazzino si scarica da solo."
@@ -41,7 +56,11 @@ export default async function PosSettingsPage() {
           </p>
           <div className="space-y-2">
             {unmapped.map((u) => (
-              <div key={`${u.source}::${u.externalProductRef}`} className="rounded-xl border border-warning-soft bg-warning-light/40 p-3">
+              <div
+                key={`${u.source}::${u.externalProductRef}`}
+                id={rowId(u.externalProductRef)}
+                className={`rounded-xl border border-warning-soft bg-warning-light/40 p-3 ${hiClass(u.externalProductRef)}`}
+              >
                 <div className="flex items-center gap-2 mb-2">
                   <Badge variant="warning" size="sm">Non collegato</Badge>
                   <span className="text-sm font-semibold text-ink">{u.productName}</span>
@@ -72,7 +91,11 @@ export default async function PosSettingsPage() {
         ) : (
           <div className="space-y-2">
             {mappings.map((m) => (
-              <div key={m.id} className="rounded-xl border border-border bg-surface-2 p-3">
+              <div
+                key={m.id}
+                id={rowId(m.posItemId)}
+                className={`rounded-xl border border-border bg-surface-2 p-3 ${hiClass(m.posItemId)}`}
+              >
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-mono text-ink-muted">{m.posItemId}</span>
                   <span className="text-sm font-semibold text-ink">{m.posItemName ?? m.recipeName ?? '—'}</span>
