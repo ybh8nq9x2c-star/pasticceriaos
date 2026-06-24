@@ -58,6 +58,9 @@ export function NewOrderForm({
   );
 
   const [state, formAction] = useFormState(createOrderAction, IDLE_STATE);
+  // Caso standard (Task 2): solo i campi indispensabili. Data/consegna/note e
+  // unità/prezzo per riga (auto-compilati dall'ingrediente) stanno dietro "dettagli".
+  const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
     if (state.status === 'success') router.push(`/orders?flash=${encodeURIComponent('Ordine creato')}`);
@@ -131,7 +134,16 @@ export function NewOrderForm({
 
         {/* Testata ordine */}
         <div className="bg-surface-2 rounded-2xl border border-border p-6 space-y-5">
-          <h2 className="text-base font-bold text-ink">Dettagli ordine</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-ink">Dettagli ordine</h2>
+            <button
+              type="button"
+              onClick={() => setShowDetails((v) => !v)}
+              className="text-xs font-semibold text-primary hover:underline"
+            >
+              {showDetails ? 'Nascondi dettagli' : 'Mostra dettagli'}
+            </button>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-ink mb-1.5">
@@ -156,42 +168,46 @@ export function NewOrderForm({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-ink mb-1.5">
-                Data ordine <span className="text-danger">*</span>
-              </label>
-              <input
-                name="orderDate"
-                type="date"
-                required
-                defaultValue={today()}
-                className="w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary"
-              />
+          {/* Avanzati: restano nel DOM (la data di default si invia comunque) ma
+              visibili solo su "Mostra dettagli". Caso standard = data oggi + niente note. */}
+          <div className={showDetails ? 'space-y-5' : 'hidden'}>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-ink mb-1.5">
+                  Data ordine <span className="text-danger">*</span>
+                </label>
+                <input
+                  name="orderDate"
+                  type="date"
+                  required
+                  defaultValue={today()}
+                  className="w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-ink mb-1.5">
+                  Consegna prevista <span className="text-ink-muted font-normal">(opz.)</span>
+                </label>
+                <input
+                  name="expectedDate"
+                  type="date"
+                  className="w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-ink mb-1.5">
-                Consegna prevista <span className="text-ink-muted font-normal">(opz.)</span>
-              </label>
-              <input
-                name="expectedDate"
-                type="date"
-                className="w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary"
-              />
-            </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-ink mb-1.5">
-              Note <span className="text-ink-muted font-normal">(opz.)</span>
-            </label>
-            <textarea
-              name="notes"
-              rows={2}
-              maxLength={2000}
-              defaultValue={prefillNote ? `Riordino da fabbisogno piano produzione.` : undefined}
-              className="w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary resize-none"
-            />
+            <div>
+              <label className="block text-sm font-medium text-ink mb-1.5">
+                Note <span className="text-ink-muted font-normal">(opz.)</span>
+              </label>
+              <textarea
+                name="notes"
+                rows={2}
+                maxLength={2000}
+                defaultValue={prefillNote ? `Riordino da fabbisogno piano produzione.` : undefined}
+                className="w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary resize-none"
+              />
+            </div>
           </div>
         </div>
 
@@ -215,12 +231,12 @@ export function NewOrderForm({
               <div key={row.key} className="grid grid-cols-12 gap-2 items-center">
                 <span className="col-span-1 text-xs text-ink-muted text-center font-mono">{idx + 1}</span>
 
-                {/* Ingrediente */}
+                {/* Ingrediente (essenziale; più largo quando i dettagli sono nascosti) */}
                 <select
                   aria-label={`Ingrediente riga ${idx + 1}`}
                   value={row.ingredientProductId}
                   onChange={(e) => updateRow(row.key, 'ingredientProductId', e.target.value)}
-                  className="col-span-5 rounded-xl border border-border px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring bg-surface-2"
+                  className={`${showDetails ? 'col-span-5' : 'col-span-7'} rounded-xl border border-border px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring bg-surface-2`}
                 >
                   <option value="">Ingrediente…</option>
                   {ingredients.map((i) => (
@@ -228,7 +244,7 @@ export function NewOrderForm({
                   ))}
                 </select>
 
-                {/* Quantità */}
+                {/* Quantità (essenziale) */}
                 <input
                   type="number"
                   step="0.001"
@@ -237,30 +253,32 @@ export function NewOrderForm({
                   aria-label={`Quantità riga ${idx + 1}`}
                   value={row.quantity}
                   onChange={(e) => updateRow(row.key, 'quantity', e.target.value)}
-                  className="col-span-2 rounded-xl border border-border px-2 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
+                  className={`${showDetails ? 'col-span-2' : 'col-span-3'} rounded-xl border border-border px-2 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring`}
                 />
 
-                {/* Unità */}
-                <select
-                  value={row.unitSnapshot}
-                  onChange={(e) => updateRow(row.key, 'unitSnapshot', e.target.value)}
-                  className="col-span-2 rounded-xl border border-border px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring bg-surface-2"
-                >
-                  {['g','kg','ml','l','pz','bustina','foglio'].map((u) => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
-
-                {/* Prezzo unitario */}
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="€/u"
-                  value={row.unitPriceSnapshot}
-                  onChange={(e) => updateRow(row.key, 'unitPriceSnapshot', e.target.value)}
-                  className="col-span-1 rounded-xl border border-border px-2 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
-                />
+                {/* Unità + Prezzo: auto-compilati dall'ingrediente, visibili solo nei dettagli */}
+                {showDetails && (
+                  <>
+                    <select
+                      value={row.unitSnapshot}
+                      onChange={(e) => updateRow(row.key, 'unitSnapshot', e.target.value)}
+                      className="col-span-2 rounded-xl border border-border px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring bg-surface-2"
+                    >
+                      {['g','kg','ml','l','pz','bustina','foglio'].map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="€/u"
+                      value={row.unitPriceSnapshot}
+                      onChange={(e) => updateRow(row.key, 'unitPriceSnapshot', e.target.value)}
+                      className="col-span-1 rounded-xl border border-border px-2 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
+                    />
+                  </>
+                )}
 
                 {/* Rimuovi */}
                 {rows.length > 1 && (

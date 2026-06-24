@@ -284,6 +284,13 @@ export default async function TodayPage() {
               <p className="text-xs text-ink-muted mt-1 truncate">
                 {todayShortages.map((s) => s.ingredientName).join(', ')}
               </p>
+              {/* CTA contestuale (Task 1: "cosa ordinare adesso") → genera bozze ordine dal piano. */}
+              <Link
+                href={`/production/${summary.todayPlan.id}`}
+                className="inline-block mt-2 text-xs font-semibold text-primary hover:underline"
+              >
+                Ordina i mancanti →
+              </Link>
             </>
           )}
         </div>
