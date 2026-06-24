@@ -10,6 +10,7 @@ import { notFound } from 'next/navigation';
 import { getPlan } from '@/modules/production/service';
 import { getIngredientRequirements } from '@/modules/reporting/service';
 import { completePlanAction, cancelPlanAction } from '@/modules/production/actions';
+import { isPendingConfirmation } from '@/modules/production/status';
 import { DraftOrdersButton } from './DraftOrdersButton';
 import type { PlanStatus } from '@/modules/production/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -56,6 +57,7 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
 
   const canComplete = plan.status === 'draft' || plan.status === 'in_progress';
   const canCancel   = plan.status !== 'completed' && plan.status !== 'cancelled';
+  const pending     = isPendingConfirmation(plan.planDate, plan.status); // passato + aperto
   const totalPortions = plan.items.reduce((s, i) => s + i.totalPortions, 0);
 
   const shortageItems = requirements.filter((r) => r.estimatedShortage > 0);
@@ -92,12 +94,24 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
             </p>
           </div>
           <StatusBadge
-            label={STATUS_LABELS[plan.status]}
-            variant={STATUS_VARIANT[plan.status]}
+            label={pending ? 'Da confermare' : STATUS_LABELS[plan.status]}
+            variant={pending ? 'amber' : STATUS_VARIANT[plan.status]}
             className="text-sm px-3 py-1"
           />
         </div>
       </div>
+
+      {/* Promemoria SOFT (piano passato non chiuso): niente auto-completamento,
+          solo invito a confermare ESPLICITAMENTE → scarico magazzino via completePlan. */}
+      {pending && (
+        <div className="mb-6 rounded-2xl border border-warning-soft bg-warning-light/50 px-5 py-4">
+          <p className="font-semibold text-ink">Questa produzione non è ancora confermata.</p>
+          <p className="text-sm text-ink-muted mt-1">
+            Il piano è di un giorno passato. Se l'hai prodotto, confermalo qui sotto: il magazzino verrà aggiornato.
+            Se non l'hai prodotto, puoi annullarlo. Nulla viene scaricato in automatico.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
@@ -255,13 +269,17 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
 
           {canComplete && (
             <form action={handleComplete}>
-              {/* SubmitButton: disabilita + spinner durante l'invio → niente doppio click. */}
+              {/* Copy chiaro (non "Segna come completato"): l'azione scarica il magazzino.
+                  SubmitButton → disabilita + spinner (niente doppio click). */}
               <SubmitButton
-                pendingLabel="Completamento…"
+                pendingLabel="Confermo…"
                 className="w-full py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
               >
-                ✓ Segna come completato
+                ✓ Conferma produzione eseguita
               </SubmitButton>
+              <p className="mt-1.5 text-xs text-ink-muted text-center">
+                Scarica automaticamente dal magazzino gli ingredienti usati.
+              </p>
             </form>
           )}
 

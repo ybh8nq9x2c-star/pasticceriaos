@@ -6,11 +6,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { listPlans } from '@/modules/production/service';
+import { isPendingConfirmation } from '@/modules/production/status';
 import type { PlanStatus } from '@/modules/production/types';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { ChefHat } from 'lucide-react';
+import { ChefHat, Clock } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Produzione' };
 
@@ -36,6 +37,7 @@ function formatDate(iso: string) {
 
 export default async function ProductionPage() {
   const plans = await listPlans();
+  const pendingCount = plans.filter((p) => isPendingConfirmation(p.planDate, p.status)).length;
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
@@ -60,6 +62,17 @@ export default async function ProductionPage() {
         }
       />
 
+      {/* Promemoria SOFT: piani passati non chiusi (stato derivato, niente auto-completamento). */}
+      {pendingCount > 0 && (
+        <div className="mb-4 rounded-2xl border border-warning-soft bg-warning-light/50 px-5 py-3 flex items-start gap-3">
+          <Clock className="size-5 text-warning-strong shrink-0 mt-0.5" aria-hidden="true" />
+          <p className="text-sm text-ink">
+            <strong>{pendingCount} pian{pendingCount === 1 ? 'o' : 'i'} da confermare:</strong> produzione di giorni
+            passati non ancora chiusa. Aprila e conferma per scaricare gli ingredienti dal magazzino.
+          </p>
+        </div>
+      )}
+
       {plans.length === 0 ? (
         <EmptyState
           icon={ChefHat}
@@ -70,7 +83,9 @@ export default async function ProductionPage() {
         />
       ) : (
         <div className="space-y-3">
-          {plans.map((plan) => (
+          {plans.map((plan) => {
+            const pending = isPendingConfirmation(plan.planDate, plan.status);
+            return (
             <Link
               key={plan.id}
               href={`/production/${plan.id}`}
@@ -81,7 +96,11 @@ export default async function ProductionPage() {
                   <p className="font-semibold text-ink group-hover:text-primary">
                     📅 {formatDate(plan.planDate)}
                   </p>
-                  <StatusBadge label={STATUS_LABELS[plan.status]} variant={STATUS_VARIANT[plan.status]} />
+                  {/* Derivato: passato + aperto → "Da confermare" (ambra), niente cambio stato DB. */}
+                  <StatusBadge
+                    label={pending ? 'Da confermare' : STATUS_LABELS[plan.status]}
+                    variant={pending ? 'amber' : STATUS_VARIANT[plan.status]}
+                  />
                 </div>
                 {plan.notes && (
                   <p className="text-xs text-ink-muted mt-1 truncate">{plan.notes}</p>
@@ -97,7 +116,8 @@ export default async function ProductionPage() {
               </div>
               <span className="text-ink-faint group-hover:text-primary text-lg">›</span>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

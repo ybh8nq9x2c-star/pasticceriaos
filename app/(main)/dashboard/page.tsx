@@ -26,6 +26,8 @@ import { getLowStockAlerts, getExpiringBatches } from '@/modules/inventory/servi
 import { listReceipts } from '@/modules/goods-receipts/service';
 import { listDocuments } from '@/modules/documents/service';
 import { listCustomerOrders } from '@/modules/customers/service';
+import { listPlans } from '@/modules/production/service';
+import { isPendingConfirmation } from '@/modules/production/status';
 import { requireSession } from '@/modules/identity/service';
 import { formatCurrency, todayISODate } from '@/lib/utils';
 
@@ -87,6 +89,7 @@ export default async function TodayPage() {
     listCustomerOrders(),
     getIngredientPurchaseStats(3),
     listReceipts({ status: ['draft', 'expected', 'partial'] }),
+    listPlans(),
   ]);
   const val = <T,>(r: PromiseSettledResult<T>, fb: T): T => (r.status === 'fulfilled' ? r.value : fb);
   const emptySummary: DashboardSummary = {
@@ -102,7 +105,11 @@ export default async function TodayPage() {
   const customerOrders = val(results[6] as PromiseSettledResult<Awaited<ReturnType<typeof listCustomerOrders>>>, []);
   const topSpend = val(results[7] as PromiseSettledResult<Awaited<ReturnType<typeof getIngredientPurchaseStats>>>, []);
   const openReceiptsRaw = val(results[8] as PromiseSettledResult<Awaited<ReturnType<typeof listReceipts>>>, []);
+  const allPlans = val(results[9] as PromiseSettledResult<Awaited<ReturnType<typeof listPlans>>>, []);
   const dataDegraded = results.some((r) => r.status === 'rejected');
+
+  // Piani passati non confermati (stato derivato, niente auto-completamento).
+  const pendingPlans = allPlans.filter((p) => isPendingConfirmation(p.planDate, p.status));
 
   // Fabbisogno del piano di oggi (se esiste): copertura stock reale. Isolato: un
   // suo errore non deve togliere il resto della dashboard.
@@ -142,6 +149,17 @@ export default async function TodayPage() {
       text: `${openReceipts.length} riceviment${openReceipts.length === 1 ? 'o' : 'i'} non contabilizzat${openReceipts.length === 1 ? 'o' : 'i'}: il magazzino non è ancora aggiornato`,
       detail: openReceipts.map((r) => r.supplierName).filter(Boolean).slice(0, 3).join(', ') || 'conferma per aggiornare le giacenze',
       href: '/receipts?tab=open',
+    });
+  }
+
+  // Piani di produzione passati non ancora confermati (stato derivato). Promemoria
+  // soft: nessun auto-completamento, solo l'invito a chiudere esplicitamente.
+  if (pendingPlans.length > 0) {
+    attention.push({
+      icon: Calculator, severity: 'amber',
+      text: `${pendingPlans.length} pian${pendingPlans.length === 1 ? 'o' : 'i'} di produzione da confermare`,
+      detail: 'produzione di giorni passati non ancora chiusa: confermala per aggiornare il magazzino',
+      href: pendingPlans.length === 1 ? `/production/${pendingPlans[0].id}` : '/production',
     });
   }
 
