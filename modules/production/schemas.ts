@@ -65,8 +65,23 @@ export const quickProduceSchema = z.object({
     .positive('Indica almeno 1 infornata'),
 });
 
-export type CreatePlanInput   = z.infer<typeof createPlanSchema>;
-export type UpdatePlanInput   = z.infer<typeof updatePlanSchema>;
-export type AddPlanItemInput  = z.infer<typeof addPlanItemSchema>;
-export type PlanItemInput     = z.infer<typeof planItemSchema>;
-export type QuickProduceInput = z.infer<typeof quickProduceSchema>;
+// ---------------------------------------------------------------------------
+// Settimana tipo (template settimanale di produzione)
+// ---------------------------------------------------------------------------
+
+const templateItemSchema = z.object({
+  weekday:    z.coerce.number().int().min(0).max(6), // 0=domenica … 6=sabato
+  recipeId:   z.string().uuid('Ricetta non valida'),
+  batchCount: z.coerce.number().int().positive('Almeno 1 batch'),
+});
+
+export const saveWeekTemplateSchema = z.object({
+  items: z.array(templateItemSchema).max(300),
+});
+
+export type CreatePlanInput      = z.infer<typeof createPlanSchema>;
+export type UpdatePlanInput      = z.infer<typeof updatePlanSchema>;
+export type AddPlanItemInput     = z.infer<typeof addPlanItemSchema>;
+export type PlanItemInput        = z.infer<typeof planItemSchema>;
+export type QuickProduceInput    = z.infer<typeof quickProduceSchema>;
+export type SaveWeekTemplateInput = z.infer<typeof saveWeekTemplateSchema>;

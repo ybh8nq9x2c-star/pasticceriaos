@@ -498,6 +498,47 @@ export interface Database {
         ];
       };
 
+      production_template_items: {
+        Row: {
+          id: string;
+          organization_id: string;
+          weekday: number;
+          recipe_id: string;
+          batch_count: number;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          weekday: number;
+          recipe_id: string;
+          batch_count: number;
+          sort_order?: number;
+        };
+        Update: {
+          weekday?: number;
+          batch_count?: number;
+          sort_order?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'production_template_items_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'production_template_items_recipe_id_fkey';
+            columns: ['recipe_id'];
+            isOneToOne: false;
+            referencedRelation: 'recipes';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+
       // ── ordering ────────────────────────────────────────────────────────────
       purchase_orders: {
         Row: {

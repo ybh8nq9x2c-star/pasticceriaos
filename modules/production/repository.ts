@@ -5,8 +5,8 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { mapSupabaseError, NotFoundError } from '@/lib/errors';
-import type { ProductionPlan, ProductionPlanListItem, ProductionPlanItem, PlanStatus } from './types';
-import type { CreatePlanInput, UpdatePlanInput, PlanItemInput } from './schemas';
+import type { ProductionPlan, ProductionPlanListItem, ProductionPlanItem, PlanStatus, WeekTemplateItem } from './types';
+import type { CreatePlanInput, UpdatePlanInput, PlanItemInput, SaveWeekTemplateInput } from './schemas';
 
 // ---------------------------------------------------------------------------
 // Production Plans
@@ -176,4 +176,68 @@ function toPlan(row: any): ProductionPlan {
       }),
     ).sort((a: ProductionPlanItem, b: ProductionPlanItem) => a.sortOrder - b.sortOrder),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Settimana tipo (production_template_items)
+// ---------------------------------------------------------------------------
+
+/** Righe del template settimanale con nome ricetta (solo ricette ancora attive). */
+export async function listTemplateItems(orgId: string): Promise<WeekTemplateItem[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('production_template_items')
+    .select('weekday, recipe_id, batch_count, sort_order, recipes(name, is_active)')
+    .eq('organization_id', orgId)
+    .order('weekday')
+    .order('sort_order');
+  if (error) throw mapSupabaseError(error);
+  return (data ?? [])
+    .map((r) => {
+      const row = r as unknown as {
+        weekday: number;
+        recipe_id: string;
+        batch_count: number;
+        recipes: { name: string; is_active: boolean } | { name: string; is_active: boolean }[] | null;
+      };
+      const rec = Array.isArray(row.recipes) ? row.recipes[0] : row.recipes;
+      return {
+        weekday: row.weekday,
+        recipeId: row.recipe_id,
+        recipeName: rec?.name ?? '',
+        batchCount: Number(row.batch_count),
+        isActive: rec?.is_active ?? false,
+      };
+    })
+    .filter((r) => r.isActive); // una ricetta disattivata non deve generare piani
+}
+
+/** Sostituisce IN BLOCCO la settimana tipo dell'org (delete + insert). */
+export async function replaceTemplateItems(orgId: string, input: SaveWeekTemplateInput): Promise<void> {
+  const supabase = await createClient();
+  const { error: delErr } = await supabase.from('production_template_items').delete().eq('organization_id', orgId);
+  if (delErr) throw mapSupabaseError(delErr);
+  if (input.items.length === 0) return;
+  // Indice per dare un sort_order stabile per giorno.
+  const perDay = new Map<number, number>();
+  const rows = input.items.map((it) => {
+    const i = perDay.get(it.weekday) ?? 0;
+    perDay.set(it.weekday, i + 1);
+    return { organization_id: orgId, weekday: it.weekday, recipe_id: it.recipeId, batch_count: it.batchCount, sort_order: i };
+  });
+  const { error: insErr } = await supabase.from('production_template_items').insert(rows);
+  if (insErr) throw mapSupabaseError(insErr);
+}
+
+/** Tra le date passate, quali hanno GIÀ un piano (così l'applicatore le salta). */
+export async function existingPlanDates(orgId: string, dates: string[]): Promise<Set<string>> {
+  if (dates.length === 0) return new Set();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('production_plans')
+    .select('plan_date')
+    .eq('organization_id', orgId)
+    .in('plan_date', dates);
+  if (error) throw mapSupabaseError(error);
+  return new Set((data ?? []).map((p) => p.plan_date as string));
 }

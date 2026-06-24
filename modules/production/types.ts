@@ -39,3 +39,25 @@ export interface ProductionPlanListItem {
   completedAt: string | null;
   createdAt: string;
 }
+
+// ── Settimana tipo (template settimanale) ────────────────────────────────────
+
+export interface WeekTemplateItem {
+  weekday: number; // 0=domenica … 6=sabato
+  recipeId: string;
+  recipeName: string;
+  batchCount: number;
+  isActive: boolean;
+}
+
+/** Un giorno della settimana tipo con le sue ricette (per la UI). */
+export interface WeekTemplateDay {
+  weekday: number;
+  items: { recipeId: string; recipeName: string; batchCount: number }[];
+}
+
+/** Esito dell'applicazione del template ai giorni. */
+export interface ApplyTemplateResult {
+  created: string[]; // date YYYY-MM-DD per cui è stato creato un piano
+  skipped: string[]; // date che avevano già un piano (non toccate)
+}

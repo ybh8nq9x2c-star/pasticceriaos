@@ -43,12 +43,20 @@ export default async function ProductionPage() {
         title="Produzione"
         subtitle={`${plans.length} piano/i`}
         action={
-          <Link
-            href="/production/new"
-            className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
-          >
-            + Nuovo piano
-          </Link>
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+            <Link
+              href="/production/template"
+              className="px-4 py-2.5 bg-surface-2 text-ink border border-border rounded-xl text-sm font-semibold hover:bg-surface-offset transition-colors text-center whitespace-nowrap"
+            >
+              Settimana tipo
+            </Link>
+            <Link
+              href="/production/new"
+              className="px-4 py-2.5 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors text-center whitespace-nowrap"
+            >
+              + Nuovo piano
+            </Link>
+          </div>
         }
       />
 

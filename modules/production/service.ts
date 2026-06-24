@@ -3,15 +3,16 @@
 // Business logic per production plans.
 // =============================================================================
 
-import { requireOrgId } from '@/modules/identity/service';
+import { requireOrgId, requireSession } from '@/modules/identity/service';
 import { createClient } from '@/lib/supabase/server';
-import { BusinessRuleError, mapSupabaseError } from '@/lib/errors';
+import { AuthError, BusinessRuleError, mapSupabaseError } from '@/lib/errors';
 import { todayISODate } from '@/lib/utils';
 import type { UnitOfMeasure } from '@/lib/database.types';
 import * as repo from './repository';
 import { aggregateLiveRequirements, type RecipeBomForReq, type LiveRequirement } from './requirements';
-import { createPlanSchema, quickProduceSchema, updatePlanSchema } from './schemas';
-import type { ProductionPlan, ProductionPlanListItem } from './types';
+import { computeApplyCandidates } from './template';
+import { createPlanSchema, quickProduceSchema, updatePlanSchema, saveWeekTemplateSchema } from './schemas';
+import type { ProductionPlan, ProductionPlanListItem, WeekTemplateDay, ApplyTemplateResult } from './types';
 import type { CreatePlanInput, QuickProduceInput, UpdatePlanInput } from './schemas';
 
 export type { LiveRequirement };
@@ -27,6 +28,75 @@ export async function listPlans(): Promise<ProductionPlanListItem[]> {
 
 export async function getPlan(id: string): Promise<ProductionPlan> {
   return repo.getPlanById(id);
+}
+
+// ---------------------------------------------------------------------------
+// Settimana tipo (template settimanale → default; piano giornaliero → override)
+// ---------------------------------------------------------------------------
+
+/** La settimana tipo come 7 giorni (0=dom..6=sab), anche vuoti, per la UI. */
+export async function getWeekTemplate(): Promise<WeekTemplateDay[]> {
+  const orgId = await requireOrgId();
+  const items = await repo.listTemplateItems(orgId);
+  const byDay = new Map<number, WeekTemplateDay['items']>();
+  for (let d = 0; d < 7; d++) byDay.set(d, []);
+  for (const it of items) {
+    byDay.get(it.weekday)!.push({ recipeId: it.recipeId, recipeName: it.recipeName, batchCount: it.batchCount });
+  }
+  return [...byDay.entries()].map(([weekday, dayItems]) => ({ weekday, items: dayItems }));
+}
+
+/** Salva (sostituisce in blocco) la settimana tipo. Riservato a owner/baker. */
+export async function saveWeekTemplate(raw: unknown): Promise<void> {
+  const session = await requireSession();
+  if (session.role === 'viewer') throw new AuthError('Non hai i permessi per modificare la settimana tipo.');
+  const input = saveWeekTemplateSchema.parse(raw);
+  await repo.replaceTemplateItems(session.organizationId, input);
+}
+
+/**
+ * Applica la settimana tipo ai PROSSIMI 7 giorni: crea SOLO i piani giornalieri
+ * mancanti (un weekday → le sue righe template). I giorni che hanno già un piano
+ * (modifica manuale o completato) vengono SALTATI, mai sovrascritti. Nessun
+ * effetto su magazzino: i piani nascono 'draft'.
+ */
+export async function applyWeekTemplate(): Promise<ApplyTemplateResult> {
+  const session = await requireSession();
+  if (session.role === 'viewer') throw new AuthError('Non hai i permessi per applicare la settimana tipo.');
+  const orgId = session.organizationId;
+
+  const template = await repo.listTemplateItems(orgId);
+  if (template.length === 0) {
+    throw new BusinessRuleError('La settimana tipo è vuota: aggiungi qualche ricetta prima di applicarla.');
+  }
+
+  const byWeekday = new Map<number, { recipeId: string; batchCount: number }[]>();
+  for (const it of template) {
+    const arr = byWeekday.get(it.weekday) ?? [];
+    arr.push({ recipeId: it.recipeId, batchCount: it.batchCount });
+    byWeekday.set(it.weekday, arr);
+  }
+
+  // Prossimi 7 giorni (logica pura/testata): solo i giorni con righe a template.
+  const candidates = computeApplyCandidates(byWeekday, new Date());
+  const existing = await repo.existingPlanDates(orgId, candidates.map((c) => c.date));
+
+  const created: string[] = [];
+  const skipped: string[] = [];
+  for (const c of candidates) {
+    if (existing.has(c.date)) {
+      skipped.push(c.date); // già pianificato → non toccare
+      continue;
+    }
+    const items = c.items.map((it, idx) => ({ recipeId: it.recipeId, batchCount: it.batchCount, sortOrder: idx }));
+    try {
+      await repo.insertPlan(orgId, { planDate: c.date, notes: 'Da settimana tipo', items } as CreatePlanInput);
+      created.push(c.date);
+    } catch {
+      skipped.push(c.date); // race su UNIQUE(org, plan_date): qualcuno l'ha appena creato
+    }
+  }
+  return { created, skipped };
 }
 
 // ---------------------------------------------------------------------------
