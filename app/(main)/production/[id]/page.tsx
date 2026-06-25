@@ -8,7 +8,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPlan } from '@/modules/production/service';
-import { getIngredientRequirements } from '@/modules/reporting/service';
+import { getIngredientRequirements, getFinishedGoodsTheoretical } from '@/modules/reporting/service';
 import { completePlanAction, cancelPlanAction } from '@/modules/production/actions';
 import { isPendingConfirmation } from '@/modules/production/status';
 import { DraftOrdersButton } from './DraftOrdersButton';
@@ -54,6 +54,16 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
   // Fabbisogno ingredienti reale: un errore qui deve emergere (error boundary),
   // non nascondere silenziosamente la sezione shortage.
   const requirements = await getIngredientRequirements(plan.id);
+
+  // Rimanenza teorica del giorno (FASE 1, derivata, read-only). La vista popola
+  // righe solo per piani CONFERMATI: prima della conferma sarà vuota → copy sobrio.
+  // Lettura secondaria: isolata, un suo errore non deve rompere la pagina del piano.
+  let finishedGoods: Awaited<ReturnType<typeof getFinishedGoodsTheoretical>> = [];
+  try {
+    finishedGoods = await getFinishedGoodsTheoretical(plan.planDate);
+  } catch {
+    finishedGoods = [];
+  }
 
   const canComplete = plan.status === 'draft' || plan.status === 'in_progress';
   const canCancel   = plan.status !== 'completed' && plan.status !== 'cancelled';
@@ -237,6 +247,52 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
               )}
             </div>
           )}
+
+          {/* Rimanenza teorica del giorno (FASE 1 — prodotti non ancora venduti). */}
+          <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+            <div className="px-6 py-4 border-b border-divider">
+              <h2 className="font-semibold text-[15px] text-ink">Rimanenza teorica</h2>
+              <p className="text-xs text-ink-muted mt-0.5">
+                Calcolata da produzione confermata e vendite registrate del giorno.
+              </p>
+            </div>
+            {finishedGoods.length === 0 ? (
+              <div className="px-6 py-8 text-center text-sm text-ink-muted">
+                {plan.status === 'completed'
+                  ? 'Nessun prodotto finito da mostrare per questo piano.'
+                  : 'Disponibile dopo la conferma della produzione: misura i pezzi prodotti meno i venduti.'}
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-bg border-b border-border">
+                  <tr>
+                    <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Prodotto</th>
+                    <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Prodotti oggi</th>
+                    <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Venduti</th>
+                    <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Rimasti teorici</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-divider">
+                  {finishedGoods.map((g) => (
+                    <tr key={g.sellableProductId} className="hover:bg-surface-offset transition-colors">
+                      <td className="px-6 py-3 font-medium text-ink">{g.productName}</td>
+                      <td className="px-6 py-3 text-right font-mono text-ink">{formatQty(g.producedQty)}</td>
+                      <td className="px-6 py-3 text-right font-mono text-ink">{formatQty(g.soldQty)}</td>
+                      <td className={`px-6 py-3 text-right font-mono font-semibold ${g.remainingTheoretical < 0 ? 'text-danger' : 'text-ink'}`}>
+                        {formatQty(g.remainingTheoretical)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <div className="px-6 py-3 border-t border-divider bg-bg">
+              <p className="text-xs text-ink-muted">
+                Stima per prodotti a pezzo (cornetti, monoporzioni, biscotti). Non considera scarti,
+                omaggi o invenduto del giorno prima.
+              </p>
+            </div>
+          </div>
 
         </div>
 

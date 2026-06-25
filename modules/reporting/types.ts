@@ -26,6 +26,19 @@ export interface IngredientRequirement {
 }
 
 // ---------------------------------------------------------------------------
+// Rimanenza teorica prodotti finiti (da v_finished_goods_daily_theoretical)
+// FASE 1 — derivata, read-only. sellableProductId ≡ recipeId.
+// ---------------------------------------------------------------------------
+
+export interface FinishedGoodTheoretical {
+  sellableProductId: string; // = recipeId (la ricetta è il prodotto vendibile)
+  productName: string;
+  producedQty: number;
+  soldQty: number;
+  remainingTheoretical: number; // produced - sold (può essere negativo: mostrato così)
+}
+
+// ---------------------------------------------------------------------------
 // Stock full (da v_inventory_stock_full)
 // ---------------------------------------------------------------------------
 

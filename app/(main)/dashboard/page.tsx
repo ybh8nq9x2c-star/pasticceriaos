@@ -20,6 +20,7 @@ import {
   getIngredientRequirements,
   getRecipeCosts,
   getIngredientPurchaseStats,
+  getTodayFinishedGoodsTheoreticalSummary,
 } from '@/modules/reporting/service';
 import type { DashboardSummary } from '@/modules/reporting/types';
 import { getLowStockAlerts, getExpiringBatches } from '@/modules/inventory/service';
@@ -90,6 +91,7 @@ export default async function TodayPage() {
     getIngredientPurchaseStats(3),
     listReceipts({ status: ['draft', 'expected', 'partial'] }),
     listPlans(),
+    getTodayFinishedGoodsTheoreticalSummary(5),
   ]);
   const val = <T,>(r: PromiseSettledResult<T>, fb: T): T => (r.status === 'fulfilled' ? r.value : fb);
   const emptySummary: DashboardSummary = {
@@ -106,6 +108,7 @@ export default async function TodayPage() {
   const topSpend = val(results[7] as PromiseSettledResult<Awaited<ReturnType<typeof getIngredientPurchaseStats>>>, []);
   const openReceiptsRaw = val(results[8] as PromiseSettledResult<Awaited<ReturnType<typeof listReceipts>>>, []);
   const allPlans = val(results[9] as PromiseSettledResult<Awaited<ReturnType<typeof listPlans>>>, []);
+  const finishedGoods = val(results[10] as PromiseSettledResult<Awaited<ReturnType<typeof getTodayFinishedGoodsTheoreticalSummary>>>, []);
   const dataDegraded = results.some((r) => r.status === 'rejected');
 
   // Piani passati non confermati (stato derivato, niente auto-completamento).
@@ -524,6 +527,45 @@ export default async function TodayPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Rimanenze teoriche di oggi (FASE 1 — derivata da produzione confermata e vendite). */}
+      <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-divider">
+          <div className="min-w-0">
+            <h2 className="font-semibold text-[15px] text-ink">Rimanenze teoriche di oggi</h2>
+            <p className="text-xs text-ink-muted mt-0.5">
+              Calcolata da produzione confermata e vendite registrate oggi.
+            </p>
+          </div>
+          <Link
+            href={summary.todayPlan ? `/production/${summary.todayPlan.id}` : '/production'}
+            className="text-xs font-semibold text-primary hover:underline shrink-0 ml-3"
+          >
+            Apri dettaglio →
+          </Link>
+        </div>
+        {finishedGoods.length === 0 ? (
+          <p className="px-5 py-8 text-sm text-ink-muted text-center">
+            Nessun prodotto da mostrare: serve un piano di produzione confermato per oggi.
+          </p>
+        ) : (
+          <div className="divide-y divide-divider">
+            {finishedGoods.map((g) => (
+              <div key={g.sellableProductId} className="flex items-center gap-3 px-5 py-3">
+                <span className="flex-1 text-sm text-ink truncate">{g.productName}</span>
+                <span className="text-xs font-mono text-ink-muted whitespace-nowrap">
+                  {g.producedQty} prod · {g.soldQty} vend
+                </span>
+                <span
+                  className={`text-sm font-mono font-semibold w-16 text-right ${g.remainingTheoretical < 0 ? 'text-danger' : 'text-ink'}`}
+                >
+                  {g.remainingTheoretical}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Top spesa ingredienti (se ci sono acquisti reali) */}

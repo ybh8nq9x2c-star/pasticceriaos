@@ -7,6 +7,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { mapSupabaseError } from '@/lib/errors';
+import { toFinishedGoodTheoretical } from './finished-goods';
 import type {
   IngredientRequirement,
   InventoryStockFull,
@@ -20,6 +21,7 @@ import type {
   SupplierMonthlySales,
   SupplierProductSales,
   SupplierCustomerStat,
+  FinishedGoodTheoretical,
 } from './types';
 
 const num = (v: unknown): number => (v === null || v === undefined ? 0 : Number(v));
@@ -61,6 +63,25 @@ export async function listIngredientRequirements(
     supplierId:            r.supplier_id,
     supplierName:          r.supplier_name,
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Rimanenza teorica prodotti finiti (FASE 1, da v_finished_goods_daily_theoretical)
+// ---------------------------------------------------------------------------
+
+export async function listFinishedGoodsTheoretical(
+  orgId: string,
+  businessDate: string,
+): Promise<FinishedGoodTheoretical[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('v_finished_goods_daily_theoretical')
+    .select('sellable_product_id, product_name, produced_qty, sold_qty, remaining_theoretical')
+    .eq('organization_id', orgId)
+    .eq('business_date', businessDate)
+    .order('remaining_theoretical', { ascending: true }); // i più "scoperti"/in esaurimento prima
+  if (error) throw mapSupabaseError(error);
+  return (data ?? []).map(toFinishedGoodTheoretical);
 }
 
 // ---------------------------------------------------------------------------

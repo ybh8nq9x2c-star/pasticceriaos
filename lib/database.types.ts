@@ -283,6 +283,8 @@ export interface Database {
           category: string | null;
           emoji: string | null;
           base_portions: number;
+          yield_quantity: number | null;
+          yield_unit: UnitOfMeasure;
           sell_price_per_portion: number | null;
           notes: string | null;
           is_active: boolean;
@@ -296,6 +298,8 @@ export interface Database {
           category?: string | null;
           emoji?: string | null;
           base_portions: number;
+          yield_quantity?: number | null;
+          yield_unit?: UnitOfMeasure;
           sell_price_per_portion?: number | null;
           notes?: string | null;
           is_active?: boolean;
@@ -307,6 +311,8 @@ export interface Database {
           category?: string | null;
           emoji?: string | null;
           base_portions?: number;
+          yield_quantity?: number | null;
+          yield_unit?: UnitOfMeasure;
           sell_price_per_portion?: number | null;
           notes?: string | null;
           is_active?: boolean;
@@ -1387,6 +1393,18 @@ export interface Database {
     };
 
     Views: {
+      v_finished_goods_daily_theoretical: {
+        Row: {
+          organization_id: string;
+          business_date: string;
+          sellable_product_id: string;
+          product_name: string;
+          produced_qty: number;
+          sold_qty: number;
+          remaining_theoretical: number;
+        };
+        Relationships: [];
+      };
       v_ingredient_requirements: {
         Row: {
           production_plan_id: string;

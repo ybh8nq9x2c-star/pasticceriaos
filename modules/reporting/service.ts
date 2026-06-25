@@ -22,6 +22,7 @@ import type {
   SupplierMonthlySales,
   SupplierProductSales,
   SupplierCustomerStat,
+  FinishedGoodTheoretical,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -74,6 +75,27 @@ export async function getMonthlySpend(monthsBack = 6): Promise<MonthlySpend[]> {
 export async function getIngredientPurchaseStats(limit = 10): Promise<IngredientPurchaseStat[]> {
   const orgId = await requireOrgId();
   return repo.listIngredientPurchaseStats(orgId, limit);
+}
+
+// ---------------------------------------------------------------------------
+// Rimanenza teorica prodotti finiti (FASE 1) — derivata, read-only.
+// "Calcolata da produzione confermata e vendite registrate" per la data.
+// ---------------------------------------------------------------------------
+
+/** Rimanenze teoriche di una giornata (default: oggi). Ordinate per rimasto crescente. */
+export async function getFinishedGoodsTheoretical(
+  businessDate?: string,
+): Promise<FinishedGoodTheoretical[]> {
+  const orgId = await requireOrgId();
+  return repo.listFinishedGoodsTheoretical(orgId, businessDate ?? todayISODate());
+}
+
+/** Riepilogo per la dashboard: i primi N prodotti (rimasto crescente) di oggi. */
+export async function getTodayFinishedGoodsTheoreticalSummary(
+  limit = 5,
+): Promise<FinishedGoodTheoretical[]> {
+  const rows = await getFinishedGoodsTheoretical();
+  return rows.slice(0, limit);
 }
 
 // ---------------------------------------------------------------------------
