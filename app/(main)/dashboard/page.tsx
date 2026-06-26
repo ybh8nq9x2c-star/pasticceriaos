@@ -34,10 +34,6 @@ import { formatCurrency, todayISODate } from '@/lib/utils';
 
 export const metadata: Metadata = { title: 'Oggi' };
 
-const ORDER_STATUS_LABELS: Record<string, string> = {
-  draft: 'Bozza', sent: 'Inviato', confirmed: 'Confermato',
-};
-
 function todayLabel() {
   return new Date().toLocaleDateString('it-IT', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
@@ -125,6 +121,16 @@ export default async function TodayPage() {
     }
   }
   const todayShortages = todayRequirements.filter((r) => r.estimatedShortage > 0);
+
+  // Ordini fornitore separati: le BOZZE sono lavoro da fare (vanno inviate), gli
+  // ordini inviati/confermati sono in attesa di consegna. Non contare le bozze
+  // come "ordini in corso".
+  const draftOrders = openOrders.filter((o) => o.status === 'draft');
+  const awaitingOrders = openOrders.filter((o) => o.status === 'sent' || o.status === 'confirmed');
+  const awaitingValue =
+    awaitingOrders.length > 0 && awaitingOrders.every((o) => o.totalAmount !== null)
+      ? awaitingOrders.reduce((s, o) => s + (o.totalAmount ?? 0), 0)
+      : null;
 
   // ── SEZIONE 2: richiede attenzione ─────────────────────────────────────────
   const now = Date.now();
@@ -443,15 +449,19 @@ export default async function TodayPage() {
             accentClass={avgFoodCostPct !== null ? (avgFoodCostPct <= 40 ? 'bg-success' : 'bg-warning') : undefined}
           />
           <KpiCard
-            label="Ordini in corso"
-            value={summary.openOrdersCount}
+            label="In attesa consegna"
+            value={awaitingOrders.length}
             sub={
-              summary.openOrdersTotalValue !== null && summary.openOrdersCount > 0
-                ? `valore €${formatCurrency(summary.openOrdersTotalValue)}`
-                : summary.openOrdersCount > 0 ? 'valore parziale' : 'nessun ordine aperto'
+              awaitingValue !== null && awaitingOrders.length > 0
+                ? `valore €${formatCurrency(awaitingValue)}`
+                : awaitingOrders.length > 0
+                ? 'valore parziale'
+                : draftOrders.length > 0
+                ? `${draftOrders.length} bozz${draftOrders.length === 1 ? 'a' : 'e'} da inviare`
+                : 'nessun ordine in attesa'
             }
             href="/orders"
-            accentClass={summary.openOrdersCount > 0 ? 'bg-primary' : undefined}
+            accentClass={awaitingOrders.length > 0 ? 'bg-primary' : undefined}
           />
           <KpiCard
             label="Sotto soglia"
@@ -473,29 +483,62 @@ export default async function TodayPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-divider">
-            <h2 className="font-semibold text-[15px] text-ink">Ordini fornitore aperti</h2>
+            <h2 className="font-semibold text-[15px] text-ink">Ordini fornitore</h2>
             <Link href="/orders" className="text-xs font-semibold text-primary hover:underline">Tutti →</Link>
           </div>
-          {openOrders.length === 0 ? (
+          {draftOrders.length === 0 && awaitingOrders.length === 0 ? (
             <p className="px-5 py-8 text-sm text-ink-muted text-center">
               Nessun ordine aperto. Le bozze si generano dal piano produzione.
             </p>
           ) : (
-            <div className="divide-y divide-divider">
-              {openOrders.slice(0, 5).map((o) => (
-                <Link key={o.orderId} href={`/orders/${o.orderId}`} className="flex items-center gap-3 px-5 py-3 hover:bg-surface-offset transition-colors">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-ink truncate">{o.supplierName}</p>
-                    <p className="text-xs text-ink-muted font-mono mt-0.5">{o.orderDate} · {o.lineItemsCount} righe</p>
-                  </div>
-                  {o.totalAmount !== null && (
-                    <span className="text-xs font-mono font-semibold text-ink">€{formatCurrency(o.totalAmount)}</span>
-                  )}
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-primary-light text-primary-hover">
-                    {ORDER_STATUS_LABELS[o.status] ?? o.status}
-                  </span>
-                </Link>
-              ))}
+            <div>
+              {/* Bozze da inviare: lavoro da fare (l'utente deve mandarle al fornitore). */}
+              <div className="px-5 pt-3 pb-1 flex items-center justify-between">
+                <span className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Bozze da inviare</span>
+                <span className="text-xs font-mono text-ink-muted">{draftOrders.length}</span>
+              </div>
+              {draftOrders.length === 0 ? (
+                <p className="px-5 pb-3 text-xs text-ink-muted">Nessuna bozza in attesa di invio.</p>
+              ) : (
+                <div className="divide-y divide-divider">
+                  {draftOrders.slice(0, 5).map((o) => (
+                    <Link key={o.orderId} href={`/orders/${o.orderId}`} className="flex items-center gap-3 px-5 py-3 hover:bg-surface-offset transition-colors group">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-ink truncate">{o.supplierName}</p>
+                        <p className="text-xs text-ink-muted font-mono mt-0.5">{o.orderDate} · {o.lineItemsCount} righe</p>
+                      </div>
+                      {o.totalAmount !== null && (
+                        <span className="text-xs font-mono font-semibold text-ink">€{formatCurrency(o.totalAmount)}</span>
+                      )}
+                      <span className="text-xs font-semibold text-primary group-hover:underline shrink-0">Invia →</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {/* In attesa di consegna: ordini già inviati/confermati. */}
+              <div className="px-5 pt-3 pb-1 flex items-center justify-between border-t border-divider">
+                <span className="text-xs font-semibold text-ink-muted uppercase tracking-wide">In attesa di consegna</span>
+                <span className="text-xs font-mono text-ink-muted">{awaitingOrders.length}</span>
+              </div>
+              {awaitingOrders.length === 0 ? (
+                <p className="px-5 pb-3 text-xs text-ink-muted">Nessun ordine in attesa di consegna.</p>
+              ) : (
+                <div className="divide-y divide-divider">
+                  {awaitingOrders.slice(0, 5).map((o) => (
+                    <Link key={o.orderId} href={`/orders/${o.orderId}`} className="flex items-center gap-3 px-5 py-3 hover:bg-surface-offset transition-colors group">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-ink truncate">{o.supplierName}</p>
+                        <p className="text-xs text-ink-muted font-mono mt-0.5">{o.orderDate} · {o.lineItemsCount} righe</p>
+                      </div>
+                      {o.totalAmount !== null && (
+                        <span className="text-xs font-mono font-semibold text-ink">€{formatCurrency(o.totalAmount)}</span>
+                      )}
+                      <span className="text-xs font-semibold text-primary group-hover:underline shrink-0">Ricevi →</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

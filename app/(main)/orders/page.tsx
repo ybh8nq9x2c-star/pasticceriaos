@@ -6,29 +6,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { listOrders } from '@/modules/ordering/service';
-import type { OrderStatus } from '@/modules/ordering/types';
+import { orderStatusBadge } from '@/modules/ordering/status-display';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ShoppingCart } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Ordini' };
-
-const STATUS_VARIANT: Record<OrderStatus, 'gray' | 'blue' | 'indigo' | 'green' | 'red'> = {
-  draft:     'gray',
-  sent:      'blue',
-  confirmed: 'indigo',
-  received:  'green',
-  cancelled: 'red',
-};
-
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  draft:     'Bozza',
-  sent:      'Inviato',
-  confirmed: 'Confermato',
-  received:  'Ricevuto',
-  cancelled: 'Annullato',
-};
 
 function formatDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', {
@@ -93,7 +77,10 @@ export default async function OrdersPage() {
                     {order.expectedDate ? formatDate(order.expectedDate) : '—'}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <StatusBadge label={STATUS_LABELS[order.status]} variant={STATUS_VARIANT[order.status]} />
+                    {(() => {
+                      const badge = orderStatusBadge(order.status, order.dispatchOutcome);
+                      return <StatusBadge label={badge.label} variant={badge.variant} />;
+                    })()}
                   </td>
                   <td className="px-6 py-4 text-right text-ink-muted font-mono">{order.lineItemsCount}</td>
                   <td className="px-6 py-4 text-right font-mono font-medium text-ink">

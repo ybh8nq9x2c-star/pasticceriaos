@@ -48,6 +48,7 @@ export async function listOrders(orgId: string): Promise<PurchaseOrderListItem[]
       lineItemsCount: items.length,
       totalAmount:    total,
       sentAt:         r.sent_at,
+      dispatchOutcome: r.dispatch_outcome,
       createdAt:      r.created_at,
     };
   });
@@ -258,6 +259,7 @@ function toOrder(row: any): PurchaseOrder {
     expectedDate:   row.expected_date,
     notes:          row.notes,
     emailMessageId: row.email_message_id,
+    dispatchOutcome: row.dispatch_outcome ?? null,
     sentAt:         row.sent_at,
     createdAt:      row.created_at,
     updatedAt:      row.updated_at,

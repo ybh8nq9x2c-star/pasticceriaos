@@ -13,19 +13,18 @@ import { changeOrderStatusAction, cancelOrderAction } from '@/modules/ordering/a
 import { RegisterBatchForm } from './RegisterBatchForm';
 import { IDLE_STATE, UNIT_LABELS, UNIT_SHORT } from '@/lib/utils';
 import type { OrderStatus } from '@/modules/ordering/types';
+import {
+  orderStatusBadge,
+  needsManualSend,
+  ORDER_PIPELINE,
+  pipelineIndex,
+} from '@/modules/ordering/status-display';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { SubmitButton } from '@/components/ui/SubmitButton';
 
 export const metadata: Metadata = { title: 'Ordine' };
 
-const STATUS_VARIANT: Record<OrderStatus, 'gray' | 'blue' | 'indigo' | 'green' | 'red'> = {
-  draft:     'gray',
-  sent:      'blue',
-  confirmed: 'indigo',
-  received:  'green',
-  cancelled: 'red',
-};
-
+// Etichette per lo storico (copre tutti gli stati DB, incluso 'confirmed' legacy).
 const STATUS_LABELS: Record<OrderStatus, string> = {
   draft:     'Bozza',
   sent:      'Inviato',
@@ -34,15 +33,13 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   cancelled: 'Annullato',
 };
 
-// Pipeline lineare per lo stepper
-const PIPELINE: OrderStatus[] = ['draft', 'sent', 'confirmed', 'received'];
+// Happy path visivo a 3 nodi: Bozza → Inviato → Ricevuto.
+const PIPELINE = ORDER_PIPELINE;
 
-// La ricezione NON è più una transizione di stato diretta: la merce entra a
-// magazzino solo dal Goods Receipt Engine (preview editabile → conferma → stock).
-// Qui restano solo le transizioni che non toccano le giacenze.
+// Unica CTA primaria di avanzamento stato: invio dell'ordine. 'confirmed' NON è
+// più nell'happy path. La ricezione passa solo dal Goods Receipt Engine.
 const NEXT_ACTIONS: Partial<Record<OrderStatus, { toStatus: OrderStatus; label: string }>> = {
-  draft:     { toStatus: 'sent',      label: 'Segna come inviato' },
-  sent:      { toStatus: 'confirmed', label: 'Segna come confermato' },
+  draft: { toStatus: 'sent', label: 'Invia ordine' },
 };
 
 function formatDate(iso: string) {
@@ -95,7 +92,9 @@ export default async function OrderDetailPage({ params }: { params: { id: string
   }
 
   const isCancelled = order.status === 'cancelled';
-  const currentIdx = PIPELINE.indexOf(order.status);
+  const currentIdx = pipelineIndex(order.status);
+  const badge = orderStatusBadge(order.status, order.dispatchOutcome);
+  const showManualSend = needsManualSend(order.status, order.dispatchOutcome);
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
@@ -115,12 +114,24 @@ export default async function OrderDetailPage({ params }: { params: { id: string
             </p>
           </div>
           <StatusBadge
-            label={STATUS_LABELS[order.status]}
-            variant={STATUS_VARIANT[order.status]}
+            label={badge.label}
+            variant={badge.variant}
             className="text-sm px-3 py-1"
           />
         </div>
       </div>
+
+      {/* Invio non attestato: stato ONESTO + azione chiara (mandalo tu al fornitore). */}
+      {showManualSend && (
+        <div className="mb-6 rounded-2xl border border-warning-soft bg-warning-light/50 px-5 py-4">
+          <p className="font-semibold text-ink">Questo ordine non è stato recapitato automaticamente.</p>
+          <p className="text-sm text-ink-muted mt-1">
+            Nessun invio email è stato confermato dal sistema. Invialo tu al fornitore
+            {order.supplierEmail ? <> — <span className="font-medium text-ink">{order.supplierEmail}</span></> : null}.
+            Quando il fornitore conferma, prosegui con “Ricevi merce”.
+          </p>
+        </div>
+      )}
 
       {/* Stepper orizzontale */}
       <div className="bg-surface-2 rounded-2xl border border-border p-6 mb-6">

@@ -15,6 +15,7 @@ import type {
   PurchaseOrderListItem,
   OrderStatusEvent,
   OrderStatus,
+  DispatchOutcome,
 } from './types';
 import type { CreateOrderInput, UpdateOrderInput, ChangeStatusInput } from './schemas';
 
@@ -124,16 +125,12 @@ export async function changeOrderStatus(
     return repo.getOrderById(id);
   }
 
-  // Altre transizioni: solo stato + history (nessun effetto su magazzino).
-  const patchFields: Parameters<typeof repo.patchOrder>[1] = {
-    status: input.status,
-  };
-
-  let historyNotes = input.notes;
-
+  // Invio al fornitore: dispatch ESTERNO (fallibile, mai bloccante) seguito dalla
+  // transizione ATOMICA via RPC `mark_order_sent` — status + sent_at +
+  // dispatch_outcome + history in UNA transazione (niente buco di audit se una
+  // delle scritture fallisce). dispatch_outcome rende lo stato ONESTO: "Inviato"
+  // solo se il recapito è attestato, altrimenti "Da inviare a mano".
   if (input.status === 'sent') {
-    patchFields.sentAt = new Date().toISOString();
-    // Canale di invio reale, con fallback ESPLICITO se non configurato.
     const dispatch = await dispatchOrderToSupplier({
       orderId:       existing.id,
       supplierName:  existing.supplierName,
@@ -148,17 +145,26 @@ export async function changeOrderStatus(
         unitPrice: li.unitPriceSnapshot,
       })),
     });
-    historyNotes = [input.notes, dispatch.detail].filter(Boolean).join(' — ');
+    const outcome: DispatchOutcome = dispatch.delivered
+      ? 'delivered'
+      : dispatch.channel === 'manual'
+      ? 'manual'
+      : 'failed';
+    const note = [input.notes, dispatch.detail].filter(Boolean).join(' — ') || null;
+
+    const { error } = await supabase.rpc('mark_order_sent', {
+      p_order_id: id,
+      p_outcome:  outcome,
+      p_note:     note,
+    });
+    if (error) throw mapSupabaseError(error);
+    return repo.getOrderById(id);
   }
 
-  await repo.patchOrder(id, patchFields);
-  await repo.appendStatusHistory(
-    id,
-    existing.status,
-    input.status,
-    user.id,
-    historyNotes,
-  );
+  // Altre transizioni (es. 'confirmed', opzionale): solo stato + history, nessun
+  // effetto su magazzino. La ricezione passa esclusivamente dal goods receipt engine.
+  await repo.patchOrder(id, { status: input.status });
+  await repo.appendStatusHistory(id, existing.status, input.status, user.id, input.notes);
 
   return repo.getOrderById(id);
 }

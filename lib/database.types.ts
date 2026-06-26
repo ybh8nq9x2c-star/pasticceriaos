@@ -22,6 +22,8 @@ export type MovementType =
   | 'sale_reversal';
 
 export type OrderStatus = 'draft' | 'sent' | 'confirmed' | 'received' | 'cancelled';
+/** Esito dell'invio ordine al fornitore (purchase_orders.dispatch_outcome). */
+export type DispatchOutcome = 'delivered' | 'manual' | 'failed';
 
 export type PlanStatus = 'draft' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -557,6 +559,7 @@ export interface Database {
           notes: string | null;
           total_amount: number | null;
           email_message_id: string | null;
+          dispatch_outcome: DispatchOutcome | null;
           marketplace_order_id: string | null;
           sent_at: string | null;
           created_by: string | null;
@@ -573,6 +576,7 @@ export interface Database {
           notes?: string | null;
           total_amount?: number | null;
           email_message_id?: string | null;
+          dispatch_outcome?: DispatchOutcome | null;
           marketplace_order_id?: string | null;
           sent_at?: string | null;
           created_by?: string | null;
@@ -587,6 +591,7 @@ export interface Database {
           notes?: string | null;
           total_amount?: number | null;
           email_message_id?: string | null;
+          dispatch_outcome?: DispatchOutcome | null;
           marketplace_order_id?: string | null;
           sent_at?: string | null;
           updated_at?: string;
@@ -1937,6 +1942,10 @@ export interface Database {
       };
       receive_purchase_order: {
         Args: { p_order_id: string };
+        Returns: undefined;
+      };
+      mark_order_sent: {
+        Args: { p_order_id: string; p_outcome: string; p_note?: string | null };
         Returns: undefined;
       };
       complete_purchase_receipt: {
