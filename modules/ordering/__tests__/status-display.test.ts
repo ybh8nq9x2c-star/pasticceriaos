@@ -38,14 +38,18 @@ describe('orderStatusBadge — invio onesto', () => {
     expect(orderStatusBadge('confirmed', null)).toEqual({ label: 'Confermato', variant: 'indigo' });
   });
 
+  it('partial → "Parziale" (arrivato solo in parte)', () => {
+    expect(orderStatusBadge('partial', null)).toEqual({ label: 'Parziale', variant: 'amber' });
+  });
+
   it('received → Ricevuto; cancelled → Annullato', () => {
     expect(orderStatusBadge('received', null)).toEqual({ label: 'Ricevuto', variant: 'green' });
     expect(orderStatusBadge('cancelled', null)).toEqual({ label: 'Annullato', variant: 'red' });
   });
 
-  it('stato inatteso (es. partial, non supportato) → badge neutro, nessun crash', () => {
-    // cast: simula un valore DB fuori dal dominio TS (order_status SQL ha 'partial').
-    const b = orderStatusBadge('partial' as unknown as Parameters<typeof orderStatusBadge>[0], null);
+  it('stato davvero inatteso → badge neutro, nessun crash', () => {
+    // cast: simula un valore fuori dal dominio TS (difesa anti-crash residua).
+    const b = orderStatusBadge('bogus' as unknown as Parameters<typeof orderStatusBadge>[0], null);
     expect(b).toEqual({ label: 'Stato sconosciuto', variant: 'gray' });
   });
 });
@@ -66,12 +70,13 @@ describe('pipeline a 3 nodi (Bozza → Inviato → Ricevuto)', () => {
     expect(ORDER_PIPELINE).toEqual(['draft', 'sent', 'received']);
   });
 
-  it('confirmed mappa sul passo "Inviato"; cancelled e stati inattesi fuori pipeline', () => {
+  it('confirmed e partial mappano sul passo "Inviato"; cancelled e stati inattesi fuori pipeline', () => {
     expect(pipelineIndex('draft')).toBe(0);
     expect(pipelineIndex('sent')).toBe(1);
     expect(pipelineIndex('confirmed')).toBe(1);
+    expect(pipelineIndex('partial')).toBe(1);
     expect(pipelineIndex('received')).toBe(2);
     expect(pipelineIndex('cancelled')).toBe(-1);
-    expect(pipelineIndex('partial' as unknown as Parameters<typeof pipelineIndex>[0])).toBe(-1);
+    expect(pipelineIndex('bogus' as unknown as Parameters<typeof pipelineIndex>[0])).toBe(-1);
   });
 });

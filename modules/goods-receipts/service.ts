@@ -596,7 +596,7 @@ export async function listReceivableOrders(): Promise<ReceivableOrder[]> {
     .from('purchase_orders')
     .select('id, supplier_id, order_date, status, suppliers(name)')
     .eq('organization_id', orgId)
-    .in('status', ['sent', 'confirmed'])
+    .in('status', ['sent', 'confirmed', 'partial'])
     .order('order_date', { ascending: false })
     .limit(50)
     .returns<{

@@ -15,6 +15,7 @@ const STATUS_CFG: Record<OrderStatus, { label: string; cls: string }> = {
   draft:     { label: 'Bozza',           cls: 'bg-neutral-light text-ink-muted' },
   sent:      { label: 'Da confermare',   cls: 'bg-primary-light text-primary-hover' },
   confirmed: { label: 'Confermato',      cls: 'bg-neutral-light text-ink' },
+  partial:   { label: 'Consegna parziale', cls: 'bg-warning-light text-warning-strong' },
   received:  { label: 'Consegnato',      cls: 'bg-success-light text-success-strong' },
   cancelled: { label: 'Annullato',       cls: 'bg-danger-light text-danger' },
 };

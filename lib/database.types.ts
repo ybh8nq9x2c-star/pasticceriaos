@@ -21,7 +21,7 @@ export type MovementType =
   | 'sale_deduction'
   | 'sale_reversal';
 
-export type OrderStatus = 'draft' | 'sent' | 'confirmed' | 'received' | 'cancelled';
+export type OrderStatus = 'draft' | 'sent' | 'confirmed' | 'partial' | 'received' | 'cancelled';
 /** Esito dell'invio ordine al fornitore (purchase_orders.dispatch_outcome). */
 export type DispatchOutcome = 'delivered' | 'manual' | 'failed';
 

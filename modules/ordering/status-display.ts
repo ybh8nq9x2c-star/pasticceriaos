@@ -36,6 +36,9 @@ export function orderStatusBadge(
         : { label: 'Da inviare a mano', variant: 'amber' };
     case 'confirmed':
       return { label: 'Confermato', variant: 'indigo' };
+    case 'partial':
+      // Arrivata solo una parte: l'ordine non è "come prima". Ambra = serve azione.
+      return { label: 'Parziale', variant: 'amber' };
     case 'received':
       return { label: 'Ricevuto', variant: 'green' };
     case 'cancelled':
@@ -68,6 +71,9 @@ export function pipelineIndex(status: OrderStatus): number {
       return 0;
     case 'sent':
     case 'confirmed':
+    case 'partial':
+      // partial sta nella tratta Inviato→Ricevuto: non claima "ricevuto" (merce
+      // ancora incompleta). Il badge "Parziale" e il residuo raccontano il resto.
       return 1;
     case 'received':
       return 2;

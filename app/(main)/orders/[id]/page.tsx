@@ -29,6 +29,7 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   draft:     'Bozza',
   sent:      'Inviato',
   confirmed: 'Confermato',
+  partial:   'Parziale',
   received:  'Ricevuto',
   cancelled: 'Annullato',
 };
@@ -69,8 +70,9 @@ export default async function OrderDetailPage({ params }: { params: { id: string
     history = [];
   }
 
-  // Lotti registrati su questo ordine (solo per ordini ricevuti).
-  const batches = order.status === 'received' ? await getBatchesForOrder(order.id) : [];
+  // Lotti registrati su questo ordine (ordini ricevuti o parzialmente ricevuti).
+  const hasGoods = order.status === 'received' || order.status === 'partial';
+  const batches = hasGoods ? await getBatchesForOrder(order.id) : [];
   const batchedQtyByIngredient = new Map<string, number>();
   for (const b of batches) {
     batchedQtyByIngredient.set(
@@ -79,9 +81,17 @@ export default async function OrderDetailPage({ params }: { params: { id: string
     );
   }
 
+  // Residuo (ordine parziale): cosa è arrivato e cosa manca ancora, per riga.
+  const isPartial = order.status === 'partial';
+  const openLines = order.lineItems
+    .map((li) => ({ li, missing: Math.max(0, li.quantity - li.quantityReceived) }))
+    .filter((r) => r.missing > 0);
+
   const nextAction = NEXT_ACTIONS[order.status];
-  const canReceive = order.status === 'sent' || order.status === 'confirmed';
-  const canCancel  = order.status !== 'received' && order.status !== 'cancelled';
+  // La ricezione del resto passa dal goods receipt engine anche per gli ordini parziali.
+  const canReceive = order.status === 'sent' || order.status === 'confirmed' || order.status === 'partial';
+  // Niente annullamento quando merce è già (in parte) arrivata: partial non è annullabile.
+  const canCancel  = order.status === 'draft' || order.status === 'sent' || order.status === 'confirmed';
 
   const orderId = order.id;
 
@@ -181,6 +191,47 @@ export default async function OrderDetailPage({ params }: { params: { id: string
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Righe ordine */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Ricezione PARZIALE: cosa è arrivato e cosa manca ancora. La merce
+              entra a magazzino solo dai Ricevimenti; qui si vede solo il residuo. */}
+          {isPartial && (
+            <div className="bg-warning-light/40 rounded-2xl border border-warning-soft overflow-hidden">
+              <div className="px-6 py-4 border-b border-warning-soft flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-ink">Ricezione parziale</h2>
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    {openLines.length} rig{openLines.length === 1 ? 'a' : 'he'} ancora apert{openLines.length === 1 ? 'a' : 'e'}: è arrivata solo una parte dell'ordine.
+                  </p>
+                </div>
+                <Link
+                  href={`/receipts/new?order=${order.id}`}
+                  className="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors whitespace-nowrap"
+                >
+                  Ricevi il resto
+                </Link>
+              </div>
+              <table className="w-full text-sm">
+                <thead className="bg-bg/60 border-b border-warning-soft">
+                  <tr>
+                    <th className="text-left px-6 py-2.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Prodotto</th>
+                    <th className="text-right px-6 py-2.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Ordinato</th>
+                    <th className="text-right px-6 py-2.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Ricevuto</th>
+                    <th className="text-right px-6 py-2.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Manca</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-warning-soft/60">
+                  {openLines.map(({ li, missing }) => (
+                    <tr key={li.id}>
+                      <td className="px-6 py-2.5 text-ink">{li.ingredientName}</td>
+                      <td className="px-6 py-2.5 text-right font-mono text-ink-muted">{li.quantity} {UNIT_SHORT[li.unitSnapshot]}</td>
+                      <td className="px-6 py-2.5 text-right font-mono text-ink-muted">{li.quantityReceived} {UNIT_SHORT[li.unitSnapshot]}</td>
+                      <td className="px-6 py-2.5 text-right font-mono font-semibold text-warning-strong">{missing} {UNIT_SHORT[li.unitSnapshot]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-bg border-b border-border">
@@ -220,8 +271,8 @@ export default async function OrderDetailPage({ params }: { params: { id: string
             </table>
           </div>
 
-          {/* Lotti e scadenze (HACCP) — solo su ordini ricevuti */}
-          {order.status === 'received' && (
+          {/* Lotti e scadenze (HACCP) — su ordini ricevuti o parzialmente ricevuti */}
+          {hasGoods && (
             <div className="bg-surface-2 rounded-2xl border border-border p-6">
               <div className="flex items-center justify-between mb-1">
                 <h2 className="text-base font-bold text-ink">Lotti e scadenze</h2>
@@ -321,7 +372,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
           )}
 
           {/* Documenti collegati */}
-          {(order.status === 'received' || order.status === 'confirmed') && (
+          {(order.status === 'received' || order.status === 'confirmed' || order.status === 'partial') && (
             <Link
               href={`/documents/new?order=${order.id}`}
               className="block w-full py-3 text-center border border-border text-ink rounded-xl text-sm font-semibold hover:bg-surface-offset transition-colors"

@@ -37,18 +37,16 @@ Tutti finiscono in `inventory_movements` e si appoggiano allo stesso trigger:
 
 | RPC | Migration | Origine | Semantica |
 |-----|-----------|---------|-----------|
-| `receive_purchase_order` | 019 | `ordering` (bottone "ricevi ordine") | **Ricezione TOTALE**: `quantity_received = quantity_ordered`, movimenti per l'intera quantità ordinata |
+| `receive_purchase_order` | 019 | **DEPRECATA (Sprint 2)**: `execute` revocato a `authenticated`, non più invocabile dall'app | (storico) Ricezione TOTALE |
 | `receive_marketplace_order` | 023 | `marketplace` (ordine cross-org consegnato) | Idempotente via `purchase_orders.marketplace_order_id UNIQUE` |
-| `complete_purchase_receipt` | 035 | `goods-receipts` (engine) | **Incrementale/idempotente** per riga via `qty_posted` (delta = received − posted) |
+| `complete_purchase_receipt` | 035 (+049) | `goods-receipts` (engine) — **unico path di ricezione** | **Incrementale/idempotente** per riga via `qty_posted` (delta = received − posted). Porta il PO a `received` se completo, a `partial` se incompleto (049) |
 
-**Perché è delicato:** `receive_purchase_order` (019) NON sottrae le quantità già
-contabilizzate — assume ricezione totale. Se sullo **stesso PO** è già stato fatto un
-ricevimento **parziale** col goods-receipt engine (PO ancora `sent`/`confirmed`), un
-successivo `receive_purchase_order` rischia di **ricontabilizzare l'intera quantità →
-doppio carico**. Quando il goods-receipt copre tutto l'ordine, però, l'ordine passa a
-`received` e i guard di transizione bloccano il path 019. ➜ **Prima di estendere uno di
-questi path, verifica i guard di stato dell'ordine e non aprire scorciatoie che
-permettano due ricezioni sullo stesso PO.** (Rischio da validare con un test e2e dedicato.)
+**Stato attuale:** la ricezione che muove stock passa **solo** da `complete_purchase_receipt`.
+`receive_purchase_order` (019) è deprecata e non invocabile (Sprint 2); `ordering` non ha
+più nessun path → `received`. Il PO riflette la verità: `partial` quando è arrivata solo
+una parte, `received` quando è completo — entrambi scritti esclusivamente dall'engine.
+➜ **Non riaprire scorciatoie di ricezione lato `ordering`: un secondo write-path
+ricreerebbe il rischio di doppio carico sullo stesso PO.**
 
 ## Pattern corretto per "ricevere merce"
 

@@ -52,7 +52,7 @@ types.ts     Tipi di dominio (camelCase) per la UI. Mappati dal repo (snake_case
 | `catalog` | Ingredienti, ricette, anagrafica prodotti | `createIngredient` riusato dal goods-receipt |
 | `inventory` | **Magazzino / ledger stock** | Vedi `inventory/AGENTS.md`. Fonte di verità |
 | `goods-receipts` | **Goods Receipt Engine** (bakery+supplier) | Vedi `goods-receipts/AGENTS.md` |
-| `ordering` | Ordini d'acquisto (PO) + ricezione | RPC `receive_purchase_order` |
+| `ordering` | Ordini d'acquisto (PO). NO ricezione: la merce entra solo dal goods receipt engine | RPC `create_purchase_order`, `mark_order_sent`, `set_order_status`. `receive_purchase_order` DEPRECATA |
 | `marketplace` | Connessioni cross-org, catalogo, ordini marketplace | RPC `receive_marketplace_order`, `keys.ts` |
 | `portal` | Portale fornitore esterno token-based | Nessuna sessione Supabase |
 | `documents` | Documenti commerciali (DDT/fatture) + matching | `matching.ts` semantica condivisa |

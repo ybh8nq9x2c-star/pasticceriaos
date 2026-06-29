@@ -30,6 +30,9 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   draft:     ['sent', 'cancelled'],
   sent:      ['confirmed', 'cancelled'],
   confirmed: ['cancelled'],
+  // 'partial' è scritto SOLO dal goods receipt engine; da qui nessuna transizione
+  // (il resto si riceve dai receipts, che porteranno l'ordine a 'received').
+  partial:   [],
   received:  [],
   cancelled: [],
 };

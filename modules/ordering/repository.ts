@@ -65,6 +65,7 @@ export async function getOrderById(id: string): Promise<PurchaseOrder> {
         id,
         ingredient_product_id,
         quantity_ordered,
+        quantity_received,
         unit,
         unit_price_snapshot,
         ingredient_products ( name )
@@ -211,6 +212,7 @@ function toOrder(row: any): PurchaseOrder {
       ingredientProductId: li.ingredient_product_id,
       ingredientName:      li.ingredient_products?.name ?? '',
       quantity:            li.quantity_ordered,
+      quantityReceived:    li.quantity_received ?? 0,
       unitSnapshot:        li.unit,
       unitPriceSnapshot:   li.unit_price_snapshot,
       lineTotal,

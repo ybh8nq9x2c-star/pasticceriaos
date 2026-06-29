@@ -5,7 +5,7 @@
 
 import type { UnitOfMeasure, DispatchOutcome } from '@/lib/database.types';
 
-export type OrderStatus = 'draft' | 'sent' | 'confirmed' | 'received' | 'cancelled';
+export type OrderStatus = 'draft' | 'sent' | 'confirmed' | 'partial' | 'received' | 'cancelled';
 export type { DispatchOutcome };
 
 export interface OrderLineItem {
@@ -13,7 +13,8 @@ export interface OrderLineItem {
   orderId: string;
   ingredientProductId: string;
   ingredientName: string;          // snapshot al momento dell'ordine
-  quantity: number;
+  quantity: number;                // ordinata
+  quantityReceived: number;        // ricevuta finora (mantenuta dal goods receipt engine)
   unitSnapshot: UnitOfMeasure;     // snapshot
   unitPriceSnapshot: number | null; // snapshot
   lineTotal: number | null;        // computed: quantity * unitPriceSnapshot

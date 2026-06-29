@@ -122,14 +122,18 @@ export default async function TodayPage() {
   }
   const todayShortages = todayRequirements.filter((r) => r.estimatedShortage > 0);
 
-  // Ordini fornitore separati: le BOZZE sono lavoro da fare (vanno inviate), gli
-  // ordini inviati/confermati sono in attesa di consegna. Non contare le bozze
-  // come "ordini in corso".
+  // Ordini fornitore in tre secchi distinti e onesti: BOZZE da inviare (lavoro da
+  // fare), IN ATTESA di consegna (inviati/confermati), PARZIALI (arrivati solo in
+  // parte, da completare). Stessa verità di /orders.
   const draftOrders = openOrders.filter((o) => o.status === 'draft');
   const awaitingOrders = openOrders.filter((o) => o.status === 'sent' || o.status === 'confirmed');
-  const awaitingValue =
-    awaitingOrders.length > 0 && awaitingOrders.every((o) => o.totalAmount !== null)
-      ? awaitingOrders.reduce((s, o) => s + (o.totalAmount ?? 0), 0)
+  const partialOrders = openOrders.filter((o) => o.status === 'partial');
+  // "In attesa di consegna" a livello KPI = tutto ciò che è inviato e non ancora
+  // completo (inclusi i parziali, che attendono il resto).
+  const deliveryPending = [...awaitingOrders, ...partialOrders];
+  const deliveryValue =
+    deliveryPending.length > 0 && deliveryPending.every((o) => o.totalAmount !== null)
+      ? deliveryPending.reduce((s, o) => s + (o.totalAmount ?? 0), 0)
       : null;
 
   // ── SEZIONE 2: richiede attenzione ─────────────────────────────────────────
@@ -450,18 +454,20 @@ export default async function TodayPage() {
           />
           <KpiCard
             label="In attesa consegna"
-            value={awaitingOrders.length}
+            value={deliveryPending.length}
             sub={
-              awaitingValue !== null && awaitingOrders.length > 0
-                ? `valore €${formatCurrency(awaitingValue)}`
-                : awaitingOrders.length > 0
+              partialOrders.length > 0
+                ? `${partialOrders.length} parzial${partialOrders.length === 1 ? 'e' : 'i'} da completare`
+                : deliveryValue !== null && deliveryPending.length > 0
+                ? `valore €${formatCurrency(deliveryValue)}`
+                : deliveryPending.length > 0
                 ? 'valore parziale'
                 : draftOrders.length > 0
                 ? `${draftOrders.length} bozz${draftOrders.length === 1 ? 'a' : 'e'} da inviare`
                 : 'nessun ordine in attesa'
             }
             href="/orders"
-            accentClass={awaitingOrders.length > 0 ? 'bg-primary' : undefined}
+            accentClass={partialOrders.length > 0 ? 'bg-warning' : deliveryPending.length > 0 ? 'bg-primary' : undefined}
           />
           <KpiCard
             label="Sotto soglia"
@@ -486,7 +492,7 @@ export default async function TodayPage() {
             <h2 className="font-semibold text-[15px] text-ink">Ordini fornitore</h2>
             <Link href="/orders" className="text-xs font-semibold text-primary hover:underline">Tutti →</Link>
           </div>
-          {draftOrders.length === 0 && awaitingOrders.length === 0 ? (
+          {draftOrders.length === 0 && awaitingOrders.length === 0 && partialOrders.length === 0 ? (
             <p className="px-5 py-8 text-sm text-ink-muted text-center">
               Nessun ordine aperto. Le bozze si generano dal piano produzione.
             </p>
@@ -538,6 +544,28 @@ export default async function TodayPage() {
                     </Link>
                   ))}
                 </div>
+              )}
+
+              {/* Parzialmente ricevuti: arrivati solo in parte, da completare. */}
+              {partialOrders.length > 0 && (
+                <>
+                  <div className="px-5 pt-3 pb-1 flex items-center justify-between border-t border-divider">
+                    <span className="text-xs font-semibold text-warning-strong uppercase tracking-wide">Parzialmente ricevuti</span>
+                    <span className="text-xs font-mono text-ink-muted">{partialOrders.length}</span>
+                  </div>
+                  <div className="divide-y divide-divider">
+                    {partialOrders.slice(0, 5).map((o) => (
+                      <Link key={o.orderId} href={`/orders/${o.orderId}`} className="flex items-center gap-3 px-5 py-3 hover:bg-surface-offset transition-colors group">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-ink truncate">{o.supplierName}</p>
+                          <p className="text-xs text-ink-muted font-mono mt-0.5">{o.orderDate} · {o.lineItemsCount} righe</p>
+                        </div>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-warning-light text-warning-strong shrink-0">Parziale</span>
+                        <span className="text-xs font-semibold text-primary group-hover:underline shrink-0">Ricevi il resto →</span>
+                      </Link>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           )}
