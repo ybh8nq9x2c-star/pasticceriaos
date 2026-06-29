@@ -40,6 +40,10 @@ export function orderStatusBadge(
       return { label: 'Ricevuto', variant: 'green' };
     case 'cancelled':
       return { label: 'Annullato', variant: 'red' };
+    default:
+      // Stato non previsto dalla UI (es. 'partial', non supportato end-to-end):
+      // nessun crash, badge neutro. Vedi reality-check Sprint 2.
+      return { label: 'Stato sconosciuto', variant: 'gray' };
   }
 }
 
@@ -69,5 +73,7 @@ export function pipelineIndex(status: OrderStatus): number {
       return 2;
     case 'cancelled':
       return -1;
+    default:
+      return -1; // stato inatteso → fuori pipeline, nessun crash
   }
 }

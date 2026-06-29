@@ -1940,12 +1940,32 @@ export interface Database {
         Args: Record<never, never>;
         Returns: boolean;
       };
-      receive_purchase_order: {
-        Args: { p_order_id: string };
-        Returns: undefined;
-      };
+      // receive_purchase_order: DEPRECATED (Sprint 2) — execute revocato a
+      // authenticated, non più invocabile dall'app. La ricezione passa solo dal
+      // goods receipt engine (complete_purchase_receipt).
       mark_order_sent: {
         Args: { p_order_id: string; p_outcome: string; p_note?: string | null };
+        Returns: undefined;
+      };
+      create_purchase_order: {
+        Args: {
+          p_organization_id: string;
+          p_supplier_id: string;
+          p_order_date: string;
+          p_expected_date: string | null;
+          p_notes: string | null;
+          p_lines: {
+            ingredient_product_id: string;
+            quantity_ordered: number;
+            unit: UnitOfMeasure;
+            unit_price_snapshot: number | null;
+          }[];
+          p_history_note?: string;
+        };
+        Returns: string;
+      };
+      set_order_status: {
+        Args: { p_order_id: string; p_to_status: OrderStatus; p_note?: string | null };
         Returns: undefined;
       };
       complete_purchase_receipt: {

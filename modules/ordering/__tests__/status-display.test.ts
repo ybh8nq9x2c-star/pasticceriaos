@@ -42,6 +42,12 @@ describe('orderStatusBadge — invio onesto', () => {
     expect(orderStatusBadge('received', null)).toEqual({ label: 'Ricevuto', variant: 'green' });
     expect(orderStatusBadge('cancelled', null)).toEqual({ label: 'Annullato', variant: 'red' });
   });
+
+  it('stato inatteso (es. partial, non supportato) → badge neutro, nessun crash', () => {
+    // cast: simula un valore DB fuori dal dominio TS (order_status SQL ha 'partial').
+    const b = orderStatusBadge('partial' as unknown as Parameters<typeof orderStatusBadge>[0], null);
+    expect(b).toEqual({ label: 'Stato sconosciuto', variant: 'gray' });
+  });
 });
 
 describe('needsManualSend', () => {
@@ -60,11 +66,12 @@ describe('pipeline a 3 nodi (Bozza → Inviato → Ricevuto)', () => {
     expect(ORDER_PIPELINE).toEqual(['draft', 'sent', 'received']);
   });
 
-  it('confirmed mappa sul passo "Inviato"; cancelled fuori pipeline', () => {
+  it('confirmed mappa sul passo "Inviato"; cancelled e stati inattesi fuori pipeline', () => {
     expect(pipelineIndex('draft')).toBe(0);
     expect(pipelineIndex('sent')).toBe(1);
     expect(pipelineIndex('confirmed')).toBe(1);
     expect(pipelineIndex('received')).toBe(2);
     expect(pipelineIndex('cancelled')).toBe(-1);
+    expect(pipelineIndex('partial' as unknown as Parameters<typeof pipelineIndex>[0])).toBe(-1);
   });
 });

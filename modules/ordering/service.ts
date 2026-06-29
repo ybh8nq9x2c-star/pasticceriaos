@@ -5,7 +5,7 @@
 
 import { requireOrgId } from '@/modules/identity/service';
 import { createClient } from '@/lib/supabase/server';
-import { AuthError, BusinessRuleError, mapSupabaseError } from '@/lib/errors';
+import { BusinessRuleError, mapSupabaseError, NotFoundError } from '@/lib/errors';
 import { dispatchOrderToSupplier } from '@/lib/order-dispatch';
 import * as repo from './repository';
 import * as reportingRepo from '@/modules/reporting/repository';
@@ -23,10 +23,13 @@ import type { CreateOrderInput, UpdateOrderInput, ChangeStatusInput } from './sc
 // State machine: allowed transitions
 // ---------------------------------------------------------------------------
 
+// La ricezione NON è una transizione dell'ordering: la merce entra a magazzino
+// solo dal goods receipt engine, che porta l'ordine a 'received' lato DB. Nessun
+// path applicativo qui può scrivere 'received'.
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   draft:     ['sent', 'cancelled'],
   sent:      ['confirmed', 'cancelled'],
-  confirmed: ['received', 'cancelled'],
+  confirmed: ['cancelled'],
   received:  [],
   cancelled: [],
 };
@@ -39,6 +42,12 @@ function assertTransition(from: OrderStatus, to: OrderStatus): void {
   }
 }
 
+/** Difesa in profondità (oltre alla RLS): l'ordine deve essere dell'org corrente. */
+async function assertOrderInOrg(order: PurchaseOrder): Promise<void> {
+  const orgId = await requireOrgId();
+  if (order.organizationId !== orgId) throw new NotFoundError('Ordine d\'acquisto');
+}
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
@@ -49,7 +58,9 @@ export async function listOrders(): Promise<PurchaseOrderListItem[]> {
 }
 
 export async function getOrder(id: string): Promise<PurchaseOrder> {
-  return repo.getOrderById(id);
+  const order = await repo.getOrderById(id);
+  await assertOrderInOrg(order);
+  return order;
 }
 
 export async function getOrderHistory(id: string): Promise<OrderStatusEvent[]> {
@@ -64,22 +75,16 @@ export async function createOrder(raw: unknown): Promise<PurchaseOrder> {
   const orgId = await requireOrgId();
   const input: CreateOrderInput = createOrderSchema.parse(raw);
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new AuthError();
-
-  const order = await repo.insertOrder(orgId, input);
-
-  // Ogni ordine nasce con la sua history: (null -> draft).
-  await repo.appendStatusHistory(order.id, null, 'draft', user.id);
-
-  return order;
+  // Header + righe + history iniziale (null -> draft) in UNA transazione (RPC).
+  // Nessun ordine può più nascere senza la sua riga di history.
+  return repo.insertOrder(orgId, input);
 }
 
 export async function updateOrder(id: string, raw: unknown): Promise<PurchaseOrder> {
   const input: UpdateOrderInput = updateOrderSchema.parse(raw);
 
   const existing = await repo.getOrderById(id);
+  await assertOrderInOrg(existing);
 
   if (existing.status !== 'draft') {
     throw new BusinessRuleError(
@@ -107,23 +112,22 @@ export async function changeOrderStatus(
   raw: unknown,
 ): Promise<PurchaseOrder> {
   const input: ChangeStatusInput = changeStatusSchema.parse(raw);
+
+  // A) La ricezione NON passa più dagli ordini: è confinata al goods receipt
+  // engine, che porta l'ordine a 'received'. Guard esplicito con messaggio chiaro
+  // (oltre alla state machine, che comunque non consente più → received).
+  if (input.status === 'received') {
+    throw new BusinessRuleError(
+      'La merce ricevuta si registra dal modulo Ricevimenti: gli ordini non si portano più manualmente a “ricevuto”.',
+    );
+  }
+
   const existing = await repo.getOrderById(id);
+  await assertOrderInOrg(existing);
 
   assertTransition(existing.status, input.status);
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new AuthError();
-
-  // Ricezione = write-path TRANSAZIONALE (RPC 019): inserisce i movimenti
-  // purchase_receipt per ogni riga, aggiorna quantity_received, rinfresca il
-  // prezzo cache su ingredient_products, porta lo stato a 'received' e scrive la
-  // history — tutto atomicamente. Niente scritture parziali su fallimento.
-  if (input.status === 'received') {
-    const { error } = await supabase.rpc('receive_purchase_order', { p_order_id: id });
-    if (error) throw mapSupabaseError(error);
-    return repo.getOrderById(id);
-  }
 
   // Invio al fornitore: dispatch ESTERNO (fallibile, mai bloccante) seguito dalla
   // transizione ATOMICA via RPC `mark_order_sent` — status + sent_at +
@@ -161,24 +165,31 @@ export async function changeOrderStatus(
     return repo.getOrderById(id);
   }
 
-  // Altre transizioni (es. 'confirmed', opzionale): solo stato + history, nessun
-  // effetto su magazzino. La ricezione passa esclusivamente dal goods receipt engine.
-  await repo.patchOrder(id, { status: input.status });
-  await repo.appendStatusHistory(id, existing.status, input.status, user.id, input.notes);
+  // Altre transizioni (es. 'confirmed', opzionale): stato + history ATOMICI via
+  // RPC `set_order_status` (rifiuta received/sent/draft). Nessun effetto magazzino.
+  const { error } = await supabase.rpc('set_order_status', {
+    p_order_id:  id,
+    p_to_status: input.status,
+    p_note:      input.notes || null,
+  });
+  if (error) throw mapSupabaseError(error);
 
   return repo.getOrderById(id);
 }
 
 export async function cancelOrder(id: string, notes?: string): Promise<void> {
   const existing = await repo.getOrderById(id);
+  await assertOrderInOrg(existing);
   assertTransition(existing.status, 'cancelled');
 
+  // Stato + history ATOMICI (RPC). Niente annullamento senza riga di audit.
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new AuthError();
-
-  await repo.patchOrder(id, { status: 'cancelled' });
-  await repo.appendStatusHistory(id, existing.status, 'cancelled', user.id, notes);
+  const { error } = await supabase.rpc('set_order_status', {
+    p_order_id:  id,
+    p_to_status: 'cancelled',
+    p_note:      notes || null,
+  });
+  if (error) throw mapSupabaseError(error);
 }
 
 // ---------------------------------------------------------------------------
@@ -205,10 +216,6 @@ export async function createDraftOrdersFromShortage(planId: string): Promise<Dra
     throw new BusinessRuleError('Il piano non ha shortage: nessun ordine da generare.');
   }
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new AuthError();
-
   // Raggruppa per fornitore (ingredienti senza fornitore -> skipped, espliciti).
   const bySupplier = new Map<string, typeof shortages>();
   const skipped: string[] = [];
@@ -224,19 +231,31 @@ export async function createDraftOrdersFromShortage(planId: string): Promise<Dra
 
   const createdOrderIds: string[] = [];
   for (const [supplierId, lines] of bySupplier) {
-    const order = await repo.insertOrder(orgId, {
-      supplierId,
-      orderDate: new Date().toISOString().slice(0, 10),
-      expectedDate: '',
-      notes: `Bozza generata dal fabbisogno del piano ${lines[0].planDate}.`,
-      lineItems: lines.map((l) => ({
+    // Arrotonda a 3 decimali (precisione DB) e SCARTA le righe che si azzerano:
+    // uno shortage trascurabile non deve generare quantity_ordered = 0 (CHECK DB)
+    // né un errore sporco. Le righe valide procedono normalmente.
+    const lineItems = lines
+      .map((l) => ({
         ingredientProductId: l.ingredientProductId,
         quantity: Math.round(l.estimatedShortage * 1000) / 1000,
         unitSnapshot: l.unit,
         unitPriceSnapshot: l.currentUnitPrice,
-      })),
-    } as CreateOrderInput);
-    await repo.appendStatusHistory(order.id, null, 'draft', user.id, 'Generato automaticamente da shortage piano');
+      }))
+      .filter((li) => li.quantity > 0);
+
+    if (lineItems.length === 0) continue; // shortage trascurabile dopo arrotondamento
+
+    const order = await repo.insertOrder(
+      orgId,
+      {
+        supplierId,
+        orderDate: new Date().toISOString().slice(0, 10),
+        expectedDate: '',
+        notes: `Bozza generata dal fabbisogno del piano ${lines[0].planDate}.`,
+        lineItems,
+      } as CreateOrderInput,
+      'Generato automaticamente da shortage piano',
+    );
     createdOrderIds.push(order.id);
   }
 

@@ -78,44 +78,35 @@ export async function getOrderById(id: string): Promise<PurchaseOrder> {
   return toOrder(data);
 }
 
+/**
+ * Crea un ordine in modo ATOMICO via RPC `create_purchase_order`: header + righe +
+ * history iniziale (null->draft) in una transazione. Niente più ordine senza history.
+ * `historyNote` permette di tracciare l'origine (es. bozza da shortage).
+ */
 export async function insertOrder(
   orgId: string,
   input: CreateOrderInput,
+  historyNote?: string,
 ): Promise<PurchaseOrder> {
   const supabase = await createClient();
 
-  const { data: order, error: orderError } = await supabase
-    .from('purchase_orders')
-    .insert({
-      organization_id: orgId,
-      supplier_id:     input.supplierId,
-      order_date:      input.orderDate,
-      expected_date:   input.expectedDate || null,
-      notes:           input.notes || null,
-      status:          'draft',
-    })
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc('create_purchase_order', {
+    p_organization_id: orgId,
+    p_supplier_id:     input.supplierId,
+    p_order_date:      input.orderDate,
+    p_expected_date:   input.expectedDate || null,
+    p_notes:           input.notes || null,
+    p_lines: input.lineItems.map((item) => ({
+      ingredient_product_id: item.ingredientProductId,
+      quantity_ordered:      item.quantity,
+      unit:                  item.unitSnapshot,
+      unit_price_snapshot:   item.unitPriceSnapshot,
+    })),
+    ...(historyNote ? { p_history_note: historyNote } : {}),
+  });
 
-  if (orderError) throw mapSupabaseError(orderError);
-
-  if (input.lineItems.length > 0) {
-    const { error: itemsError } = await supabase
-      .from('order_line_items')
-      .insert(
-        input.lineItems.map((item) => ({
-          purchase_order_id:     order.id,
-          ingredient_product_id: item.ingredientProductId,
-          quantity_ordered:      item.quantity,
-          unit:                  item.unitSnapshot,
-          unit_price_snapshot:   item.unitPriceSnapshot,
-        })),
-      );
-
-    if (itemsError) throw mapSupabaseError(itemsError);
-  }
-
-  return getOrderById(order.id);
+  if (error) throw mapSupabaseError(error);
+  return getOrderById(data as string);
 }
 
 export async function patchOrder(
@@ -177,27 +168,9 @@ export async function insertOrderLineItems(
 
 // ---------------------------------------------------------------------------
 // Order Status History (append-only)
+// Le SCRITTURE passano dalle RPC atomiche (create_purchase_order, mark_order_sent,
+// set_order_status, complete_purchase_receipt): qui solo lettura.
 // ---------------------------------------------------------------------------
-
-export async function appendStatusHistory(
-  orderId: string,
-  fromStatus: OrderStatus | null,
-  toStatus: OrderStatus,
-  changedBy: string,
-  notes?: string,
-): Promise<void> {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('order_status_history')
-    .insert({
-      purchase_order_id: orderId,
-      from_status:       fromStatus,
-      to_status:         toStatus,
-      changed_by:        changedBy,
-      notes:             notes || null,
-    });
-  if (error) throw mapSupabaseError(error);
-}
 
 export async function listStatusHistory(orderId: string): Promise<OrderStatusEvent[]> {
   const supabase = await createClient();

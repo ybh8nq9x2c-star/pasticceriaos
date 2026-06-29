@@ -54,14 +54,19 @@ function formatCurrency(n: number | null) {
 }
 
 export default async function OrderDetailPage({ params }: { params: { id: string } }) {
-  let order, history;
+  // L'ordine è l'entità primaria: se manca → 404. Lo storico è ancillare: un suo
+  // errore NON deve far sparire un ordine esistente (degrada a lista vuota).
+  let order;
   try {
-    [order, history] = await Promise.all([
-      getOrder(params.id),
-      getOrderHistory(params.id),
-    ]);
+    order = await getOrder(params.id);
   } catch {
     notFound();
+  }
+  let history: Awaited<ReturnType<typeof getOrderHistory>> = [];
+  try {
+    history = await getOrderHistory(params.id);
+  } catch {
+    history = [];
   }
 
   // Lotti registrati su questo ordine (solo per ordini ricevuti).
