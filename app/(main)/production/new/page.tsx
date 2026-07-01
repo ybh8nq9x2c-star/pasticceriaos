@@ -13,6 +13,8 @@ import { Cake } from 'lucide-react';
 import { IDLE_STATE, UNIT_LABELS } from '@/lib/utils';
 import { createPlanAction } from '@/modules/production/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
+import { QuantityStepper } from '@/components/ui/QuantityStepper';
+import { StickyActionBar } from '@/components/ui/StickyActionBar';
 import type { UnitOfMeasure } from '@/lib/database.types';
 
 interface RecipeOption { id: string; name: string; emoji: string | null; basePortions: number }
@@ -195,12 +197,12 @@ export default function NewProductionPage() {
   }
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
       <div className="mb-6">
         <Link href="/production" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Produzione
         </Link>
-        <h1 className="text-3xl font-bold text-ink mt-3">Nuovo piano di produzione</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-ink mt-3">Nuovo piano di produzione</h1>
       </div>
 
       <form action={handleSubmit} className="space-y-6">
@@ -313,11 +315,19 @@ export default function NewProductionPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-ink">
               Ricette <span className="text-danger">*</span>
+              {(() => {
+                const n = rows.filter((r) => r.recipeId && (parseInt(r.batchCount) || 0) > 0).length;
+                return n > 0 ? (
+                  <span className="ml-2 text-xs font-semibold text-primary align-middle">
+                    {n} selezionat{n === 1 ? 'a' : 'e'}
+                  </span>
+                ) : null;
+              })()}
             </h2>
             <button
               type="button"
               onClick={addRow}
-              className="text-xs font-semibold text-primary hover:underline"
+              className="min-h-[44px] px-2 text-xs font-semibold text-primary hover:underline"
             >
               + Aggiungi ricetta
             </button>
@@ -326,15 +336,24 @@ export default function NewProductionPage() {
           <div className="space-y-3">
             {rows.map((row, idx) => {
               const recipe = recipes.find((r) => r.id === row.recipeId);
+              const selected = row.recipeId !== '' && (parseInt(row.batchCount) || 0) > 0;
               const totalPortions = recipe ? recipe.basePortions * (parseInt(row.batchCount) || 0) : null;
               return (
-                <div key={row.key} className="flex gap-2 items-center">
+                // Mobile: card impilata (ricetta su riga piena, stepper sotto).
+                // Da sm in su: riga compatta come prima. Selezionata → bordo primario.
+                <div
+                  key={row.key}
+                  className={`rounded-xl border p-3 sm:p-2 flex flex-wrap gap-2 items-center transition-colors ${
+                    selected ? 'border-primary-soft bg-primary-light/30' : 'border-border'
+                  }`}
+                >
                   <span className="text-xs text-ink-muted w-5 text-center font-mono">{idx + 1}</span>
 
                   <select
+                    aria-label={`Ricetta riga ${idx + 1}`}
                     value={row.recipeId}
                     onChange={(e) => updateRow(row.key, 'recipeId', e.target.value)}
-                    className="flex-1 rounded-xl border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring bg-surface-2"
+                    className="min-w-full sm:min-w-0 sm:flex-1 rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring bg-surface-2"
                   >
                     <option value="">Seleziona ricetta…</option>
                     {recipes.map((r) => (
@@ -344,24 +363,24 @@ export default function NewProductionPage() {
                     ))}
                   </select>
 
-                  <div className="flex flex-col items-center">
-                    <input
-                      type="number"
-                      min={1}
-                      value={row.batchCount}
-                      onChange={(e) => updateRow(row.key, 'batchCount', e.target.value)}
-                      className="w-16 rounded-xl border border-border px-2 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
-                    />
-                    {totalPortions !== null && (
-                      <span className="text-xs text-ink-muted mt-0.5 font-mono">{totalPortions} pz</span>
-                    )}
-                  </div>
+                  <QuantityStepper
+                    value={row.batchCount}
+                    onChange={(v) => updateRow(row.key, 'batchCount', v)}
+                    min={1}
+                    label={recipe ? `infornate di ${recipe.name}` : 'infornate'}
+                  />
+                  <span className="text-xs text-ink-muted font-mono min-w-[64px]">
+                    {recipe
+                      ? `${totalPortions} pz (${recipe.basePortions}/inf.)`
+                      : ''}
+                  </span>
 
                   {rows.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeRow(row.key)}
-                      className="text-ink-faint hover:text-danger transition-colors text-lg leading-none"
+                      aria-label={`Rimuovi riga ${idx + 1}`}
+                      className="ml-auto flex items-center justify-center w-11 h-11 rounded-md text-ink-faint hover:text-danger hover:bg-danger-light transition-colors text-lg leading-none"
                     >
                       ×
                     </button>
@@ -382,7 +401,7 @@ export default function NewProductionPage() {
 
         {/* Fabbisogno LIVE — si aggiorna da solo mentre componi il piano (Task 1) */}
         {(requirements.length > 0 || reqLoading) && (
-          <div className="bg-surface-2 rounded-2xl border border-border p-6">
+          <div id="fabbisogno" className="bg-surface-2 rounded-2xl border border-border p-6 scroll-mt-24">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-bold text-ink">Fabbisogno ingredienti</h2>
               <span className="text-xs text-ink-muted">{reqLoading ? 'Aggiorno…' : 'Aggiornato'}</span>
@@ -424,20 +443,32 @@ export default function NewProductionPage() {
           </div>
         )}
 
-        <div className="flex gap-3">
-          <Link
-            href="/production"
-            className="flex-1 py-3 text-center rounded-xl border border-border text-sm font-semibold text-ink hover:bg-surface-offset"
-          >
-            Annulla
-          </Link>
-          <SubmitButton
-            pendingLabel="Creazione…"
-            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
-          >
-            Crea piano
-          </SubmitButton>
-        </div>
+        {/* CTA primaria SEMPRE visibile su mobile (niente scroll fino in fondo). */}
+        <StickyActionBar>
+          {(() => {
+            const shortageCount = requirements.filter((r) => r.shortage > 0).length;
+            return shortageCount > 0 ? (
+              <p className="mb-1.5 text-xs font-medium text-warning-strong">
+                Mancano {shortageCount} ingredient{shortageCount === 1 ? 'e' : 'i'} per questo piano —{' '}
+                <a href="#fabbisogno" className="underline">vedi e ordina</a>. Puoi comunque salvare.
+              </p>
+            ) : null;
+          })()}
+          <div className="flex gap-3">
+            <Link
+              href="/production"
+              className="flex-1 py-3 text-center rounded-xl border border-border text-sm font-semibold text-ink bg-surface-2 hover:bg-surface-offset"
+            >
+              Annulla
+            </Link>
+            <SubmitButton
+              pendingLabel="Creazione…"
+              className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
+            >
+              Crea piano
+            </SubmitButton>
+          </div>
+        </StickyActionBar>
       </form>
     </div>
   );

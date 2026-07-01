@@ -20,7 +20,7 @@ function formatQty(n: number): string {
 export default async function NewOrderPage({
   searchParams,
 }: {
-  searchParams: { plan?: string; ingredient?: string; qty?: string };
+  searchParams: { plan?: string; ingredient?: string; qty?: string; ingredients?: string };
 }) {
   const [suppliers, ingredients] = await Promise.all([
     listSuppliers(),
@@ -30,6 +30,41 @@ export default async function NewOrderPage({
   let initialRows: PrefillRow[] | undefined;
   let initialSupplierId: string | undefined;
   let prefillNote: string | undefined;
+
+  // Riordino MULTIPLO ("Ordina tutti i mancanti" / task dashboard):
+  // ?ingredients=id:qty,id:qty — quantità già suggerite a monte (2×soglia − scorta).
+  if (searchParams.ingredients && !searchParams.plan && !searchParams.ingredient) {
+    const entries = searchParams.ingredients
+      .split(',')
+      .slice(0, 20)
+      .map((pair) => {
+        const [id, rawQty] = pair.split(':');
+        const ing = ingredients.find((i) => i.id === id);
+        if (!ing) return null;
+        const qty = Number(rawQty);
+        return {
+          ingredientProductId: ing.id,
+          quantity:            Number.isFinite(qty) && qty > 0 ? formatQty(qty) : '',
+          unitSnapshot:        ing.unit,
+          unitPriceSnapshot:   ing.unitPrice !== null ? String(ing.unitPrice) : '',
+          supplierId:          ing.supplierId ?? null,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    if (entries.length > 0) {
+      initialRows = entries.map(({ supplierId: _s, ...row }) => row);
+      // Preseleziona il fornitore più ricorrente tra i mancanti (come per i piani).
+      const counts = new Map<string, number>();
+      for (const e of entries) {
+        if (e.supplierId) counts.set(e.supplierId, (counts.get(e.supplierId) ?? 0) + 1);
+      }
+      initialSupplierId = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+      prefillNote =
+        `${entries.length} ingredienti sotto soglia precompilati con la quantità suggerita ` +
+        '(riporta la scorta a 2× la soglia): verifica e correggi prima di creare.';
+    }
+  }
 
   // Riordino rapido di UN ingrediente (da "Ordina subito" sugli alert scorte).
   if (searchParams.ingredient && !searchParams.plan) {

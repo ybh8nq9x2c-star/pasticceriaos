@@ -119,6 +119,25 @@ export async function getReceiptRow(id: string): Promise<ReceiptRow> {
   return data;
 }
 
+/** Ricevimento APERTO già collegato a un ordine (per riusarlo, niente doppioni). */
+export async function findOpenReceiptIdForOrder(
+  orgId: string,
+  orderId: string,
+): Promise<string | null> {
+  const supabase = await createClient<Database>();
+  const { data, error } = await supabase
+    .from('purchase_receipts')
+    .select('id')
+    .eq('organization_id', orgId)
+    .eq('purchase_order_id', orderId)
+    .in('status', ['draft', 'expected', 'partial'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw mapSupabaseError(error);
+  return data?.id ?? null;
+}
+
 export interface ListReceiptsFilter {
   status?: ReceiptStatus[] | null;
   supplierId?: string | null;

@@ -10,6 +10,7 @@ import { orderStatusBadge } from '@/modules/ordering/status-display';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { OrdersMobileList } from '@/components/orders/OrdersMobileList';
 import { ShoppingCart } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Ordini' };
@@ -29,7 +30,7 @@ export default async function OrdersPage() {
   const orders = await listOrders();
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       <PageHeader
         title="Ordini d'acquisto"
         subtitle={`${orders.length} ordine/i`}
@@ -52,7 +53,14 @@ export default async function OrdersPage() {
           ctaLabel="Crea ordine"
         />
       ) : (
-        <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+        <>
+          {/* Mobile: card azionabili, default "da gestire", storico collassato. */}
+          <div className="md:hidden">
+            <OrdersMobileList orders={orders} />
+          </div>
+
+          {/* Desktop: tabella invariata. */}
+          <div className="hidden md:block bg-surface-2 rounded-2xl border border-border overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-bg border-b border-border">
               <tr>
@@ -90,7 +98,8 @@ export default async function OrdersPage() {
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

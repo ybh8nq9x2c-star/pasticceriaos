@@ -558,6 +558,37 @@ export async function receiveAllAndComplete(id: string): Promise<ReceiptStatus> 
   return completeReceipt(id);
 }
 
+/**
+ * SPRINT 1 MOBILE — "Ricevuto" in un tap dalla lista ordini: ricezione TOTALE
+ * (o del residuo, su ordini parziali) componendo ESCLUSIVAMENTE l'engine
+ * esistente: createReceipt prefillato dall'ordine → receiveAllAndComplete →
+ * RPC complete_purchase_receipt. Nessun nuovo write-path di stock; se esiste
+ * già un ricevimento aperto collegato all'ordine viene riusato (niente doppioni).
+ */
+export async function receiveOrderInFull(orderId: string): Promise<ReceiptStatus> {
+  const orgId = await requireOrgId();
+
+  const existing = await repo.findOpenReceiptIdForOrder(orgId, orderId);
+  if (existing) return receiveAllAndComplete(existing);
+
+  // Fornitore dall'ordine (createReceipt valida stato/org ma non backfilla il supplier).
+  const supabase = await createClient<Database>();
+  const { data: order, error } = await supabase
+    .from('purchase_orders')
+    .select('id, organization_id, supplier_id')
+    .eq('id', orderId)
+    .maybeSingle();
+  if (error) throw mapSupabaseError(error);
+  if (!order || order.organization_id !== orgId) throw new NotFoundError('Ordine');
+
+  const receiptId = await createReceipt({
+    mode: 'bakery',
+    supplierId: order.supplier_id ?? '',
+    purchaseOrderId: orderId,
+  });
+  return receiveAllAndComplete(receiptId);
+}
+
 export async function cancelReceipt(id: string): Promise<void> {
   const orgId = await requireOrgId();
   const receipt = await repo.getReceiptRow(id);

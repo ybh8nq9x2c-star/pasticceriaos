@@ -12,8 +12,11 @@ import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
 import {
   Package, Ban, AlertTriangle, Hourglass, Mail, ReceiptText, TrendingDown,
-  ShoppingCart, Cake, Recycle, Calculator,
+  ShoppingCart, Cake, Recycle, Calculator, ChevronDown, ChefHat,
 } from 'lucide-react';
+import { getMobilePriorityTasks, type PriorityTaskKind } from '@/lib/priority-tasks';
+import { MobileTaskCard, type TaskTone } from '@/components/mobile/MobileTaskCard';
+import { MobileSectionHeader } from '@/components/mobile/MobileSectionHeader';
 import {
   getDashboardSummary,
   getOpenOrders,
@@ -135,6 +138,23 @@ export default async function TodayPage() {
     deliveryPending.length > 0 && deliveryPending.every((o) => o.totalAmount !== null)
       ? deliveryPending.reduce((s, o) => s + (o.totalAmount ?? 0), 0)
       : null;
+
+  // ── "Da fare adesso" (mobile): max 2 task prioritari, logica centralizzata ──
+  const priorityTasks = getMobilePriorityTasks({
+    alerts: stockAlerts.map((a) => ({
+      ingredientProductId: a.ingredientProductId,
+      // Riordino suggerito: riporta la scorta a 2× la soglia (regola canonica).
+      suggestedQty: Math.max(0, Math.round((a.minThreshold * 2 - a.currentQuantity) * 1000) / 1000),
+    })),
+    awaitingOrders: deliveryPending.map((o) => ({ id: o.orderId, supplierName: o.supplierName })),
+    todayPlan: summary.todayPlan,
+  });
+  const TASK_UI: Record<PriorityTaskKind, { icon: LucideIcon; tone: TaskTone }> = {
+    order_missing: { icon: ShoppingCart, tone: 'danger' },
+    receive_order: { icon: Package,      tone: 'primary' },
+    complete_plan: { icon: Calculator,   tone: 'warning' },
+    create_plan:   { icon: ChefHat,      tone: 'primary' },
+  };
 
   // ── SEZIONE 2: richiede attenzione ─────────────────────────────────────────
   const now = Date.now();
@@ -284,11 +304,62 @@ export default async function TodayPage() {
     return Math.round(avg);
   })();
 
+  // KPI renderizzati UNA volta e riusati in due wrapper: su mobile stanno dietro
+  // un <details> (informativi, non azionabili al mattino); su desktop invariati.
+  const kpiGrid = (
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <KpiCard
+        label="Spesa mese corrente"
+        value={summary.monthSpend > 0 ? `€${formatCurrency(summary.monthSpend)}` : '—'}
+        sub={summary.monthOrdersReceived > 0 ? `${summary.monthOrdersReceived} ordini ricevuti` : 'in attesa di dati'}
+        href="/analytics"
+        accentClass={summary.monthSpend > 0 ? 'bg-primary' : undefined}
+      />
+      <KpiCard
+        label="Food cost medio"
+        value={avgFoodCostPct !== null ? `${avgFoodCostPct}%` : '—'}
+        sub={avgFoodCostPct !== null ? `${pricedRecipes.length} ricette prezzate` : 'imposta prezzi di vendita'}
+        href="/analytics"
+        accentClass={avgFoodCostPct !== null ? (avgFoodCostPct <= 40 ? 'bg-success' : 'bg-warning') : undefined}
+      />
+      <KpiCard
+        label="In attesa consegna"
+        value={deliveryPending.length}
+        sub={
+          partialOrders.length > 0
+            ? `${partialOrders.length} parzial${partialOrders.length === 1 ? 'e' : 'i'} da completare`
+            : deliveryValue !== null && deliveryPending.length > 0
+            ? `valore €${formatCurrency(deliveryValue)}`
+            : deliveryPending.length > 0
+            ? 'valore parziale'
+            : draftOrders.length > 0
+            ? `${draftOrders.length} bozz${draftOrders.length === 1 ? 'a' : 'e'} da inviare`
+            : 'nessun ordine in attesa'
+        }
+        href="/orders"
+        accentClass={partialOrders.length > 0 ? 'bg-warning' : deliveryPending.length > 0 ? 'bg-primary' : undefined}
+      />
+      <KpiCard
+        label="Sotto soglia"
+        value={totalAlerts}
+        sub={
+          summary.outOfStockCount > 0 ? `${summary.outOfStockCount} esauriti` :
+          totalAlerts > 0 ? 'scorte in alert' : 'scorte OK'
+        }
+        href="/inventory"
+        accentClass={
+          summary.outOfStockCount > 0 ? 'bg-danger' :
+          totalAlerts > 0 ? 'bg-warning' : 'bg-success'
+        }
+      />
+    </div>
+  );
+
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6 lg:space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-ink leading-tight">
+        <h1 className="text-2xl sm:text-3xl font-bold text-ink leading-tight">
           Buongiorno — <span className="text-primary">{session.organizationName}</span>
         </h1>
         <p className="text-sm text-ink-muted mt-1 capitalize">{todayLabel()}</p>
@@ -299,6 +370,28 @@ export default async function TodayPage() {
         <div className="rounded-2xl border border-warning-soft bg-warning-light/50 px-5 py-3 text-sm text-ink-muted">
           Alcuni dati non sono disponibili in questo momento: le sezioni interessate potrebbero risultare vuote.
           Riprova tra poco — il resto della dashboard è aggiornato.
+        </div>
+      )}
+
+      {/* ── 0 · DA FARE ADESSO (mobile): max 2 task, un tap ciascuno ───────── */}
+      {priorityTasks.length > 0 && (
+        <div className="lg:hidden">
+          <MobileSectionHeader>Da fare adesso</MobileSectionHeader>
+          <div className="space-y-2">
+            {priorityTasks.map((t) => {
+              const ui = TASK_UI[t.kind];
+              return (
+                <MobileTaskCard
+                  key={t.kind}
+                  href={t.href}
+                  icon={ui.icon}
+                  tone={ui.tone}
+                  title={t.title}
+                  cta={t.cta}
+                />
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -434,54 +527,18 @@ export default async function TodayPage() {
         </div>
       )}
 
-      {/* ── 4 · KPI OPERATIVI (tutti da query reali) ───────────────────────── */}
+      {/* ── 4 · KPI OPERATIVI (mobile: collassati; desktop: invariati) ─────── */}
       <div>
-        <h2 className="font-semibold text-sm text-ink-muted uppercase tracking-wide mb-3">KPI operativi</h2>
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <KpiCard
-            label="Spesa mese corrente"
-            value={summary.monthSpend > 0 ? `€${formatCurrency(summary.monthSpend)}` : '—'}
-            sub={summary.monthOrdersReceived > 0 ? `${summary.monthOrdersReceived} ordini ricevuti` : 'in attesa di dati'}
-            href="/analytics"
-            accentClass={summary.monthSpend > 0 ? 'bg-primary' : undefined}
-          />
-          <KpiCard
-            label="Food cost medio"
-            value={avgFoodCostPct !== null ? `${avgFoodCostPct}%` : '—'}
-            sub={avgFoodCostPct !== null ? `${pricedRecipes.length} ricette prezzate` : 'imposta prezzi di vendita'}
-            href="/analytics"
-            accentClass={avgFoodCostPct !== null ? (avgFoodCostPct <= 40 ? 'bg-success' : 'bg-warning') : undefined}
-          />
-          <KpiCard
-            label="In attesa consegna"
-            value={deliveryPending.length}
-            sub={
-              partialOrders.length > 0
-                ? `${partialOrders.length} parzial${partialOrders.length === 1 ? 'e' : 'i'} da completare`
-                : deliveryValue !== null && deliveryPending.length > 0
-                ? `valore €${formatCurrency(deliveryValue)}`
-                : deliveryPending.length > 0
-                ? 'valore parziale'
-                : draftOrders.length > 0
-                ? `${draftOrders.length} bozz${draftOrders.length === 1 ? 'a' : 'e'} da inviare`
-                : 'nessun ordine in attesa'
-            }
-            href="/orders"
-            accentClass={partialOrders.length > 0 ? 'bg-warning' : deliveryPending.length > 0 ? 'bg-primary' : undefined}
-          />
-          <KpiCard
-            label="Sotto soglia"
-            value={totalAlerts}
-            sub={
-              summary.outOfStockCount > 0 ? `${summary.outOfStockCount} esauriti` :
-              totalAlerts > 0 ? 'scorte in alert' : 'scorte OK'
-            }
-            href="/inventory"
-            accentClass={
-              summary.outOfStockCount > 0 ? 'bg-danger' :
-              totalAlerts > 0 ? 'bg-warning' : 'bg-success'
-            }
-          />
+        <details className="group lg:hidden">
+          <summary className="flex items-center justify-between min-h-[44px] cursor-pointer list-none select-none [&::-webkit-details-marker]:hidden">
+            <span className="font-semibold text-sm text-ink-muted uppercase tracking-wide">KPI operativi</span>
+            <ChevronDown size={16} aria-hidden="true" className="text-ink-faint transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-2">{kpiGrid}</div>
+        </details>
+        <div className="hidden lg:block">
+          <h2 className="font-semibold text-sm text-ink-muted uppercase tracking-wide mb-3">KPI operativi</h2>
+          {kpiGrid}
         </div>
       </div>
 
@@ -639,30 +696,44 @@ export default async function TodayPage() {
         )}
       </div>
 
-      {/* Top spesa ingredienti (se ci sono acquisti reali) */}
-      {topSpend.length > 0 && (
-        <div className="bg-surface-2 rounded-2xl border border-border px-6 py-5">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Top ingredienti per spesa</p>
-            <Link href="/analytics" className="text-xs font-semibold text-primary hover:underline">Analisi →</Link>
-          </div>
-          <div className="mt-3 space-y-2">
-            {topSpend.map((item, idx) => {
-              const max = topSpend[0]?.totalSpend || 1;
-              return (
-                <div key={item.ingredientProductId} className="flex items-center gap-3">
-                  <span className="text-xs font-mono text-ink-muted w-4">{idx + 1}</span>
-                  <span className="text-sm text-ink w-40 truncate">{item.ingredientName}</span>
-                  <div className="flex-1 h-2 bg-surface-offset rounded-full overflow-hidden">
-                    <div className="h-full bg-primary rounded-full" style={{ width: `${Math.max(4, Math.round((item.totalSpend / max) * 100))}%` }} />
+      {/* Top spesa ingredienti (mobile: collassata; desktop: invariata) */}
+      {topSpend.length > 0 && (() => {
+        const topSpendCard = (
+          <div className="bg-surface-2 rounded-2xl border border-border px-6 py-5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide">Top ingredienti per spesa</p>
+              <Link href="/analytics" className="text-xs font-semibold text-primary hover:underline">Analisi →</Link>
+            </div>
+            <div className="mt-3 space-y-2">
+              {topSpend.map((item, idx) => {
+                const max = topSpend[0]?.totalSpend || 1;
+                return (
+                  <div key={item.ingredientProductId} className="flex items-center gap-3">
+                    <span className="text-xs font-mono text-ink-muted w-4">{idx + 1}</span>
+                    <span className="text-sm text-ink w-40 truncate">{item.ingredientName}</span>
+                    <div className="flex-1 h-2 bg-surface-offset rounded-full overflow-hidden">
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${Math.max(4, Math.round((item.totalSpend / max) * 100))}%` }} />
+                    </div>
+                    <span className="text-xs font-mono font-semibold text-ink w-20 text-right">€{formatCurrency(item.totalSpend)}</span>
                   </div>
-                  <span className="text-xs font-mono font-semibold text-ink w-20 text-right">€{formatCurrency(item.totalSpend)}</span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+        return (
+          <div>
+            <details className="group lg:hidden">
+              <summary className="flex items-center justify-between min-h-[44px] cursor-pointer list-none select-none [&::-webkit-details-marker]:hidden">
+                <span className="font-semibold text-sm text-ink-muted uppercase tracking-wide">Top ingredienti per spesa</span>
+                <ChevronDown size={16} aria-hidden="true" className="text-ink-faint transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="mt-2">{topSpendCard}</div>
+            </details>
+            <div className="hidden lg:block">{topSpendCard}</div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

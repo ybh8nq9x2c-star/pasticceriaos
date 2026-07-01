@@ -108,12 +108,12 @@ export function NewOrderForm({
   }, 0);
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
       <div className="mb-6">
         <Link href="/orders" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Ordini
         </Link>
-        <h1 className="text-3xl font-bold text-ink mt-3">Nuovo ordine d'acquisto</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-ink mt-3">Nuovo ordine d'acquisto</h1>
       </div>
 
       {prefillNote && (

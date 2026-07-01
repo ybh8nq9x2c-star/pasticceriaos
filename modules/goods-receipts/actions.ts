@@ -232,6 +232,26 @@ export async function receiveAllAndCompleteAction(
   }
 }
 
+/**
+ * SPRINT 1 MOBILE — "Ricevuto" 1-tap dalla lista ordini: ricezione totale (o del
+ * residuo) via engine. Argomento semplice (niente FormData): chiamata da sheet.
+ */
+export async function receiveOrderInFullAction(orderId: string): Promise<ActionState> {
+  try {
+    const status = await service.receiveOrderInFull(orderId);
+    revalidateReceipt('bakery');
+    return {
+      status: 'success',
+      message:
+        status === 'completed'
+          ? 'Ordine ricevuto: magazzino aggiornato.'
+          : 'Carico registrato: controlla il ricevimento per le righe rimaste aperte.',
+    };
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+}
+
 export async function cancelReceiptAction(
   _prev: ActionState,
   formData: FormData,
