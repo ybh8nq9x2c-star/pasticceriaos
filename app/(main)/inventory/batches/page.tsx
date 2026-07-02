@@ -28,7 +28,7 @@ export default async function BatchesPage() {
   const urgent = batches.filter((b) => b.daysToExpiry <= 3);
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
       <PageHeader
         title="Lotti e scadenze"
         subtitle="Tracciabilità HACCP: lotti registrati alla ricezione, consumati in FEFO dalla produzione"
@@ -57,7 +57,7 @@ export default async function BatchesPage() {
             </div>
           )}
 
-          <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+          <div className="bg-surface-2 rounded-2xl border border-border overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-bg border-b border-border">
                 <tr>

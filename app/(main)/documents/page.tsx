@@ -39,7 +39,7 @@ export default async function DocumentsPage({
   };
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       <PageHeader
         title="Documenti"
         subtitle="DDT, fatture e conferme ordine — matching con gli ordini reali"

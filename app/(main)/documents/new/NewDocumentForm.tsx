@@ -70,7 +70,7 @@ export function NewDocumentForm({
   }
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
       <div className="mb-6">
         <Link href="/documents" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Documenti

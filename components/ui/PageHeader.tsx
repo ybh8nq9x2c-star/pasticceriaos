@@ -37,12 +37,18 @@ export function PageHeader({
           {backLabel ?? 'Indietro'}
         </Link>
       )}
-      <div className="flex items-start justify-between gap-4">
+      {/* Mobile: titolo sopra, azioni sotto a tutta larghezza (tap col pollice).
+          Da sm in su: riga classica titolo a sinistra, azioni a destra. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold text-ink leading-tight truncate">{title}</h1>
           {subtitle && <p className="text-sm text-ink-muted mt-1">{subtitle}</p>}
         </div>
-        {right && <div className="shrink-0 flex items-center gap-2">{right}</div>}
+        {right && (
+          <div className="flex flex-col items-stretch gap-2 sm:shrink-0 sm:flex-row sm:items-center [&_a]:text-center">
+            {right}
+          </div>
+        )}
       </div>
     </header>
   );

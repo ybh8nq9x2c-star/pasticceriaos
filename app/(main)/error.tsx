@@ -14,7 +14,7 @@ export default function MainError({
   reset: () => void;
 }) {
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
       <div className="bg-surface-2 rounded-2xl border border-border p-10 text-center">
         <p className="text-4xl mb-3">⚠️</p>
         <h1 className="text-xl font-bold text-ink">

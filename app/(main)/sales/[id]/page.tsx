@@ -31,7 +31,7 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
   if (!sale) notFound();
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
       <div className="mb-6">
         <Link href="/sales" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Vendite
@@ -50,6 +50,44 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
       </p>
 
       <div className="overflow-hidden rounded-2xl border border-border">
+        {/* Mobile: card per riga — prodotto, qtà, ricetta, stato */}
+        <div className="md:hidden divide-y divide-divider bg-surface-2">
+          {lines.map((l) => {
+            const cfg = LINE_CFG[l.status] ?? LINE_CFG.unlinked;
+            return (
+              <div key={l.id} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-ink truncate">{l.productName}</p>
+                    {l.productName !== l.externalProductRef && (
+                      <p className="text-xs text-ink-faint font-mono truncate">{l.externalProductRef}</p>
+                    )}
+                  </div>
+                  <span className="shrink-0 font-mono text-sm text-ink-muted">×{l.quantity}</span>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Badge variant={cfg.variant} size="sm">{cfg.label}</Badge>
+                  {l.recipeName ? (
+                    <Link href={`/recipes/${l.recipeId}`} className="text-xs font-semibold text-primary hover:underline">
+                      da «{l.recipeName}» →
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/settings/pos?highlight=${encodeURIComponent(l.externalProductRef)}`}
+                      className="text-xs font-semibold text-primary hover:underline"
+                    >
+                      Collega «{l.externalProductRef}» →
+                    </Link>
+                  )}
+                </div>
+                {l.exception && <p className="text-xs text-ink-muted mt-1.5">{l.exception}</p>}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop: tabella completa */}
+        <div className="hidden md:block">
         <table className="w-full text-sm">
           <thead className="bg-surface-offset text-ink-muted">
             <tr>
@@ -100,6 +138,7 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
             })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

@@ -72,7 +72,7 @@ export default async function CustomerOrdersPage({
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
       <PageHeader
         title="Ordini clienti"
         subtitle="Prenotazioni e ritiri — alimentano il fabbisogno del piano produzione"

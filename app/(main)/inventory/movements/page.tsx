@@ -40,7 +40,7 @@ export default async function MovementsPage() {
   const movements = await listMovements(undefined, 100);
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       <div className="flex items-start justify-between mb-8">
         <div>
           <Link href="/inventory" className="text-sm text-ink-muted hover:text-ink transition-colors">
@@ -68,7 +68,7 @@ export default async function MovementsPage() {
           <p className="text-sm text-ink-muted mt-1">I movimenti vengono registrati automaticamente dagli ordini e dalla produzione.</p>
         </div>
       ) : (
-        <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+        <div className="bg-surface-2 rounded-2xl border border-border overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-bg border-b border-border">
               <tr>

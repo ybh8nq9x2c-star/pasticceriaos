@@ -28,7 +28,8 @@ export function RegisterBatchForm({
   }
 
   return (
-    <form action={formAction} className="flex flex-wrap items-center gap-2">
+    // Mobile: griglia 2×2 con campi comodi da toccare; da sm: riga compatta.
+    <form action={formAction} className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
       <input type="hidden" name="purchaseOrderId" value={orderId} />
       <input type="hidden" name="ingredientProductId" value={ingredientProductId} />
       <input type="hidden" name="unit" value={unit} />
@@ -37,13 +38,13 @@ export function RegisterBatchForm({
         type="text"
         placeholder="N° lotto"
         maxLength={100}
-        className="w-24 rounded-lg border border-border px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
+        className="w-full sm:w-24 rounded-lg border border-border px-2.5 py-2.5 sm:py-1.5 text-sm sm:text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
       />
       <input
         name="expiryDate"
         type="date"
         required
-        className="rounded-lg border border-border px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary-ring"
+        className="w-full sm:w-auto rounded-lg border border-border px-2.5 py-2.5 sm:py-1.5 text-sm sm:text-xs focus:outline-none focus:ring-2 focus:ring-primary-ring"
       />
       <input
         name="quantity"
@@ -51,14 +52,16 @@ export function RegisterBatchForm({
         step="0.001"
         min="0.001"
         required
+        inputMode="decimal"
+        aria-label="Quantità"
         defaultValue={defaultQuantity}
-        className="w-20 rounded-lg border border-border px-2 py-1.5 text-xs text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
+        className="w-full sm:w-20 rounded-lg border border-border px-2.5 py-2.5 sm:py-1.5 text-sm sm:text-xs text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
       />
-      <SubmitButton className="px-3 py-1.5 bg-primary text-primary-fg rounded-lg text-xs font-semibold hover:bg-primary-hover">
+      <SubmitButton className="w-full sm:w-auto px-3 py-2.5 sm:py-1.5 bg-primary text-primary-fg rounded-lg text-sm sm:text-xs font-semibold hover:bg-primary-hover">
         Registra
       </SubmitButton>
       {state.status === 'error' && (
-        <span className="text-xs text-danger basis-full">{state.error}</span>
+        <span className="text-xs text-danger col-span-2 sm:basis-full">{state.error}</span>
       )}
     </form>
   );

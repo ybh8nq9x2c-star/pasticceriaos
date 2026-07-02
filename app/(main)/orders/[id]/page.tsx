@@ -21,6 +21,7 @@ import {
 } from '@/modules/ordering/status-display';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { SubmitButton } from '@/components/ui/SubmitButton';
+import { StickyActionBar } from '@/components/ui/StickyActionBar';
 
 export const metadata: Metadata = { title: 'Ordine' };
 
@@ -112,7 +113,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
   const showManualSend = needsManualSend(order.status, order.dispatchOutcome);
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
       {/* Breadcrumb + header */}
       <div className="mb-6">
         <Link href="/orders" className="text-sm text-ink-muted hover:text-ink transition-colors">
@@ -195,7 +196,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
               entra a magazzino solo dai Ricevimenti; qui si vede solo il residuo. */}
           {isPartial && (
             <div className="bg-warning-light/40 rounded-2xl border border-warning-soft overflow-hidden">
-              <div className="px-6 py-4 border-b border-warning-soft flex items-center justify-between gap-3">
+              <div className="px-4 sm:px-6 py-4 border-b border-warning-soft flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-base font-bold text-ink">Ricezione parziale</h2>
                   <p className="text-xs text-ink-muted mt-0.5">
@@ -204,11 +205,30 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                 </div>
                 <Link
                   href={`/receipts/new?order=${order.id}`}
-                  className="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors whitespace-nowrap"
+                  className="sm:shrink-0 px-3 py-2.5 rounded-xl text-xs font-semibold text-center bg-primary text-primary-fg hover:bg-primary-hover transition-colors whitespace-nowrap"
                 >
                   Ricevi il resto
                 </Link>
               </div>
+
+              {/* Mobile: righe aperte come row-stack */}
+              <div className="md:hidden divide-y divide-warning-soft/60">
+                {openLines.map(({ li, missing }) => (
+                  <div key={li.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-ink truncate">{li.ingredientName}</p>
+                      <p className="text-xs text-ink-muted font-mono mt-0.5">
+                        ordinato {li.quantity} · ricevuto {li.quantityReceived} {UNIT_SHORT[li.unitSnapshot]}
+                      </p>
+                    </div>
+                    <span className="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-warning-light text-warning-strong">
+                      manca {missing} {UNIT_SHORT[li.unitSnapshot]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden md:block">
               <table className="w-full text-sm">
                 <thead className="bg-bg/60 border-b border-warning-soft">
                   <tr>
@@ -229,10 +249,37 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
           <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+            {/* Mobile: righe ordine come row-stack con totale in coda */}
+            <div className="md:hidden">
+              <div className="divide-y divide-divider">
+                {order.lineItems.map((li) => (
+                  <div key={li.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-ink truncate">{li.ingredientName}</p>
+                      <p className="text-xs text-ink-muted font-mono mt-0.5">
+                        {li.quantity} {UNIT_SHORT[li.unitSnapshot]}
+                        {li.unitPriceSnapshot !== null && ` × ${formatCurrency(li.unitPriceSnapshot)}`}
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-mono font-medium text-sm text-ink">
+                      {formatCurrency(li.lineTotal)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="px-4 py-3 border-t border-border bg-bg flex items-center justify-between">
+                <span className="text-sm font-medium text-ink-muted">Totale ordine</span>
+                <span className="font-mono font-bold text-ink">{formatCurrency(order.totalAmount)}</span>
+              </div>
+            </div>
+
+            {/* Desktop: tabella completa */}
+            <div className="hidden md:block">
             <table className="w-full text-sm">
               <thead className="bg-bg border-b border-border">
                 <tr>
@@ -269,6 +316,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                 </tr>
               </tfoot>
             </table>
+            </div>
           </div>
 
           {/* Lotti e scadenze (HACCP) — su ordini ricevuti o parzialmente ricevuti */}
@@ -308,8 +356,8 @@ export default async function OrderDetailPage({ params }: { params: { id: string
                   const remaining = Math.max(0, li.quantity - registered);
                   if (remaining <= 0) return null;
                   return (
-                    <div key={li.id} className="flex flex-wrap items-center gap-3 py-1">
-                      <span className="text-sm text-ink w-44 truncate">{li.ingredientName}</span>
+                    <div key={li.id} className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 py-1">
+                      <span className="text-sm font-medium text-ink sm:w-44 truncate">{li.ingredientName}</span>
                       <RegisterBatchForm
                         orderId={order.id}
                         ingredientProductId={li.ingredientProductId}
@@ -382,11 +430,12 @@ export default async function OrderDetailPage({ params }: { params: { id: string
           )}
 
           {/* Ricevi merce → Goods Receipt Engine (preview editabile, poi conferma).
-              Unica via di ingresso a magazzino: niente posting istantaneo. */}
+              Unica via di ingresso a magazzino: niente posting istantaneo.
+              Su mobile la stessa azione vive nella StickyActionBar in fondo. */}
           {canReceive && (
             <Link
               href={`/receipts/new?order=${order.id}`}
-              className="block w-full py-3 text-center rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
+              className="hidden lg:block w-full py-3 text-center rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
             >
               <Package size={15} className="inline-block mr-1.5 -mt-0.5" aria-hidden="true" /> Ricevi merce
             </Link>
@@ -394,7 +443,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
 
           {/* Azione avanzamento stato (non tocca il magazzino) */}
           {nextAction && (
-            <form action={handleAdvance}>
+            <form action={handleAdvance} className="hidden lg:block">
               <input type="hidden" name="status" value={nextAction.toStatus} />
               <SubmitButton
                 pendingLabel="Attendere…"
@@ -422,6 +471,30 @@ export default async function OrderDetailPage({ params }: { params: { id: string
           )}
         </div>
       </div>
+
+      {/* Mobile: una sola CTA primaria, sticky sopra la tab bar */}
+      {(canReceive || nextAction) && (
+        <StickyActionBar className="lg:hidden mt-6">
+          {canReceive ? (
+            <Link
+              href={`/receipts/new?order=${order.id}`}
+              className="flex items-center justify-center w-full h-12 rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
+            >
+              <Package size={15} className="mr-1.5" aria-hidden="true" /> Ricevi merce
+            </Link>
+          ) : nextAction ? (
+            <form action={handleAdvance}>
+              <input type="hidden" name="status" value={nextAction.toStatus} />
+              <SubmitButton
+                pendingLabel="Attendere…"
+                className="w-full h-12 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
+              >
+                {nextAction.label}
+              </SubmitButton>
+            </form>
+          ) : null}
+        </StickyActionBar>
+      )}
     </div>
   );
 }

@@ -134,6 +134,34 @@ export default async function SalesPage() {
           />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-border">
+            {/* Mobile: card list — scontrino, quando, stato, totale, storno */}
+            <div className="md:hidden divide-y divide-divider bg-surface-2">
+              {sales.map((s) => {
+                const cfg = STATUS_CFG[s.status as SaleStatus] ?? STATUS_CFG.processed;
+                return (
+                  <div key={s.id} className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <Link href={`/sales/${s.id}`} className="min-w-0">
+                        <p className="font-mono text-sm text-primary truncate">{s.externalSaleId}</p>
+                        <p className="text-xs text-ink-muted mt-0.5">
+                          {dateFmt.format(new Date(s.soldAt))} · {s.source} · {s.lineCount} {s.lineCount === 1 ? 'riga' : 'righe'}
+                        </p>
+                      </Link>
+                      <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <span className="font-mono text-sm text-ink">
+                        {s.totalAmount != null ? formatCurrency(s.totalAmount) : '—'}
+                      </span>
+                      {reversible(s.status as SaleStatus) && <ReverseSaleButton saleId={s.id} />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop: tabella completa */}
+            <div className="hidden md:block">
             <table className="w-full text-sm">
               <thead className="bg-surface-offset text-ink-muted">
                 <tr>
@@ -174,6 +202,7 @@ export default async function SalesPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </section>

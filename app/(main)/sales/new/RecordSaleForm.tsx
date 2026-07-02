@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { recordSaleAction } from '@/modules/sales/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
+import { StickyActionBar } from '@/components/ui/StickyActionBar';
 
 interface LineRow {
   key: number;
@@ -84,7 +85,7 @@ export function RecordSaleForm({ recipes }: { recipes: { id: string; name: strin
   }, 0);
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
       <div className="mb-6">
         <Link href="/sales" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Vendite
@@ -108,8 +109,8 @@ export function RecordSaleForm({ recipes }: { recipes: { id: string; name: strin
           </div>
         )}
 
-        <div className="bg-surface-2 rounded-2xl border border-border p-6 space-y-5">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="bg-surface-2 rounded-2xl border border-border p-4 sm:p-6 space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>ID scontrino <span className="text-danger">*</span></label>
               <input name="externalSaleId" type="text" required defaultValue={defaultSaleId()} className={fieldClass} />
@@ -132,7 +133,7 @@ export function RecordSaleForm({ recipes }: { recipes: { id: string; name: strin
             <button
               type="button"
               onClick={() => setLines((p) => [...p, newLine()])}
-              className="text-xs font-semibold text-primary hover:underline"
+              className="min-h-[44px] px-3 -my-2 -mr-3 text-xs font-semibold text-primary hover:underline"
             >
               + Aggiungi riga
             </button>
@@ -141,6 +142,7 @@ export function RecordSaleForm({ recipes }: { recipes: { id: string; name: strin
           <div className="space-y-3">
             {lines.map((line, idx) => (
               <div key={line.key} className="rounded-xl border border-divider p-3 space-y-2">
+                {/* Riga 1: prodotto + rimuovi (tap target 44px) */}
                 <div className="flex items-center gap-2">
                   <span className="w-5 font-mono text-xs text-ink-muted">{idx + 1}</span>
                   <input
@@ -148,34 +150,40 @@ export function RecordSaleForm({ recipes }: { recipes: { id: string; name: strin
                     placeholder="Nome/codice prodotto — es. Cannoncino"
                     value={line.externalProductRef}
                     onChange={(e) => update(line.key, 'externalProductRef', e.target.value)}
-                    className="flex-1 rounded-lg border border-border px-2 py-2 text-sm bg-surface-2 focus:outline-none focus:ring-2 focus:ring-primary-ring"
-                  />
-                  <input
-                    type="number" min="0" step="0.001"
-                    value={line.quantity}
-                    onChange={(e) => update(line.key, 'quantity', e.target.value)}
-                    className="w-16 rounded-lg border border-border px-2 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
-                  />
-                  <input
-                    type="number" step="0.01" min="0" placeholder="€"
-                    value={line.unitPrice}
-                    onChange={(e) => update(line.key, 'unitPrice', e.target.value)}
-                    className="w-20 rounded-lg border border-border px-2 py-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
+                    className="flex-1 min-w-0 h-11 rounded-lg border border-border px-3 text-sm bg-surface-2 focus:outline-none focus:ring-2 focus:ring-primary-ring"
                   />
                   {lines.length > 1 && (
                     <button
                       type="button"
                       onClick={() => setLines((p) => p.filter((l) => l.key !== line.key))}
-                      className="text-ink-faint hover:text-danger text-lg leading-none"
+                      aria-label={`Rimuovi riga ${idx + 1}`}
+                      className="shrink-0 w-11 h-11 -mr-1 flex items-center justify-center rounded-lg text-ink-faint hover:text-danger hover:bg-danger-light text-xl leading-none transition-colors"
                     >
                       ×
                     </button>
                   )}
                 </div>
+                {/* Riga 2: quantità + prezzo unitario */}
+                <div className="flex items-center gap-2 pl-7">
+                  <input
+                    type="number" min="0" step="0.001" inputMode="decimal"
+                    aria-label="Quantità"
+                    value={line.quantity}
+                    onChange={(e) => update(line.key, 'quantity', e.target.value)}
+                    className="w-24 h-11 rounded-lg border border-border px-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
+                  />
+                  <input
+                    type="number" step="0.01" min="0" inputMode="decimal" placeholder="€ unitario"
+                    aria-label="Prezzo unitario"
+                    value={line.unitPrice}
+                    onChange={(e) => update(line.key, 'unitPrice', e.target.value)}
+                    className="flex-1 min-w-0 h-11 rounded-lg border border-border px-2 text-sm text-center font-mono focus:outline-none focus:ring-2 focus:ring-primary-ring"
+                  />
+                </div>
                 <select
                   value={line.recipeId}
                   onChange={(e) => update(line.key, 'recipeId', e.target.value)}
-                  className="w-full rounded-lg border border-border px-2 py-2 text-sm bg-surface-2 text-ink-muted focus:outline-none focus:ring-2 focus:ring-primary-ring"
+                  className="w-full h-11 rounded-lg border border-border px-2 text-sm bg-surface-2 text-ink-muted focus:outline-none focus:ring-2 focus:ring-primary-ring"
                 >
                   <option value="">Ricetta: auto (per nome/collegamento)…</option>
                   {recipes.map((r) => (
@@ -196,17 +204,20 @@ export function RecordSaleForm({ recipes }: { recipes: { id: string; name: strin
           )}
         </div>
 
-        <div className="flex gap-3">
-          <Link href="/sales" className="flex-1 py-3 text-center rounded-xl border border-border text-sm font-semibold text-ink hover:bg-surface-offset">
-            Annulla
-          </Link>
-          <SubmitButton
-            pendingLabel="Registrazione…"
-            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
-          >
-            Registra vendita
-          </SubmitButton>
-        </div>
+        {/* CTA sempre visibile su mobile (sopra la tab bar), statica su desktop */}
+        <StickyActionBar>
+          <div className="flex gap-3">
+            <Link href="/sales" className="flex-1 h-12 flex items-center justify-center rounded-xl border border-border text-sm font-semibold text-ink bg-surface-2 hover:bg-surface-offset">
+              Annulla
+            </Link>
+            <SubmitButton
+              pendingLabel="Registrazione…"
+              className="flex-[2] h-12 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
+            >
+              Registra vendita
+            </SubmitButton>
+          </div>
+        </StickyActionBar>
       </form>
     </div>
   );

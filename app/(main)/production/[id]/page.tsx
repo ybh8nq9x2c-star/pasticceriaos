@@ -15,6 +15,7 @@ import { DraftOrdersButton } from './DraftOrdersButton';
 import type { PlanStatus } from '@/modules/production/types';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { SubmitButton } from '@/components/ui/SubmitButton';
+import { StickyActionBar } from '@/components/ui/StickyActionBar';
 import { UNIT_LABELS } from '@/lib/utils';
 
 export const metadata: Metadata = { title: 'Piano di produzione' };
@@ -87,7 +88,7 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
 
       {/* Breadcrumb + header */}
       <div>
@@ -174,11 +175,39 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
                 {shortageItems.length > 0 && (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-danger-light text-danger">
                     <span className="w-1.5 h-1.5 rounded-full bg-danger" />
-                    {shortageItems.length} shortage
+                    {shortageItems.length} da ordinare
                   </span>
                 )}
               </div>
 
+              {/* Mobile: row-stack — prima i mancanti, poi gli OK */}
+              <div className="md:hidden divide-y divide-divider">
+                {[...shortageItems, ...okItems].map((req) => {
+                  const short = req.estimatedShortage > 0;
+                  return (
+                    <div key={req.ingredientProductId} className={`px-4 py-3 ${short ? 'bg-danger-light/40' : ''}`}>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-ink truncate">{req.ingredientName}</p>
+                        {short ? (
+                          <span className="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-danger-light text-danger">
+                            manca {formatQty(req.estimatedShortage)} {UNIT_LABELS[req.unit]}
+                          </span>
+                        ) : (
+                          <span className="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-success-light text-success-strong">
+                            OK
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-ink-muted font-mono mt-1">
+                        serve {formatQty(req.totalRequired)} {UNIT_LABELS[req.unit]} · in casa {formatQty(req.currentStock)} {UNIT_LABELS[req.unit]}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop: tabella completa */}
+              <div className="hidden md:block">
               <table className="w-full text-sm">
                 <thead className="bg-bg border-b border-border">
                   <tr>
@@ -229,9 +258,10 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
                   ))}
                 </tbody>
               </table>
+              </div>
 
               {shortageItems.length > 0 && (
-                <div className="px-6 py-4 border-t border-divider bg-bg flex items-center justify-between gap-3">
+                <div className="px-4 sm:px-6 py-4 border-t border-divider bg-bg flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-xs text-ink-muted">
                     {shortageItems.length} ingrediente/i non sufficienti per completare il piano.
                     {shortageItems.some((s) => s.estimatedShortageCost !== null) && (
@@ -263,28 +293,53 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
                   : 'Disponibile dopo la conferma della produzione: misura i pezzi prodotti meno i venduti.'}
               </div>
             ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-bg border-b border-border">
-                  <tr>
-                    <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Prodotto</th>
-                    <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Prodotti oggi</th>
-                    <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Venduti</th>
-                    <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Rimasti teorici</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-divider">
+              <>
+                {/* Mobile: row-stack — nome + rimasti in evidenza */}
+                <div className="md:hidden divide-y divide-divider">
                   {finishedGoods.map((g) => (
-                    <tr key={g.sellableProductId} className="hover:bg-surface-offset transition-colors">
-                      <td className="px-6 py-3 font-medium text-ink">{g.productName}</td>
-                      <td className="px-6 py-3 text-right font-mono text-ink">{formatQty(g.producedQty)}</td>
-                      <td className="px-6 py-3 text-right font-mono text-ink">{formatQty(g.soldQty)}</td>
-                      <td className={`px-6 py-3 text-right font-mono font-semibold ${g.remainingTheoretical < 0 ? 'text-danger' : 'text-ink'}`}>
-                        {formatQty(g.remainingTheoretical)}
-                      </td>
-                    </tr>
+                    <div key={g.sellableProductId} className="px-4 py-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-ink truncate">{g.productName}</p>
+                        <p className="text-xs text-ink-muted font-mono mt-0.5">
+                          prodotti {formatQty(g.producedQty)} · venduti {formatQty(g.soldQty)}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className={`font-mono font-semibold text-base ${g.remainingTheoretical < 0 ? 'text-danger' : 'text-ink'}`}>
+                          {formatQty(g.remainingTheoretical)}
+                        </p>
+                        <p className="text-[11px] text-ink-faint">rimasti</p>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+
+                {/* Desktop: tabella completa */}
+                <div className="hidden md:block">
+                <table className="w-full text-sm">
+                  <thead className="bg-bg border-b border-border">
+                    <tr>
+                      <th className="text-left px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Prodotto</th>
+                      <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Prodotti oggi</th>
+                      <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Venduti</th>
+                      <th className="text-right px-6 py-3 font-semibold text-ink-muted text-xs uppercase tracking-wide">Rimasti teorici</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-divider">
+                    {finishedGoods.map((g) => (
+                      <tr key={g.sellableProductId} className="hover:bg-surface-offset transition-colors">
+                        <td className="px-6 py-3 font-medium text-ink">{g.productName}</td>
+                        <td className="px-6 py-3 text-right font-mono text-ink">{formatQty(g.producedQty)}</td>
+                        <td className="px-6 py-3 text-right font-mono text-ink">{formatQty(g.soldQty)}</td>
+                        <td className={`px-6 py-3 text-right font-mono font-semibold ${g.remainingTheoretical < 0 ? 'text-danger' : 'text-ink'}`}>
+                          {formatQty(g.remainingTheoretical)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                </div>
+              </>
             )}
             <div className="px-6 py-3 border-t border-divider bg-bg">
               <p className="text-xs text-ink-muted">
@@ -324,9 +379,10 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
           )}
 
           {canComplete && (
-            <form action={handleComplete}>
+            <form action={handleComplete} className="hidden lg:block">
               {/* Copy chiaro (non "Segna come completato"): l'azione scarica il magazzino.
-                  SubmitButton → disabilita + spinner (niente doppio click). */}
+                  SubmitButton → disabilita + spinner (niente doppio click).
+                  Su mobile la stessa azione vive nella StickyActionBar in fondo. */}
               <SubmitButton
                 pendingLabel="Confermo…"
                 className="w-full py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
@@ -352,6 +408,20 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
 
         </div>
       </div>
+
+      {/* Mobile: CTA primaria sempre raggiungibile col pollice, sopra la tab bar */}
+      {canComplete && (
+        <StickyActionBar className="lg:hidden">
+          <form action={handleComplete}>
+            <SubmitButton
+              pendingLabel="Confermo…"
+              className="w-full h-12 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
+            >
+              ✓ Conferma produzione eseguita
+            </SubmitButton>
+          </form>
+        </StickyActionBar>
+      )}
     </div>
   );
 }

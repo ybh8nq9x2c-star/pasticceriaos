@@ -39,7 +39,7 @@ export default async function PosSettingsPage({ searchParams }: { searchParams: 
       : undefined;
 
   return (
-    <div className="p-8 max-w-3xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto space-y-8">
       {highlightTargetId && <HighlightScroll targetId={rowId(highlightTargetId)} />}
       <PageHeader
         title="Integrazione POS"

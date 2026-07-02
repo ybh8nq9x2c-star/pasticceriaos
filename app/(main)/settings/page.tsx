@@ -51,7 +51,7 @@ export default async function SettingsPage() {
   const roleLabel = ROLE_LABELS[session.role] ?? session.role;
 
   return (
-    <div className="p-8 max-w-2xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto space-y-6">
       <PageHeader title="Impostazioni" subtitle="Account e organizzazione" />
 
       {/* Account */}

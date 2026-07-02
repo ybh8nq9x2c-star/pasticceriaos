@@ -49,7 +49,7 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
 
   if (loading) {
     return (
-      <div className="p-8 max-w-2xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
         <div className="h-8 w-40 rounded-xl bg-surface-offset animate-pulse mb-3" />
         <div className="h-56 rounded-2xl bg-surface-offset animate-pulse" />
       </div>
@@ -58,7 +58,7 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
 
   if (!supplier) {
     return (
-      <div className="p-8 max-w-2xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
         <div className="bg-surface-2 rounded-2xl border border-border p-8 text-center">
           <p className="text-sm text-danger mb-3">Fornitore non trovato.</p>
           <Link href="/suppliers" className="text-sm font-semibold text-primary hover:underline">
@@ -70,7 +70,7 @@ export default function SupplierDetailPage({ params }: { params: { id: string } 
   }
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
       <div className="mb-6">
         <Link href="/suppliers" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Fornitori

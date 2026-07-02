@@ -34,7 +34,7 @@ export default async function RecipeDetailPage({ params }: { params: { id: strin
   const unpricedLines = breakdown.filter((l) => l.lineCost === null);
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
       {/* Breadcrumb */}
       <div className="mb-6">
         <Link href="/recipes" className="text-sm text-ink-muted hover:text-ink transition-colors">
@@ -67,6 +67,7 @@ export default async function RecipeDetailPage({ params }: { params: { id: strin
             {breakdown.length === 0 ? (
               <p className="text-sm text-ink-muted">Nessun ingrediente aggiunto.</p>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-xs text-ink-muted border-b border-divider">
@@ -132,6 +133,7 @@ export default async function RecipeDetailPage({ params }: { params: { id: strin
                   </tfoot>
                 )}
               </table>
+              </div>
             )}
           </div>
 

@@ -44,7 +44,7 @@ export default function MovementPage() {
   }, [state, router]);
 
   return (
-    <div className="p-8 max-w-xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-xl mx-auto">
       <div className="mb-6">
         <Link href="/inventory" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Magazzino

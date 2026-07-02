@@ -63,7 +63,7 @@ export function NewCustomerOrderForm({ recipes }: { recipes: { id: string; name:
   }, 0);
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
       <div className="mb-6">
         <Link href="/customers" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Ordini clienti

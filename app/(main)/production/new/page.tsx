@@ -216,7 +216,7 @@ export default function NewProductionPage() {
         <div className="bg-surface-2 rounded-2xl border border-border p-6 space-y-5">
           <h2 className="text-base font-bold text-ink">Dettagli piano</h2>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-ink mb-1.5">
                 Data produzione <span className="text-danger">*</span>

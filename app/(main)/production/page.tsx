@@ -40,7 +40,7 @@ export default async function ProductionPage() {
   const pendingCount = plans.filter((p) => isPendingConfirmation(p.planDate, p.status)).length;
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       <PageHeader
         title="Produzione"
         subtitle={`${plans.length} piano/i`}

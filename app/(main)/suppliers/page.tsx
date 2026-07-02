@@ -56,7 +56,7 @@ export default async function SuppliersPage() {
   const unlinkedConnections = connections.filter((c) => !linkedOrgIds.has(c.supplierOrgId));
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       <PageHeader
         title="Fornitori"
         subtitle="Anagrafica, ordini, documenti e connessioni — tutto in un posto"
@@ -130,7 +130,7 @@ export default async function SuppliersPage() {
           ctaLabel="Aggiungi fornitore"
         />
       ) : (
-        <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+        <div className="bg-surface-2 rounded-2xl border border-border overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-bg border-b border-border">
               <tr>

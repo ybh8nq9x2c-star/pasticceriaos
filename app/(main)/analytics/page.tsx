@@ -137,7 +137,7 @@ export default async function AnalyticsPage() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-8">
       <PageHeader title="Analisi" subtitle="Panoramica aggregata su magazzino e ordini" />
 
       {/* ── KPI row ─────────────────────────────────────────────────────── */}
@@ -369,7 +369,7 @@ export default async function AnalyticsPage() {
           <h2 className="font-semibold text-sm text-ink-muted uppercase tracking-wide mb-3">
             Top ingredienti per spesa (ordini ricevuti)
           </h2>
-          <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+          <div className="bg-surface-2 rounded-2xl border border-border overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-bg border-b border-border">
                 <tr>
@@ -418,7 +418,7 @@ export default async function AnalyticsPage() {
           <h2 className="font-semibold text-sm text-ink-muted uppercase tracking-wide mb-3">
             Top ingredienti per valore in scorta
           </h2>
-          <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+          <div className="bg-surface-2 rounded-2xl border border-border overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-bg border-b border-border">
                 <tr>
@@ -472,7 +472,7 @@ export default async function AnalyticsPage() {
           <h2 className="font-semibold text-sm text-ink-muted uppercase tracking-wide mb-3">
             Ordini aperti recenti
           </h2>
-          <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+          <div className="bg-surface-2 rounded-2xl border border-border overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-bg border-b border-border">
                 <tr>

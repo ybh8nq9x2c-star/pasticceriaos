@@ -68,7 +68,7 @@ export default async function DocumentDetailPage({ params }: { params: { id: str
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
       <div>
         <Link href="/documents" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Documenti
@@ -120,6 +120,7 @@ export default async function DocumentDetailPage({ params }: { params: { id: str
             <div className="px-6 py-4 border-b border-divider">
               <h2 className="font-semibold text-[15px] text-ink">Righe documento</h2>
             </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-bg border-b border-border">
                 <tr>
@@ -165,6 +166,7 @@ export default async function DocumentDetailPage({ params }: { params: { id: str
                 </tfoot>
               )}
             </table>
+            </div>
           </div>
 
           {/* Anomalie */}

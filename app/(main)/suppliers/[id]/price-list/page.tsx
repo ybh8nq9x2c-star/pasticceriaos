@@ -29,7 +29,7 @@ export default async function PriceListPage({ params }: { params: { id: string }
   const unpriced = ingredients.filter((i) => !pricedIds.has(i.id));
 
   return (
-    <div className="p-8 max-w-3xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto space-y-6">
       <div>
         <Link href={`/suppliers/${params.id}`} className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← {supplier.name}
