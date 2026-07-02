@@ -17,6 +17,7 @@
 import type { BadgeVariant } from '@/components/ui/Badge';
 import type { ReceiptLineStatus } from '@/lib/database.types';
 import type { StockStatus } from '@/modules/reporting/types';
+import type { MarketplaceOrderStatus } from '@/modules/marketplace/types';
 
 // Re-export degli stati di ricevimento (già canonici in goods-receipts/types):
 // importarli da qui o da lì è equivalente, ma qui è l'hub documentato.
@@ -45,4 +46,22 @@ export const STOCK_STATUS_BADGE: Record<StockStatus, BadgeVariant> = {
   critical:     'warning',
   low:          'primary',
   ok:           'success',
+};
+
+/**
+ * Ordine marketplace → tono canonico (liste cliente/fornitore + dettaglio).
+ * Applica la palette dell'hub: `submitted` è warning perché per il fornitore
+ * "serve un'azione" (confermare); `cancelled` è neutral, NON danger — un
+ * annullamento è un esito normale, il rosso resta riservato alle anomalie.
+ * `accepted`/`shipped` condividono famiglie tonali distinte dal warning:
+ * pipeline in corso, nessuna urgenza.
+ */
+export const MARKETPLACE_ORDER_BADGE: Record<MarketplaceOrderStatus, BadgeVariant> = {
+  draft:          'neutral',
+  submitted:      'warning',
+  accepted:       'info',
+  in_preparation: 'primary',
+  shipped:        'primary',
+  delivered:      'success',
+  cancelled:      'neutral',
 };

@@ -16,6 +16,9 @@ import {
   getSupplierProductSales,
 } from '@/modules/reporting/service';
 import { StatusBadge } from '@/components/marketplace/StatusBadge';
+import { MobileTaskCard } from '@/components/mobile/MobileTaskCard';
+import { MobileSectionHeader } from '@/components/mobile/MobileSectionHeader';
+import { Inbox } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 export const metadata: Metadata = { title: 'Dashboard fornitore' };
@@ -79,6 +82,21 @@ export default async function SupplierDashboardPage() {
           {new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
       </div>
+
+      {/* ── DA FARE ADESSO (mobile): specchio del lato bakery — un tap sull'unica
+          azione che conta al mattino: confermare gli ordini in attesa. ───────── */}
+      {summary.ordersPending > 0 && (
+        <div className="lg:hidden">
+          <MobileSectionHeader>Da fare adesso</MobileSectionHeader>
+          <MobileTaskCard
+            href="/supplier/orders?stato=in_attesa"
+            icon={Inbox}
+            tone="warning"
+            title={`${summary.ordersPending} ordin${summary.ordersPending === 1 ? 'e' : 'i'} da confermare`}
+            cta="Apri la coda"
+          />
+        </div>
+      )}
 
       {/* KPI riga 1: pipeline ordini */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -222,26 +240,29 @@ export default async function SupplierDashboardPage() {
               Analisi →
             </Link>
           </div>
-          <table className="w-full text-sm">
-            <thead className="bg-bg text-ink-muted text-xs uppercase">
-              <tr>
-                <th className="text-left px-5 py-2.5">Prodotto</th>
-                <th className="text-right px-5 py-2.5">Qtà</th>
-                <th className="text-right px-5 py-2.5">Ordini</th>
-                <th className="text-right px-5 py-2.5">Ricavo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((p) => (
-                <tr key={`${p.catalogItemId ?? p.name}-${p.unit}`} className="border-t border-divider">
-                  <td className="px-5 py-3 font-medium text-ink">{p.name}</td>
-                  <td className="px-5 py-3 text-right font-mono text-ink-muted text-xs">{p.totalQuantity} {p.unit}</td>
-                  <td className="px-5 py-3 text-right font-mono text-ink-muted text-xs">{p.ordersCount}</td>
-                  <td className="px-5 py-3 text-right font-mono font-semibold text-ink">€{formatCurrency(p.totalRevenue)}</td>
+          {/* Guardia 375px: la tabella scorre nel wrapper, mai la pagina. */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-bg text-ink-muted text-xs uppercase">
+                <tr>
+                  <th className="text-left px-5 py-2.5">Prodotto</th>
+                  <th className="text-right px-5 py-2.5">Qtà</th>
+                  <th className="text-right px-5 py-2.5">Ordini</th>
+                  <th className="text-right px-5 py-2.5">Ricavo</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {products.map((p) => (
+                  <tr key={`${p.catalogItemId ?? p.name}-${p.unit}`} className="border-t border-divider">
+                    <td className="px-5 py-3 font-medium text-ink">{p.name}</td>
+                    <td className="px-5 py-3 text-right font-mono text-ink-muted text-xs whitespace-nowrap">{p.totalQuantity} {p.unit}</td>
+                    <td className="px-5 py-3 text-right font-mono text-ink-muted text-xs">{p.ordersCount}</td>
+                    <td className="px-5 py-3 text-right font-mono font-semibold text-ink whitespace-nowrap">€{formatCurrency(p.totalRevenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
