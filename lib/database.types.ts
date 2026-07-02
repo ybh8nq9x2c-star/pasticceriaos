@@ -1309,6 +1309,45 @@ export interface Database {
         ];
       };
 
+      // ── finished goods (dominio prodotti finiti, 050) ───────────────────────
+      finished_goods_movements: {
+        Row: {
+          id: string;
+          organization_id: string;
+          recipe_id: string;
+          movement_type: string;
+          quantity_delta: number;
+          reference_type: string | null;
+          reference_id: string | null;
+          performed_by: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          recipe_id: string;
+          movement_type: string;
+          quantity_delta: number;
+          reference_type?: string | null;
+          reference_id?: string | null;
+          performed_by?: string | null;
+          notes?: string | null;
+        };
+        Update: never; // ledger append-only
+        Relationships: [];
+      };
+      finished_goods_levels: {
+        Row: {
+          organization_id: string;
+          recipe_id: string;
+          current_quantity: number;
+          updated_at: string;
+        };
+        Insert: never; // scrive solo il trigger
+        Update: never;
+        Relationships: [];
+      };
       pos_configs: {
         Row: {
           id: string;
@@ -1352,6 +1391,8 @@ export interface Database {
           organization_id: string;
           provider: string;
           external_receipt_id: string;
+          event_type: string;
+          external_store_id: string;
           raw_payload: Json;
           status: string;
           sale_id: string | null;
@@ -1365,6 +1406,8 @@ export interface Database {
           organization_id: string;
           provider: string;
           external_receipt_id: string;
+          event_type?: string;
+          external_store_id?: string;
           raw_payload: Json;
           status?: string;
           sale_id?: string | null;
@@ -2028,6 +2071,10 @@ export interface Database {
       reverse_sale_system: {
         Args: { p_org: string; p_sale_id: string };
         Returns: string;
+      };
+      relink_sale_lines: {
+        Args: { p_sale_id: string; p_lines: Json };
+        Returns: number;
       };
     };
 

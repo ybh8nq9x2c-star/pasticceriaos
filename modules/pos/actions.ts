@@ -25,3 +25,30 @@ export async function upsertPosMappingAction(_prev: ActionState, formData: FormD
   revalidatePath('/sales');
   return { status: 'success', message: 'Mappatura salvata.' };
 }
+
+/** Replay di un evento POS (failed → riesegui; processed+unlinked → relink). */
+export async function replayPosEventAction(eventId: string): Promise<ActionState> {
+  try {
+    const res = await service.replayPosEvent(eventId);
+    revalidatePath('/sales/inbox');
+    revalidatePath('/sales');
+    revalidatePath('/inventory');
+    if (res.status === 'nothing_to_do') {
+      return {
+        status: 'error',
+        error: res.stillUnlinked?.length
+          ? `Nessuna riga ricollegabile: ${res.stillUnlinked.length} prodott${res.stillUnlinked.length === 1 ? 'o' : 'i'} ancora senza mappatura.`
+          : 'Niente da rielaborare per questo evento.',
+      };
+    }
+    return {
+      status: 'success',
+      message:
+        res.status === 'relinked'
+          ? `${res.relinkedCount} rig${res.relinkedCount === 1 ? 'a ricollegata' : 'he ricollegate'}: prodotti finiti scalati.`
+          : 'Evento rielaborato.',
+    };
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+}

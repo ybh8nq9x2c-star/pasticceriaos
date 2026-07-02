@@ -65,11 +65,14 @@ export function buildCanonicalSale(
 export async function ingestPosEvent(orgId: string, incoming: IncomingSale, client: SalesDb): Promise<IngestResult> {
   const source = posSource(incoming.provider);
 
-  // 1) Ledger di idempotenza PRIMARIO (ON CONFLICT DO NOTHING).
+  // 1) Ledger di idempotenza PRIMARIO (ON CONFLICT DO NOTHING). event_type nella
+  //    chiave: sale e void dello stesso scontrino sono DUE eventi distinti.
   const event = await repo.insertPosEvent(client, {
     orgId,
     provider: incoming.provider,
     externalReceiptId: incoming.external_receipt_id,
+    eventType: incoming.is_reversal ? 'reversal' : 'sale',
+    externalStoreId: incoming.store_id ?? '',
     rawPayload: incoming as unknown as Json,
   });
   if (event.duplicate) return { status: 'duplicate' };

@@ -49,10 +49,21 @@ export async function resolveOrgId(
   return null;
 }
 
-/** Inserisce l'evento (ON CONFLICT DO NOTHING). duplicate=true se già presente. */
+/**
+ * Inserisce l'evento (ON CONFLICT DO NOTHING). duplicate=true se già presente.
+ * Chiave di idempotenza (050): org + provider + store + receipt + EVENT_TYPE —
+ * così il VOID con lo stesso receipt_id del SALE non viene più inghiottito.
+ */
 export async function insertPosEvent(
   client: SalesDb,
-  e: { orgId: string; provider: string; externalReceiptId: string; rawPayload: Json },
+  e: {
+    orgId: string;
+    provider: string;
+    externalReceiptId: string;
+    eventType: 'sale' | 'reversal';
+    externalStoreId: string;
+    rawPayload: Json;
+  },
 ): Promise<{ id: string; duplicate: boolean }> {
   const { data, error } = await client
     .from('pos_events')
@@ -61,10 +72,15 @@ export async function insertPosEvent(
         organization_id: e.orgId,
         provider: e.provider,
         external_receipt_id: e.externalReceiptId,
+        event_type: e.eventType,
+        external_store_id: e.externalStoreId,
         raw_payload: e.rawPayload,
         status: 'pending',
       },
-      { onConflict: 'organization_id,provider,external_receipt_id', ignoreDuplicates: true },
+      {
+        onConflict: 'organization_id,provider,external_store_id,external_receipt_id,event_type',
+        ignoreDuplicates: true,
+      },
     )
     .select('id');
   if (error) throw mapSupabaseError(error);
@@ -76,7 +92,9 @@ export async function insertPosEvent(
     .select('id')
     .eq('organization_id', e.orgId)
     .eq('provider', e.provider)
+    .eq('external_store_id', e.externalStoreId)
     .eq('external_receipt_id', e.externalReceiptId)
+    .eq('event_type', e.eventType)
     .maybeSingle();
   if (existing.error) throw mapSupabaseError(existing.error);
   return { id: existing.data!.id as string, duplicate: true };

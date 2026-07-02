@@ -1,18 +1,18 @@
 // =============================================================================
 // modules/sales/service.ts
-// Orchestrazione della deduzione magazzino al momento della vendita.
+// Orchestrazione vendite. DOMINIO (050): la vendita registra l'evento e scala i
+// PRODOTTI FINITI (righe risolte su ricetta). NIENTE esplosione BOM, niente
+// consumo materie prime: quello avviene al completamento produzione.
 //   ingestSale: payload grezzo → adapter → CanonicalSale → risoluzione prodotto
-//   → esplosione BOM (conversione unità) → payload RPC → ingest_sale (atomico+
-//   idempotente). La matematica è in bom.ts (pura); qui c'è solo il collante I/O.
+//   → payload RPC → ingest_sale (atomico + idempotente, scala i finiti).
 // =============================================================================
 
 import { AuthError } from '@/lib/errors';
 import type { Json } from '@/lib/database.types';
 import { requireSession } from '@/modules/identity/service';
 import { getAdapter } from './adapters';
-import { explodeLine, aggregateSaleStatus } from './bom';
 import { linkProductSchema, reverseSaleSchema } from './schemas';
-import type { CanonicalSale, IngestSummary } from './types';
+import { aggregateSaleStatus, type CanonicalSale, type IngestSummary, type SaleLineStatus } from './types';
 import * as repo from './repository';
 
 async function requireWriter() {
@@ -53,19 +53,22 @@ export async function ingestCanonicalSale(
     { nameFallback: opts?.nameFallback },
   );
 
-  // 2) Carica i BOM delle ricette risolte (una sola query).
-  const recipeIds = [...new Set([...resolved.values()].filter((v): v is string => !!v))];
-  const boms = await repo.loadBoms(orgId, recipeIds, opts?.client);
-
-  // 3) Esplodi ogni riga (logica pura): movimenti + stato + eccezione.
-  const exploded = sale.lines.map((line, i) => {
+  // 2) Stato riga: risolta → 'deducted' (la RPC scala i PRODOTTI FINITI per
+  //    quella quantità); non risolta → 'unlinked' (registrata, nessuno scarico).
+  //    Niente BOM: le materie prime le consuma la produzione, non la vendita.
+  const lines = sale.lines.map((line, i) => {
     const recipeId = resolved.get(i) ?? null;
-    const bom = recipeId ? boms.get(recipeId) ?? { basePortions: 0, items: [] } : null;
-    return { line, recipeId, result: explodeLine(bom, line.quantity) };
+    const status: SaleLineStatus = recipeId ? 'deducted' : 'unlinked';
+    return {
+      line,
+      recipeId,
+      status,
+      exception: recipeId ? null : 'Prodotto non collegato a una ricetta.',
+    };
   });
-  const saleStatus = aggregateSaleStatus(exploded.map((e) => e.result.status));
+  const saleStatus = aggregateSaleStatus(lines.map((l) => l.status));
 
-  // 4) Costruisci il payload per la RPC atomica (snake_case lato DB).
+  // 3) Payload per la RPC atomica (snake_case lato DB).
   const payload = {
     external_sale_id: sale.externalSaleId,
     source: sale.source,
@@ -74,37 +77,32 @@ export async function ingestCanonicalSale(
     total_amount: sale.totalAmount ?? null,
     customer_id: sale.customerId ?? null,
     notes: sale.notes ?? null,
-    lines: exploded.map((e, i) => ({
-      external_line_id: e.line.externalLineId ?? null,
-      external_product_ref: e.line.externalProductRef,
-      product_name_snapshot: e.line.productName,
-      recipe_id: e.recipeId,
-      quantity: e.line.quantity,
-      unit_price: e.line.unitPrice ?? null,
-      status: e.result.status,
-      exception: e.result.exception,
+    lines: lines.map((l, i) => ({
+      external_line_id: l.line.externalLineId ?? null,
+      external_product_ref: l.line.externalProductRef,
+      product_name_snapshot: l.line.productName,
+      recipe_id: l.recipeId,
+      quantity: l.line.quantity,
+      unit_price: l.line.unitPrice ?? null,
+      status: l.status,
+      exception: l.exception,
       sort_order: i,
-      movements: e.result.movements.map((m) => ({
-        ingredient_product_id: m.ingredientProductId,
-        quantity_delta: m.quantityDelta,
-        unit: m.unit,
-      })),
     })),
   };
 
-  // 5) Scrittura atomica + idempotente (ON CONFLICT impedisce doppia deduzione).
+  // 4) Scrittura atomica + idempotente (ON CONFLICT impedisce doppia deduzione).
   const saleId = opts?.system
     ? await repo.ingestSaleSystemRpc(orgId, payload as unknown as Json, opts.client!)
     : await repo.ingestSaleRpc(payload as unknown as Json, opts?.client);
 
-  const linesDeducted = exploded.filter((e) => e.result.status === 'deducted').length;
+  const linesDeducted = lines.filter((l) => l.status === 'deducted').length;
   return {
     saleId,
     status: saleStatus,
     linesTotal: sale.lines.length,
     linesDeducted,
     linesNeedingAttention: sale.lines.length - linesDeducted,
-    movementsCreated: exploded.reduce((n, e) => n + e.result.movements.length, 0),
+    movementsCreated: linesDeducted, // 1 movimento finished-goods per riga dedotta
   };
 }
 
@@ -152,6 +150,17 @@ export async function linkProduct(raw: unknown): Promise<void> {
   const session = await requireWriter();
   const input = linkProductSchema.parse(raw);
   await repo.upsertMapping(session.organizationId, input.source, input.externalProductRef, input.recipeId);
+}
+
+/**
+ * Ricollega righe unlinked di una vendita ESISTENTE dopo la correzione del
+ * mapping (replay dall'inbox POS): RPC atomica, deduzione finiti solo per le
+ * righe appena risolte, stato vendita ricalcolato. Idempotente per riga.
+ */
+export async function relinkSaleLines(saleId: string, lines: repo.RelinkLine[]): Promise<number> {
+  await requireWriter();
+  if (lines.length === 0) return 0;
+  return repo.relinkSaleLinesRpc(saleId, lines);
 }
 
 // ── Letture per la UI ─────────────────────────────────────────────────────────

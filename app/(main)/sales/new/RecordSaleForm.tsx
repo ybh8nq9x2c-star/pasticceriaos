@@ -3,7 +3,7 @@
 // =============================================================================
 // app/(main)/sales/new/RecordSaleForm.tsx
 // Form vendita manuale a righe dinamiche. Le righe vengono serializzate in JSON
-// nel campo nascosto `lines`; il service esplode i BOM e deduce il magazzino.
+// nel campo nascosto `lines`; il service risolve le ricette e scala i prodotti finiti (050).
 // Selezionare una ricetta per riga è facoltativo: senza, il prodotto viene
 // risolto per nome/mapping e — se non collegato — la vendita resta registrata
 // ma non dedotta (la si collega poi da /sales).
@@ -91,7 +91,7 @@ export function RecordSaleForm({ recipes }: { recipes: { id: string; name: strin
         </Link>
         <h1 className="text-3xl font-bold text-ink mt-3">Registra vendita</h1>
         <p className="text-sm text-ink-muted mt-1">
-          Alla conferma, il magazzino viene scaricato automaticamente in base alle ricette.
+          Alla conferma, i prodotti finiti vengono scalati automaticamente (le materie prime si consumano in produzione).
         </p>
       </div>
 
@@ -204,7 +204,7 @@ export function RecordSaleForm({ recipes }: { recipes: { id: string; name: strin
             pendingLabel="Registrazione…"
             className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
-            Registra e scarica magazzino
+            Registra vendita
           </SubmitButton>
         </div>
       </form>

@@ -6,7 +6,6 @@
 
 import { describe, it, expect } from 'vitest';
 import { unitConversionFactor, isUnitConvertible } from '../units';
-import { convertFactor } from '@/modules/sales/bom';
 import type { UnitOfMeasure } from '@/lib/database.types';
 
 const UNITS: UnitOfMeasure[] = ['g', 'kg', 'ml', 'l', 'pz', 'bustina', 'foglio'];
@@ -40,10 +39,6 @@ describe('unitConversionFactor', () => {
   });
 });
 
-describe('coerenza con sales/bom convertFactor (unica fonte di verità)', () => {
-  it('convertFactor delega a unitConversionFactor su tutta la matrice', () => {
-    for (const a of UNITS) for (const b of UNITS) {
-      expect(convertFactor(a, b)).toBe(unitConversionFactor(a, b));
-    }
-  });
-});
+// (Il re-export convertFactor di sales/bom è stato rimosso con il dominio 050:
+// il BOM non appartiene più al flusso vendita. lib/units resta l'unica fonte
+// di verità TS, mirror della funzione DB unit_conversion_factor.)

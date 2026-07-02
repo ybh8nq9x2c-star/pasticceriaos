@@ -48,6 +48,22 @@ una parte, `received` quando è completo — entrambi scritti esclusivamente dal
 ➜ **Non riaprire scorciatoie di ricezione lato `ordering`: un secondo write-path
 ricreerebbe il rischio di doppio carico sullo stesso PO.**
 
+## DUE domini di magazzino (050) — la vendita NON tocca questo ledger
+
+Dalla migration 050 esistono **due** magazzini distinti:
+
+| Dominio | Ledger (source of truth) | Proiezione | Chi lo muove |
+|---|---|---|---|
+| Materie prime | `inventory_movements` | `inventory_levels` | ricezioni, **produzione** (`production_usage`), rettifiche |
+| Prodotti finiti | `finished_goods_movements` | `finished_goods_levels` | **produzione** (+`production_output`), **vendite** (−`sale_deduction`), storni (+`sale_reversal`) |
+
+`complete_production_plan` fa ENTRAMBI: −ingredienti +finiti (resa = `yield_quantity`
+con fallback `base_portions`). `ingest_sale*` scala SOLO i finiti: la vendita non
+esplode più il BOM e non consuma materie prime (i tipi `sale_deduction`/`sale_reversal`
+su `inventory_movements` restano solo per lo storico pre-050 e i relativi storni).
+➜ **Non reintrodurre la deduzione ingredienti nel flusso vendita: raddoppierebbe il
+consumo per chi completa i piani di produzione.**
+
 ## Pattern corretto per "ricevere merce"
 
 Non scrivere movimenti a mano dalla UI per le ricezioni: usa il **Goods Receipt Engine**

@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { getSale, getSaleLines } from '@/modules/sales/service';
-import type { SaleLineStatus } from '@/modules/sales/bom';
+import type { SaleLineStatus } from '@/modules/sales/types';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 
 export const metadata: Metadata = { title: 'Dettaglio vendita' };

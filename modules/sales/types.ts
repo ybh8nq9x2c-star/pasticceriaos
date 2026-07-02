@@ -1,11 +1,24 @@
 // =============================================================================
 // modules/sales/types.ts
-// Tipi dominio per la deduzione magazzino al momento della vendita.
-// CanonicalSale = forma NORMALIZZATA indipendente dalla sorgente (webhook POS,
-// import CSV, inserimento manuale): la logica di dominio lavora solo su questa.
+// Tipi dominio vendite. CanonicalSale = forma NORMALIZZATA indipendente dalla
+// sorgente (webhook POS, import CSV, inserimento manuale).
+//
+// DOMINIO (050): la vendita scala i PRODOTTI FINITI (finished_goods_movements),
+// MAI le materie prime — quelle le consuma il completamento produzione. Il BOM
+// non appartiene più al flusso vendita.
 // =============================================================================
 
-import type { SaleStatus, SaleLineStatus } from './bom';
+export type SaleLineStatus = 'deducted' | 'unlinked' | 'no_bom' | 'unit_mismatch';
+export type SaleStatus = 'processed' | 'partially_linked' | 'unlinked';
+
+/** Stato vendita aggregato dagli stati riga. 'processed' solo se TUTTO dedotto. */
+export function aggregateSaleStatus(lineStatuses: SaleLineStatus[]): SaleStatus {
+  if (lineStatuses.length === 0) return 'unlinked';
+  const deducted = lineStatuses.filter((s) => s === 'deducted').length;
+  if (deducted === lineStatuses.length) return 'processed';
+  if (deducted > 0) return 'partially_linked';
+  return 'unlinked';
+}
 
 export interface CanonicalSaleLine {
   externalLineId?: string | null;

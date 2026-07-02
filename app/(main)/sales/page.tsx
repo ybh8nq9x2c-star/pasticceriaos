@@ -45,17 +45,25 @@ export default async function SalesPage() {
   const reversible = (s: SaleStatus) => s !== 'reversed' && s !== 'void';
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       <PageHeader
         title="Vendite"
-        subtitle="Ogni vendita scarica automaticamente le materie prime dal magazzino."
+        subtitle="Ogni vendita scala i prodotti finiti. Le materie prime si consumano in produzione."
         action={
-          <Link
-            href="/sales/new"
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-fg hover:bg-primary-hover transition-colors"
-          >
-            <Plus className="size-4" /> Registra vendita
-          </Link>
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+            <Link
+              href="/sales/inbox"
+              className="px-4 py-2.5 border border-border rounded-xl text-sm font-semibold text-ink hover:bg-surface-offset transition-colors text-center whitespace-nowrap"
+            >
+              Inbox POS
+            </Link>
+            <Link
+              href="/sales/new"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-fg hover:bg-primary-hover transition-colors whitespace-nowrap"
+            >
+              <Plus className="size-4" /> Registra vendita
+            </Link>
+          </div>
         }
       />
 

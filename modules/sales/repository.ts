@@ -1,16 +1,16 @@
 // =============================================================================
 // modules/sales/repository.ts
-// Accesso DB per il dominio vendite: risoluzione prodotto→ricetta, caricamento
-// BOM, chiamate RPC atomiche (ingest_sale/reverse_sale), viste di lettura.
+// Accesso DB per il dominio vendite: risoluzione prodotto→ricetta, chiamate RPC
+// atomiche (ingest_sale/reverse_sale/relink_sale_lines), viste di lettura.
 // Le RPC sono SECURITY DEFINER e fanno l'org-check internamente; le SELECT sono
 // org-scoped via RLS (passiamo comunque orgId esplicito, come gli altri moduli).
+// Il BOM non si carica più qui: la vendita scala i prodotti finiti (050).
 // =============================================================================
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { mapSupabaseError } from '@/lib/errors';
-import type { UnitOfMeasure, Json, Database } from '@/lib/database.types';
-import type { Bom } from './bom';
+import type { Json, Database } from '@/lib/database.types';
 import type { SaleView, SaleLineView, UnlinkedProduct } from './types';
 
 const norm = (s: string) => s.trim().toLowerCase();
@@ -78,50 +78,7 @@ export async function resolveRecipeIds(
   return out;
 }
 
-/**
- * Carica i BOM per le ricette risolte. L'unità di MAGAZZINO di ogni ingrediente
- * viene da ingredient_products.unit (la deduzione è in quell'unità). Una ricetta
- * inattiva o senza ingredienti viene restituita con items=[] → explodeLine la
- * tratta come no_bom (nessuna deduzione, eccezione registrata).
- */
-export async function loadBoms(orgId: string, recipeIds: string[], client?: SalesDb): Promise<Map<string, Bom>> {
-  if (recipeIds.length === 0) return new Map();
-  const supabase = await resolveDb(client);
-
-  const { data, error } = await supabase
-    .from('recipes')
-    .select(
-      'id, base_portions, is_active, recipe_ingredients(ingredient_product_id, quantity, unit, ingredient_products(unit))',
-    )
-    .eq('organization_id', orgId)
-    .in('id', recipeIds);
-  if (error) throw mapSupabaseError(error);
-
-  const out = new Map<string, Bom>();
-  for (const r of data ?? []) {
-    const rec = r as unknown as {
-      id: string;
-      base_portions: number;
-      is_active: boolean;
-      recipe_ingredients: {
-        ingredient_product_id: string;
-        quantity: number;
-        unit: UnitOfMeasure;
-        ingredient_products: { unit: UnitOfMeasure } | null;
-      }[];
-    };
-    const items = rec.is_active
-      ? (rec.recipe_ingredients ?? []).map((ri) => ({
-          ingredientProductId: ri.ingredient_product_id,
-          quantity: Number(ri.quantity),
-          unit: ri.unit,
-          stockUnit: ri.ingredient_products?.unit ?? ri.unit,
-        }))
-      : [];
-    out.set(rec.id, { basePortions: rec.base_portions, items });
-  }
-  return out;
-}
+// (loadBoms rimossa — 050: il BOM appartiene alla produzione, non alla vendita.)
 
 // ── RPC atomiche ──────────────────────────────────────────────────────────────
 
@@ -170,6 +127,27 @@ export async function findSaleIdByExternal(
     .maybeSingle();
   if (error) throw mapSupabaseError(error);
   return (data?.id as string) ?? null;
+}
+
+/** Righe da ricollegare per relink_sale_lines (formato RPC). */
+export interface RelinkLine {
+  sale_line_id: string;
+  recipe_id: string;
+  quantity: number;
+}
+
+/**
+ * Ricollega righe unlinked di una vendita ESISTENTE (post-correzione mapping):
+ * RPC atomica — aggiorna righe, scala i prodotti finiti, ricalcola lo stato.
+ */
+export async function relinkSaleLinesRpc(saleId: string, lines: RelinkLine[], client?: SalesDb): Promise<number> {
+  const supabase = await resolveDb(client);
+  const { data, error } = await supabase.rpc('relink_sale_lines', {
+    p_sale_id: saleId,
+    p_lines: lines as unknown as Json,
+  });
+  if (error) throw mapSupabaseError(error);
+  return (data as number) ?? 0;
 }
 
 /** Crea/aggiorna il mapping POS→ricetta (risolve i "non collegati" futuri). */

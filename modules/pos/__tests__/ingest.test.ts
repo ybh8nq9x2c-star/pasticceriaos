@@ -103,4 +103,19 @@ describe('ingestPosEvent', () => {
     expect(sales.reverseSaleAsSystem).not.toHaveBeenCalled();
     expect(repo.markFailed).toHaveBeenCalled();
   });
+
+  it('sale e void con lo STESSO receipt_id → due eventi con event_type distinto (il void non è più inghiottito)', async () => {
+    vi.mocked(repo.insertPosEvent).mockResolvedValue({ id: 'E1', duplicate: false });
+    vi.mocked(repo.loadMappings).mockResolvedValue(new Map());
+    vi.mocked(sales.ingestSaleAsSystem).mockResolvedValue(summary);
+    await ingestPosEvent('ORG', baseSale, client);
+
+    vi.mocked(sales.findSaleIdForExternal).mockResolvedValue('SALE-1');
+    vi.mocked(sales.reverseSaleAsSystem).mockResolvedValue();
+    await ingestPosEvent('ORG', { ...baseSale, is_reversal: true }, client);
+
+    const calls = vi.mocked(repo.insertPosEvent).mock.calls;
+    expect(calls[0][1]).toMatchObject({ eventType: 'sale', externalStoreId: 'S1', externalReceiptId: 'RCP-1' });
+    expect(calls[1][1]).toMatchObject({ eventType: 'reversal', externalStoreId: 'S1', externalReceiptId: 'RCP-1' });
+  });
 });

@@ -8,7 +8,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Receipt, AlertTriangle } from 'lucide-react';
-import { listPosMappings, listUnmappedPosProducts, listRecipeOptions } from '@/modules/pos/service';
+import { listPosMappings, listUnmappedPosProducts, listRecipeOptions, getPosIntegrationStatus } from '@/modules/pos/service';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Badge } from '@/components/ui/Badge';
@@ -21,10 +21,11 @@ export const metadata: Metadata = { title: 'Mappature POS' };
 const rowId = (ref: string) => `pos-row-${ref.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
 export default async function PosSettingsPage({ searchParams }: { searchParams: { highlight?: string } }) {
-  const [mappings, unmapped, recipes] = await Promise.all([
+  const [mappings, unmapped, recipes, integration] = await Promise.all([
     listPosMappings(),
     listUnmappedPosProducts(),
     listRecipeOptions(),
+    getPosIntegrationStatus('mipos'),
   ]);
 
   const highlight = searchParams.highlight?.trim().toLowerCase() ?? null;
@@ -41,9 +42,55 @@ export default async function PosSettingsPage({ searchParams }: { searchParams: 
     <div className="p-8 max-w-3xl mx-auto space-y-8">
       {highlightTargetId && <HighlightScroll targetId={rowId(highlightTargetId)} />}
       <PageHeader
-        title="Mappature POS"
-        subtitle="Collega ogni prodotto della cassa a una ricetta: alla vendita il magazzino si scarica da solo."
+        title="Integrazione POS"
+        subtitle="Collega ogni prodotto della cassa a una ricetta: alla vendita i prodotti finiti si scalano da soli."
+        action={
+          <Link
+            href="/sales/inbox"
+            className="px-4 py-2.5 border border-border rounded-xl text-sm font-semibold text-ink hover:bg-surface-offset transition-colors whitespace-nowrap"
+          >
+            Inbox eventi →
+          </Link>
+        }
       />
+
+      {/* Checklist di attivazione: cosa manca prima di andare live (onesta). */}
+      <section className="rounded-2xl border border-border bg-surface-2 p-5">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 className="text-base font-bold text-ink">Stato integrazione MiPOS</h2>
+          {integration.readyForLive ? (
+            <Badge variant="success">Pronto</Badge>
+          ) : (
+            <Badge variant="warning">Setup incompleto</Badge>
+          )}
+        </div>
+        <ul className="space-y-1.5 text-sm">
+          {[
+            { ok: integration.adapterRegistered, label: 'Adapter provider registrato' },
+            { ok: integration.webhookSecretConfigured, label: 'Secret webhook configurato (server)' },
+            { ok: integration.configActive, label: 'Configurazione POS attiva per questa organizzazione' },
+            { ok: integration.storeConfigured, label: 'Store/merchant collegato (risoluzione organizzazione)' },
+            { ok: integration.mappingsCount > 0, label: `Prodotti mappati (${integration.mappingsCount})` },
+            { ok: integration.processedEventsCount > 0, label: `Almeno un evento di test elaborato (${integration.processedEventsCount})` },
+          ].map((c) => (
+            <li key={c.label} className="flex items-center gap-2">
+              <span className={c.ok ? 'text-success-strong' : 'text-ink-faint'}>{c.ok ? '✓' : '○'}</span>
+              <span className={c.ok ? 'text-ink' : 'text-ink-muted'}>{c.label}</span>
+            </li>
+          ))}
+        </ul>
+        {integration.lastEventAt && (
+          <p className="mt-3 text-xs text-ink-muted">
+            Ultimo evento ricevuto: {new Date(integration.lastEventAt).toLocaleString('it-IT')}
+          </p>
+        )}
+        {!integration.readyForLive && (
+          <p className="mt-3 text-xs text-warning-strong">
+            Non attivare il POS live finché tutti i punti non sono verdi. Puoi collaudare con un evento di
+            prova (dry-run) senza toccare il magazzino.
+          </p>
+        )}
+      </section>
 
       {/* Prodotti non collegati (visti in vendita, senza mappatura) */}
       {unmapped.length > 0 && (
