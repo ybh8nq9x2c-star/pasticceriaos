@@ -2052,6 +2052,15 @@ export interface Database {
         Args: { p_order_id: string };
         Returns: string;
       };
+      place_marketplace_order: {
+        Args: {
+          p_connection_id: string;
+          p_lines: { catalog_item_id: string; quantity: number }[];
+          p_notes?: string | null;
+          p_idempotency_key?: string | null;
+        };
+        Returns: string;
+      };
       unit_conversion_factor: {
         Args: { p_from: UnitOfMeasure; p_to: UnitOfMeasure };
         Returns: number | null;

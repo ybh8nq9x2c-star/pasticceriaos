@@ -29,11 +29,11 @@ type Db = SupabaseClient<Database>;
 
 // ── audit helper ─────────────────────────────────────────────────────────────
 async function audit(
-  db: Db, orgId: string, action: string, entityType: string,
+  db: Db, orgId: string, actorUserId: string | null, action: string, entityType: string,
   entityId: string | null, metadata: Record<string, unknown> = {},
 ): Promise<void> {
   await db.from('audit_logs').insert({
-    org_id: orgId, actor_user_id: null, action, entity_type: entityType,
+    org_id: orgId, actor_user_id: actorUserId, action, entity_type: entityType,
     entity_id: entityId, metadata,
   } as never);
 }
@@ -44,10 +44,14 @@ function mapPgError(code: string | undefined, fallback: string): never {
     P0301: 'Organizzazione non trovata.',
     P0302: 'Chiave fornitore non valida o revocata.',
     P0303: 'Non puoi collegarti alla tua stessa organizzazione.',
+    P0304: 'Connessione fornitore non valida o revocata.',
+    P0305: 'Uno dei prodotti non appartiene al fornitore collegato o non è disponibile.',
+    P0306: 'Aggiungi almeno un prodotto all\'ordine.',
     P0200: 'Transizione ordine non consentita.',
     P0201: 'Non sei autorizzato a eseguire questa transizione.',
     P0202: 'Non sei il cliente di questo ordine.',
     P0203: 'Non sei il fornitore di questo ordine.',
+    P0212: 'Unità della riga non compatibile con il prodotto a magazzino: correggi l\'unità del prodotto o della riga prima di registrare il carico.',
   };
   throw new BusinessRuleError(code && map[code] ? map[code] : fallback);
 }
@@ -57,7 +61,7 @@ function mapPgError(code: string | undefined, fallback: string): never {
 // =============================================================================
 
 export async function generateSupplierKey(raw: unknown): Promise<{ plaintext: string; prefix: string }> {
-  const { orgId } = await requireSupplierSession();
+  const { orgId, userId } = await requireSupplierSession();
   const input = generateKeySchema.parse(raw);
   const db = await createMarketplaceClient();
 
@@ -75,7 +79,7 @@ export async function generateSupplierKey(raw: unknown): Promise<{ plaintext: st
     .single();
   if (error) throw new AppError(error.message);
 
-  await audit(db, orgId, 'connection_key.created', 'connection_key', (data as { id: string }).id, { prefix: key.prefix });
+  await audit(db, orgId, userId, 'connection_key.created', 'connection_key', (data as { id: string }).id, { prefix: key.prefix });
   // plaintext is returned ONCE; never persisted.
   return { plaintext: key.plaintext, prefix: key.prefix };
 }
@@ -95,7 +99,7 @@ export async function listSupplierKeys(): Promise<ConnectionKeyView[]> {
 }
 
 export async function revokeSupplierKey(raw: unknown): Promise<void> {
-  const { orgId } = await requireSupplierSession();
+  const { orgId, userId } = await requireSupplierSession();
   const { keyId } = revokeKeySchema.parse(raw);
   const db = await createMarketplaceClient();
   const { error } = await db
@@ -103,7 +107,7 @@ export async function revokeSupplierKey(raw: unknown): Promise<void> {
     .update({ is_active: false, revoked_at: new Date().toISOString() } as never)
     .eq('id', keyId);
   if (error) throw new AppError(error.message);
-  await audit(db, orgId, 'connection_key.revoked', 'connection_key', keyId);
+  await audit(db, orgId, userId, 'connection_key.revoked', 'connection_key', keyId);
 }
 
 // =============================================================================
@@ -164,7 +168,7 @@ export async function revokeConnection(raw: unknown): Promise<void> {
     .update({ status: 'revoked', revoked_at: new Date().toISOString() } as never)
     .eq('id', connectionId);
   if (error) throw new AppError(error.message);
-  await audit(db, session.organizationId, 'connection.revoked', 'connection', connectionId);
+  await audit(db, session.organizationId, session.userId, 'connection.revoked', 'connection', connectionId);
 }
 
 // =============================================================================
@@ -226,65 +230,33 @@ export async function listCatalogForConnection(connectionId: string): Promise<Ca
 // ORDERS · canonical cross-org
 // =============================================================================
 
-export async function createOrder(raw: unknown): Promise<string> {
-  const { orgId } = await requireCustomerSession();
+/**
+ * Create + submit in one step (the common "place order" UX).
+ *
+ * ATOMICO e IDEMPOTENTE end-to-end via RPC place_marketplace_order (051):
+ * header + righe + submit vivono in UNA transazione DB (niente draft fantasma
+ * con idempotency key consumata), e un retry benigno con la stessa key — es.
+ * risposta HTTP persa dopo il commit — restituisce l'ordine già piazzato come
+ * SUCCESSO invece di un errore fuorviante che induce duplicati manuali.
+ * La RPC è SECURITY INVOKER: RLS e trigger restano il confine reale.
+ */
+export async function placeOrder(raw: unknown): Promise<string> {
+  const { orgId, userId } = await requireCustomerSession();
   const input = createOrderSchema.parse(raw);
   const db = await createMarketplaceClient();
 
-  const conn = await loadMyConnection(db, input.connectionId);
-
-  // idempotency: same key -> return the existing order.
-  if (input.idempotencyKey) {
-    const { data: existing } = await db
-      .from('marketplace_orders').select('id')
-      .eq('customer_org_id', orgId).eq('idempotency_key', input.idempotencyKey).maybeSingle();
-    if (existing) return (existing as { id: string }).id;
-  }
-
-  // snapshot catalog lines (only items belonging to the connected supplier).
-  const ids = input.lines.map((l) => l.catalogItemId);
-  const { data: items, error: itemErr } = await db
-    .from('supplier_catalog_items')
-    .select('id, name, sku, unit, unit_price, supplier_org_id, is_active')
-    .in('id', ids);
-  if (itemErr) throw new AppError(itemErr.message);
-  const byId = new Map((items ?? []).map((i) => [i.id, i]));
-  for (const l of input.lines) {
-    const it = byId.get(l.catalogItemId);
-    if (!it || it.supplier_org_id !== conn.supplier_org_id || !it.is_active) {
-      throw new BusinessRuleError('Uno dei prodotti non appartiene al fornitore collegato o non è disponibile.');
-    }
-  }
-
-  const { data: order, error: orderErr } = await db
-    .from('marketplace_orders')
-    .insert({
-      customer_org_id: orgId, supplier_org_id: conn.supplier_org_id, connection_id: conn.id,
-      status: 'draft', notes: input.notes || null, idempotency_key: input.idempotencyKey || null,
-      created_by: null,
-    } as never)
-    .select('id').single();
-  if (orderErr) throw new AppError(orderErr.message);
-  const orderId = (order as { id: string }).id;
-
-  const lineRows = input.lines.map((l, idx) => {
-    const it = byId.get(l.catalogItemId)!;
-    return {
-      order_id: orderId, catalog_item_id: it.id, name_snapshot: it.name, sku_snapshot: it.sku,
-      unit: it.unit, quantity: l.quantity, unit_price_snapshot: it.unit_price, sort_order: idx,
-    };
+  const { data, error } = await db.rpc('place_marketplace_order', {
+    p_connection_id: input.connectionId,
+    p_lines: input.lines.map((l) => ({ catalog_item_id: l.catalogItemId, quantity: l.quantity })),
+    p_notes: input.notes || null,
+    p_idempotency_key: input.idempotencyKey || null,
   });
-  const { error: linesErr } = await db.from('marketplace_order_lines').insert(lineRows as never);
-  if (linesErr) throw new AppError(linesErr.message);
+  if (error) mapPgError(error.code, error.message);
 
-  await audit(db, orgId, 'order.created', 'marketplace_order', orderId, { supplier_org_id: conn.supplier_org_id });
-  return orderId;
-}
-
-/** Create + submit in one step (the common "place order" UX). */
-export async function placeOrder(raw: unknown): Promise<string> {
-  const orderId = await createOrder(raw);
-  await changeOrderStatus({ orderId, toStatus: 'submitted' });
+  const orderId = data as string;
+  await audit(db, orgId, userId, 'order.placed', 'marketplace_order', orderId, {
+    connection_id: input.connectionId, line_count: input.lines.length,
+  });
   return orderId;
 }
 
@@ -317,7 +289,7 @@ export async function changeOrderStatus(raw: unknown): Promise<void> {
       .update({ note } as never)
       .eq('order_id', orderId).eq('to_status', toStatus);
   }
-  await audit(db, session.organizationId, 'order.status_changed', 'marketplace_order', orderId, { from, to: toStatus });
+  await audit(db, session.organizationId, session.userId, 'order.status_changed', 'marketplace_order', orderId, { from, to: toStatus });
 }
 
 export async function listOrders(): Promise<MarketplaceOrderSummary[]> {
@@ -325,9 +297,12 @@ export async function listOrders(): Promise<MarketplaceOrderSummary[]> {
   const myOrg = session.organizationId;
   const db = await createMarketplaceClient();
 
+  // Difesa in profondità: il filtro org è ridondante rispetto a mo_select, ma
+  // una regressione di policy non deve trasformarsi in un leak cross-tenant.
   const { data: orders, error } = await db
     .from('marketplace_orders')
     .select('id, customer_org_id, supplier_org_id, status, created_at, submitted_at')
+    .or(`customer_org_id.eq.${myOrg},supplier_org_id.eq.${myOrg}`)
     .order('created_at', { ascending: false })
     .returns<{ id: string; customer_org_id: string; supplier_org_id: string; status: MarketplaceOrderStatus; created_at: string; submitted_at: string | null }[]>();
   if (error) throw new AppError(error.message);
@@ -364,10 +339,13 @@ export async function getOrder(orderId: string): Promise<MarketplaceOrderDetail>
   const myOrg = session.organizationId;
   const db = await createMarketplaceClient();
 
+  // Difesa in profondità: stesso filtro esplicito di listOrders (vedi sopra).
   const { data: o, error } = await db
     .from('marketplace_orders')
     .select('id, customer_org_id, supplier_org_id, connection_id, status, notes, created_at, submitted_at')
-    .eq('id', orderId).maybeSingle()
+    .eq('id', orderId)
+    .or(`customer_org_id.eq.${myOrg},supplier_org_id.eq.${myOrg}`)
+    .maybeSingle()
     .returns<{ id: string; customer_org_id: string; supplier_org_id: string; connection_id: string; status: MarketplaceOrderStatus; notes: string | null; created_at: string; submitted_at: string | null } | null>();
   if (error) throw new AppError(error.message);
   if (!o) throw new NotFoundError('Ordine');
@@ -409,14 +387,13 @@ export async function getOrder(orderId: string): Promise<MarketplaceOrderDetail>
  * Ritorna l'id del purchase_order locale.
  */
 export async function receiveMarketplaceOrderIntoInventory(orderId: string): Promise<string> {
-  await requireCustomerSession();
+  const { orgId, userId } = await requireCustomerSession();
   const db = await createMarketplaceClient();
 
   const { data, error } = await db.rpc('receive_marketplace_order', { p_order_id: orderId });
   if (error) mapPgError(error.code, error.message);
 
-  const session = await requireSession();
-  await audit(db, session.organizationId, 'order.received_into_inventory', 'marketplace_order', orderId, {
+  await audit(db, orgId, userId, 'order.received_into_inventory', 'marketplace_order', orderId, {
     purchase_order_id: data,
   });
   return data as string;

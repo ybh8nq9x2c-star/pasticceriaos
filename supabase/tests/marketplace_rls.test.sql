@@ -129,6 +129,36 @@ do $$ declare s text; n int; begin
   assert n = 1, 'status history must record the accept';
 end $$;
 
+-- ── Assertions: draft NON visibile al fornitore (052) ────────────────────────
+-- Un draft è un'intenzione d'acquisto non ancora comunicata: la policy
+-- mo_select lo espone solo al cliente. Le policy di lines/history passano
+-- dall'exists su marketplace_orders, quindi anche le righe spariscono.
+reset role;
+insert into marketplace_orders (id, customer_org_id, supplier_org_id, connection_id, status)
+select 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'cccccccc-cccc-cccc-cccc-cccccccccccc', id, 'draft'
+from supplier_customer_connections
+where customer_org_id='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+insert into marketplace_order_lines (order_id, name_snapshot, unit, quantity)
+values ('ffffffff-ffff-ffff-ffff-ffffffffffff', 'Zucchero', 'kg', 5);
+
+-- Supplier S: vede ancora solo l'ordine accettato, MAI il draft né le sue righe
+select pg_temp.act_as('33333333-3333-3333-3333-333333333333');
+do $$ declare n int; begin
+  select count(*) into n from marketplace_orders;
+  assert n = 1, 'Supplier S must see only the non-draft order, saw ' || n;
+  select count(*) into n from marketplace_orders where status = 'draft';
+  assert n = 0, 'Supplier S must NOT see customer drafts, saw ' || n;
+  select count(*) into n from marketplace_order_lines where order_id='ffffffff-ffff-ffff-ffff-ffffffffffff';
+  assert n = 0, 'Supplier S must NOT see draft lines, saw ' || n;
+end $$;
+
+-- Customer A: continua a vedere il proprio draft
+select pg_temp.act_as('11111111-1111-1111-1111-111111111111');
+do $$ declare n int; begin
+  select count(*) into n from marketplace_orders where status = 'draft';
+  assert n = 1, 'Customer A must still see its own draft, saw ' || n;
+end $$;
+
 reset role;
 select 'ALL MARKETPLACE RLS ASSERTIONS PASSED' as result;
 

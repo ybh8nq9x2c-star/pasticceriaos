@@ -11,7 +11,8 @@
     "start": "next start -p ${PORT:-3000}",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:sql": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f supabase/tests/marketplace_rls.test.sql -f supabase/tests/marketplace_place_receive.test.sql"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
