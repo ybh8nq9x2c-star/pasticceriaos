@@ -41,6 +41,7 @@ import {
 import { parseDdtText, type ParsedDdt } from './ddt-parser';
 import { extractPdfText } from './pdf-text';
 import { parseGs1, gs1ToLineFields } from './gs1';
+import { convertQty, unitConversionFactor } from './units';
 import type { ReceiptDetail, ReceiptListItem, ReceiptMode } from './types';
 
 const OPEN_STATUSES: ReceiptStatus[] = ['draft', 'expected', 'partial'];
@@ -219,6 +220,43 @@ export async function importDdt(raw: unknown, file: File): Promise<ImportDdtResu
     })),
   );
 
+  // Matching righe → catalogo dell'org (PRIMA di creare il receipt, così gli
+  // avvisi sulle unità finiscono nelle note). UNITÀ: mai coercizzare all'unità
+  // del prodotto senza convertire la quantità (DDT "25 kg" su prodotto in
+  // grammi deve diventare 25000 g, non "25 g"). Unità NON convertibile → il
+  // match automatico decade a 'pending' con avviso: decide l'operatore.
+  const catalog = await repo.listCatalogRefs(orgId);
+  let matched = 0;
+  const preparedLines = parsed.lines.map((l, i) => {
+    const m = matchProduct(catalog, { sku: l.sku, name: l.rawName });
+    let auto = Boolean(m && m.confidence >= AUTO_MATCH_THRESHOLD);
+    let qtyExpected = l.qty;
+    let unit: UnitOfMeasure = l.unit;
+    if (auto && m) {
+      const converted = convertQty(l.qty, l.unit, m.product.unit);
+      if (converted === null) {
+        auto = false;
+        parsed.warnings.push(
+          `"${l.rawName}": unità DDT (${l.unit}) non convertibile in quella del prodotto "${m.product.name}" (${m.product.unit}) — riga da risolvere manualmente.`,
+        );
+      } else {
+        qtyExpected = converted;
+        unit = m.product.unit;
+      }
+    }
+    if (auto) matched++;
+    return {
+      product_id: auto && m ? m.product.id : null,
+      raw_product_name: l.rawName,
+      sku: l.sku,
+      qty_expected: qtyExpected,
+      unit,
+      lot_number: l.lotNumber,
+      line_status: (auto ? 'matched' : 'pending') as Database['public']['Tables']['purchase_receipt_lines']['Insert']['line_status'],
+      sort_order: i,
+    };
+  });
+
   const receiptId = await repo.insertReceipt({
     organization_id: orgId,
     mode: input.mode,
@@ -231,26 +269,7 @@ export async function importDdt(raw: unknown, file: File): Promise<ImportDdtResu
     created_by: userId,
   });
 
-  // Matching righe → catalogo dell'org.
-  const catalog = await repo.listCatalogRefs(orgId);
-  let matched = 0;
-  const lineRows = parsed.lines.map((l, i) => {
-    const m = matchProduct(catalog, { sku: l.sku, name: l.rawName });
-    const auto = m && m.confidence >= AUTO_MATCH_THRESHOLD;
-    if (auto) matched++;
-    return {
-      receipt_id: receiptId,
-      product_id: auto ? m.product.id : null,
-      raw_product_name: l.rawName,
-      sku: l.sku,
-      qty_expected: l.qty,
-      unit: auto ? m.product.unit : l.unit,
-      lot_number: l.lotNumber,
-      line_status: (auto ? 'matched' : 'pending') as Database['public']['Tables']['purchase_receipt_lines']['Insert']['line_status'],
-      sort_order: i,
-    };
-  });
-  await repo.insertLines(lineRows);
+  await repo.insertLines(preparedLines.map((l) => ({ ...l, receipt_id: receiptId })));
 
   return {
     receiptId,
@@ -445,9 +464,29 @@ export async function resolveLineProduct(raw: unknown): Promise<void> {
   const product = catalog.find((p) => p.id === input.productId);
   if (!product) throw new NotFoundError('Prodotto');
 
+  if (Number(line.qty_posted) > 0) {
+    throw new BusinessRuleError(
+      'Questa riga ha già quantità contabilizzate a magazzino: non può cambiare prodotto o unità. Usa una rettifica.',
+    );
+  }
+
+  // UNITÀ: la riga passa all'unità del prodotto SOLO convertendo le quantità.
+  // Non convertibile → errore esplicito (mai "2 pz" che diventano "2 kg").
+  const lineUnit = line.unit as UnitOfMeasure;
+  const factor = unitConversionFactor(lineUnit, product.unit);
+  if (factor === null) {
+    throw new BusinessRuleError(
+      `Unità incompatibili: la riga è in ${lineUnit}, il prodotto "${product.name}" è in ${product.unit}. ` +
+      `Azzera la quantità di questa riga e aggiungine una manuale in ${product.unit}, oppure scegli un altro prodotto.`,
+    );
+  }
+
   await repo.patchLine(input.lineId, {
     product_id: product.id,
     unit: product.unit,
+    qty_received: convertQty(Number(line.qty_received), lineUnit, product.unit) ?? Number(line.qty_received),
+    qty_expected:
+      line.qty_expected === null ? null : convertQty(Number(line.qty_expected), lineUnit, product.unit),
     line_status: 'matched',
   });
 
@@ -476,6 +515,23 @@ export async function createProductFromLine(raw: unknown): Promise<void> {
   if (receipt.organization_id !== orgId) throw new NotFoundError('Ricevimento');
   assertOpen(receipt.status);
 
+  if (Number(line.qty_posted) > 0) {
+    throw new BusinessRuleError(
+      'Questa riga ha già quantità contabilizzate a magazzino: non può cambiare prodotto o unità. Usa una rettifica.',
+    );
+  }
+
+  // UNITÀ: il nuovo prodotto nasce in input.unit e la riga vi si aggancia —
+  // le quantità della riga vanno convertite, o l'unità scelta è incompatibile.
+  const lineUnit = line.unit as UnitOfMeasure;
+  const qtyReceivedConv = convertQty(Number(line.qty_received), lineUnit, input.unit);
+  if (qtyReceivedConv === null) {
+    throw new BusinessRuleError(
+      `Unità incompatibili: la riga è in ${lineUnit} ma stai creando il prodotto in ${input.unit}. ` +
+      `Crea il prodotto in ${lineUnit}, oppure azzera la riga e aggiungine una manuale in ${input.unit}.`,
+    );
+  }
+
   const created = await createIngredient({
     name: input.name,
     sku: input.sku ?? '',
@@ -499,6 +555,9 @@ export async function createProductFromLine(raw: unknown): Promise<void> {
     product_id: created.id,
     raw_product_name: input.name,
     unit: input.unit,
+    qty_received: qtyReceivedConv,
+    qty_expected:
+      line.qty_expected === null ? null : convertQty(Number(line.qty_expected), lineUnit, input.unit),
     line_status: 'matched',
   });
 }

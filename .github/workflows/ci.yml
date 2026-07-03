@@ -1,0 +1,81 @@
+# =============================================================================
+# CI minima — protegge i percorsi critici, niente di più.
+#   app  : typecheck (tsc strict) + unit test (vitest)
+#   sql  : catena migrations_v2 da zero su Postgres Supabase locale + i test
+#          SQL transazionali del repo (RLS, place/receive, unit guard,
+#          double-count). La catena stessa è parte del test: se una migration
+#          non applica da zero, la CI deve dirlo.
+# NOTA: supabase/migrations/ (001–003 legacy, schema PRE-rewrite) NON va
+# applicata: la verità è SOLO migrations_v2. Si usa `supabase db start`, che
+# avvia il DB senza applicare migration.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: typecheck + unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+
+  sql:
+    name: migrations + SQL tests
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start local database
+        run: supabase db start
+      - name: Reset public schema (determinismo)
+        # Qualunque cosa il CLI abbia applicato (es. supabase/migrations legacy),
+        # la catena parte SEMPRE da un public vuoto. Auth/extensions restano.
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c \
+            "drop schema if exists public cascade;
+             create schema public;
+             grant all on schema public to postgres;
+             grant usage on schema public to anon, authenticated, service_role;"
+      - name: Apply migrations_v2 from scratch
+        run: |
+          shopt -s nullglob
+          for f in supabase/migrations_v2/[0-9]*.sql; do
+            echo "── applying $f"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+      - name: SQL regression tests
+        run: |
+          for t in \
+            supabase/tests/marketplace_rls.test.sql \
+            supabase/tests/marketplace_place_receive.test.sql \
+            supabase/tests/receipt_unit_guard.test.sql \
+            supabase/tests/receipts_double_count.test.sql; do
+            echo "── running $t"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$t"
+          done
+      - name: Smoke nightly reconciliation (read-only)
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+            -c "select public.run_nightly_reconciliation();"
