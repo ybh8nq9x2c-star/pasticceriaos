@@ -21,9 +21,26 @@ export async function upsertPosMappingAction(_prev: ActionState, formData: FormD
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };
   }
-  revalidatePath('/settings/pos');
+  revalidatePath('/sales/pos');
   revalidatePath('/sales');
   return { status: 'success', message: 'Mappatura salvata.' };
+}
+
+/** Salva la config POS (store/merchant) dal wizard /sales/pos. */
+export async function savePosConfigAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  try {
+    await service.savePosConfig({
+      provider: formField(formData, 'provider') || 'mipos',
+      storeId: formField(formData, 'storeId'),
+      merchantCode: formField(formData, 'merchantCode'),
+      isActive: formData.get('isActive') !== 'false',
+    });
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+  revalidatePath('/sales/pos');
+  revalidatePath('/sales');
+  return { status: 'success', message: 'Configurazione salvata: la cassa ora risolve la tua organizzazione.' };
 }
 
 /** Replay di un evento POS (failed → riesegui; processed+unlinked → relink). */

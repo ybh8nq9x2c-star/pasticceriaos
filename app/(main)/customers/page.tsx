@@ -10,18 +10,12 @@ import { CUSTOMER_ORDER_STATUS_LABELS, CUSTOMER_ORDER_TRANSITIONS } from '@/modu
 import { changeCustomerOrderStatusAction } from '@/modules/customers/actions';
 import { formatCurrency, IDLE_STATE } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { Badge } from '@/components/ui/Badge';
+import { SalesTabs } from '@/components/sales/SalesTabs';
+import { CUSTOMER_ORDER_BADGE } from '@/lib/status';
 import type { CustomerOrderStatus } from '@/lib/database.types';
 
-export const metadata: Metadata = { title: 'Ordini clienti' };
-
-const STATUS_BADGE: Record<CustomerOrderStatus, string> = {
-  pending:       'bg-primary-light text-primary-hover',
-  confirmed:     'bg-neutral-light text-ink',
-  in_production: 'bg-primary-light text-primary',
-  ready:         'bg-success-light text-success-strong',
-  delivered:     'bg-neutral-light text-ink-muted',
-  cancelled:     'bg-danger-light text-danger',
-};
+export const metadata: Metadata = { title: 'Ordini cliente' };
 
 function fmtDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', {
@@ -73,8 +67,9 @@ export default async function CustomerOrdersPage({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
+      <div className="-mb-1"><SalesTabs active="customers" /></div>
       <PageHeader
-        title="Ordini clienti"
+        title="Ordini cliente"
         subtitle="Prenotazioni e ritiri — alimentano il fabbisogno del piano produzione"
         action={
           <Link
@@ -139,9 +134,9 @@ export default async function CustomerOrdersPage({
                   {o.totalAmount !== null && (
                     <span className="text-sm font-mono font-medium text-ink">€{formatCurrency(o.totalAmount)}</span>
                   )}
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[o.status]}`}>
+                  <Badge variant={CUSTOMER_ORDER_BADGE[o.status]} size="sm">
                     {CUSTOMER_ORDER_STATUS_LABELS[o.status]}
-                  </span>
+                  </Badge>
                   {!showClosed && <AdvanceButton orderId={o.id} status={o.status} />}
                 </div>
               ))}

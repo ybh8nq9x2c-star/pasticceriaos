@@ -112,7 +112,7 @@ export default async function SettingsPage() {
             Collega i prodotti del registratore di cassa alle ricette: ogni scontrino emesso scarica
             automaticamente il magazzino in base alla distinta base.
           </p>
-          <Link href="/settings/pos" className="inline-block text-sm font-semibold text-primary hover:underline">
+          <Link href="/sales/pos" className="inline-block text-sm font-semibold text-primary hover:underline">
             Gestisci mappature POS →
           </Link>
         </div>

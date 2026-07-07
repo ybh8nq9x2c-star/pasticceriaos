@@ -1,22 +1,27 @@
 // =============================================================================
-// app/(main)/sales/page.tsx
-// Vendite: hub V1 della deduzione magazzino AL MOMENTO DELLA VENDITA.
-//   • registra una vendita (→ /sales/new) che deduce il magazzino
-//   • alert "prodotti venduti ma non collegati a una ricetta" (regola #4)
-//   • elenco vendite recenti con stato deduzione + storno (regola #3)
-// Il ledger movimenti e gli alert scorte restano su /inventory.
+// app/(main)/sales/page.tsx — HUB dell'area commerciale unica "Vendite".
+// In 5 secondi: quanto ho venduto, il POS funziona?, cosa devo risolvere,
+// chi ritira nei prossimi giorni, le vendite recenti. Le azioni: registrare
+// una vendita manuale, creare un ordine cliente, sistemare il POS.
+// La mappatura prodotti vive in UN posto solo: /sales/pos (niente doppioni).
+// DOMINIO: la vendita scala i PRODOTTI FINITI; le materie prime si muovono
+// con ricezione e produzione, mai con lo scontrino.
 // =============================================================================
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Receipt, Plus, AlertTriangle, Warehouse } from 'lucide-react';
-import { listSales, listUnlinkedProducts, listLinkableRecipes } from '@/modules/sales/service';
+import { Receipt, Plus, Cake } from 'lucide-react';
+import { listSales } from '@/modules/sales/service';
+import { getPosHealth } from '@/modules/pos/service';
+import { listCustomerOrders } from '@/modules/customers/service';
+import { CUSTOMER_ORDER_STATUS_LABELS } from '@/modules/customers/types';
 import type { SaleStatus } from '@/lib/database.types';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
+import { SalesTabs } from '@/components/sales/SalesTabs';
+import { PosStatusCard } from '@/components/sales/PosStatusCard';
 import { formatCurrency } from '@/lib/utils';
-import { LinkProductForm } from './LinkProductForm';
 import { ReverseSaleButton } from './ReverseSaleButton';
 
 export const metadata: Metadata = { title: 'Vendite' };
@@ -33,95 +38,123 @@ const dateFmt = new Intl.DateTimeFormat('it-IT', {
   day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
 });
 
-export default async function SalesPage() {
-  const [sales, unlinked, recipes] = await Promise.all([
+function fmtPickup(iso: string) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short' });
+}
+
+export default async function SalesHubPage() {
+  const [sales, health, customerOrders] = await Promise.all([
     listSales(),
-    listUnlinkedProducts(),
-    listLinkableRecipes(),
+    getPosHealth('mipos'),
+    listCustomerOrders(),
   ]);
 
   const today = new Date().toDateString();
-  const todayCount = sales.filter((s) => new Date(s.soldAt).toDateString() === today).length;
+  const todaySales = sales.filter(
+    (s) => new Date(s.soldAt).toDateString() === today && s.status !== 'reversed' && s.status !== 'void',
+  );
+  const todayRevenue = todaySales.reduce((sum, s) => sum + (s.totalAmount ?? 0), 0);
+  const toResolve = health.unmappedCount + health.failedCount;
+  const upcomingPickups = customerOrders
+    .filter((o) => o.status !== 'delivered' && o.status !== 'cancelled')
+    .slice(0, 4);
   const reversible = (s: SaleStatus) => s !== 'reversed' && s !== 'void';
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
+      <SalesTabs active="overview" />
+
       <PageHeader
         title="Vendite"
-        subtitle="Ogni vendita scala i prodotti finiti. Le materie prime si consumano in produzione."
+        subtitle="Scontrini e prenotazioni in un posto solo. Ogni vendita scala i prodotti finiti."
         action={
           <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
             <Link
-              href="/sales/inbox"
-              className="px-4 py-2.5 border border-border rounded-xl text-sm font-semibold text-ink hover:bg-surface-offset transition-colors text-center whitespace-nowrap"
+              href="/customers/new"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-border rounded-xl text-sm font-semibold text-ink hover:bg-surface-offset transition-colors whitespace-nowrap"
             >
-              Inbox POS
+              <Cake className="size-4" aria-hidden="true" /> Ordine cliente
             </Link>
             <Link
               href="/sales/new"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-fg hover:bg-primary-hover transition-colors whitespace-nowrap"
             >
-              <Plus className="size-4" /> Registra vendita
+              <Plus className="size-4" aria-hidden="true" /> Registra vendita
             </Link>
           </div>
         }
       />
 
-      {/* Riepilogo */}
-      <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {/* KPI essenziali di oggi */}
+      <div className="mt-6 grid grid-cols-3 gap-3">
         <div className="rounded-2xl border border-border bg-surface-2 p-4">
           <p className="text-xs text-ink-muted">Vendite oggi</p>
-          <p className="text-2xl font-bold text-ink mt-1">{todayCount}</p>
+          <p className="text-2xl font-bold text-ink mt-1 tnum">{todaySales.length}</p>
         </div>
         <div className="rounded-2xl border border-border bg-surface-2 p-4">
-          <p className="text-xs text-ink-muted">Totale registrate</p>
-          <p className="text-2xl font-bold text-ink mt-1">{sales.length}</p>
+          <p className="text-xs text-ink-muted">Incasso oggi</p>
+          <p className="text-2xl font-bold text-ink mt-1 tnum">
+            {todayRevenue > 0 ? `€${formatCurrency(todayRevenue)}` : '—'}
+          </p>
         </div>
         <Link
-          href="/inventory"
-          className="rounded-2xl border border-border bg-surface-2 p-4 hover:bg-surface-offset transition-colors"
+          href={toResolve > 0 ? health.cta.cta.href : '/sales/inbox'}
+          className={`rounded-2xl border p-4 transition-colors ${
+            toResolve > 0
+              ? 'border-warning-soft bg-warning-light/40 hover:bg-warning-light/60'
+              : 'border-border bg-surface-2 hover:bg-surface-offset'
+          }`}
         >
-          <p className="text-xs text-ink-muted inline-flex items-center gap-1">
-            <Warehouse className="size-3.5" /> Magazzino
+          <p className="text-xs text-ink-muted">Da risolvere</p>
+          <p className={`text-2xl font-bold mt-1 tnum ${toResolve > 0 ? 'text-warning-strong' : 'text-ink'}`}>
+            {toResolve}
           </p>
-          <p className="text-sm font-semibold text-primary mt-2">Giacenze e movimenti →</p>
         </Link>
       </div>
 
-      {/* Prodotti non collegati (regola #4) */}
-      {unlinked.length > 0 && (
-        <section className="mt-8">
-          <h2 className="flex items-center gap-2 text-base font-bold text-ink">
-            <AlertTriangle className="size-4 text-warning" />
-            Prodotti venduti ma non collegati ({unlinked.length})
-          </h2>
-          <p className="text-sm text-ink-muted mt-1">
-            Queste vendite sono registrate ma <strong>non hanno scaricato il magazzino</strong>.
-            Collega ogni prodotto a una ricetta: le vendite future verranno dedotte in automatico.
+      {/* Stato POS: collegato? funziona? qual è l'unica azione giusta adesso? */}
+      <div className="mt-4">
+        <PosStatusCard health={health} />
+      </div>
+
+      {/* Prossimi ritiri (ordini cliente aperti) */}
+      <section className="mt-8">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-bold text-ink">Prossimi ritiri</h2>
+          <Link href="/customers" className="text-xs font-semibold text-primary hover:underline">
+            Tutti gli ordini cliente →
+          </Link>
+        </div>
+        {upcomingPickups.length === 0 ? (
+          <p className="rounded-2xl border border-border bg-surface-2 px-5 py-4 text-sm text-ink-muted">
+            Nessuna prenotazione in corso.{' '}
+            <Link href="/customers/new" className="text-primary font-semibold hover:underline">
+              Registra un ordine cliente →
+            </Link>
           </p>
-          <div className="mt-3 space-y-2">
-            {unlinked.map((u) => (
-              <div
-                key={`${u.source}::${u.externalProductRef}`}
-                className="rounded-xl border border-warning-soft bg-warning-light/40 p-3 flex flex-col sm:flex-row sm:items-center gap-3"
-              >
+        ) : (
+          <div className="rounded-2xl border border-border bg-surface-2 divide-y divide-divider overflow-hidden">
+            {upcomingPickups.map((o) => (
+              <div key={o.id} className="flex items-center gap-3 px-4 sm:px-5 py-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-ink truncate">{u.productName}</p>
-                  <p className="text-xs text-ink-muted">
-                    <span className="font-mono">{u.externalProductRef}</span> · {u.source} ·{' '}
-                    {u.occurrences} {u.occurrences === 1 ? 'riga' : 'righe'}
+                  <p className="text-sm font-semibold text-ink truncate">{o.customerName}</p>
+                  <p className="text-xs text-ink-muted mt-0.5 capitalize">
+                    {fmtPickup(o.pickupDate)}
+                    {o.pickupTime && ` · ${o.pickupTime.slice(0, 5)}`}
+                    {` · ${o.piecesCount} ${o.piecesCount === 1 ? 'pezzo' : 'pezzi'}`}
                   </p>
                 </div>
-                <LinkProductForm
-                  source={u.source}
-                  externalProductRef={u.externalProductRef}
-                  recipes={recipes}
-                />
+                <Badge
+                  variant={o.status === 'ready' ? 'success' : o.status === 'in_production' ? 'primary' : 'info'}
+                  size="sm"
+                >
+                  {CUSTOMER_ORDER_STATUS_LABELS[o.status]}
+                </Badge>
               </div>
             ))}
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {/* Vendite recenti */}
       <section className="mt-8">
@@ -130,7 +163,9 @@ export default async function SalesPage() {
           <EmptyState
             icon={Receipt}
             title="Nessuna vendita registrata"
-            description="Registra la prima vendita: il magazzino si aggiorna da solo, ricetta per ricetta."
+            description="Registra la prima vendita o collega il POS: il magazzino prodotti finiti si aggiorna da solo."
+            ctaHref="/sales/new"
+            ctaLabel="Registra vendita"
           />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-border">
@@ -166,10 +201,10 @@ export default async function SalesPage() {
               <thead className="bg-surface-offset text-ink-muted">
                 <tr>
                   <th className="text-left font-medium px-4 py-2.5">Scontrino</th>
-                  <th className="text-left font-medium px-4 py-2.5 hidden sm:table-cell">Quando</th>
+                  <th className="text-left font-medium px-4 py-2.5">Quando</th>
                   <th className="text-center font-medium px-4 py-2.5">Righe</th>
                   <th className="text-left font-medium px-4 py-2.5">Stato</th>
-                  <th className="text-right font-medium px-4 py-2.5 hidden sm:table-cell">Totale</th>
+                  <th className="text-right font-medium px-4 py-2.5">Totale</th>
                   <th className="px-4 py-2.5" />
                 </tr>
               </thead>
@@ -184,14 +219,12 @@ export default async function SalesPage() {
                         </Link>
                         <span className="block text-xs text-ink-faint">{s.source}</span>
                       </td>
-                      <td className="px-4 py-3 text-ink-muted hidden sm:table-cell">
-                        {dateFmt.format(new Date(s.soldAt))}
-                      </td>
+                      <td className="px-4 py-3 text-ink-muted">{dateFmt.format(new Date(s.soldAt))}</td>
                       <td className="px-4 py-3 text-center font-mono text-ink-muted">{s.lineCount}</td>
                       <td className="px-4 py-3">
                         <Badge variant={cfg.variant}>{cfg.label}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-ink hidden sm:table-cell">
+                      <td className="px-4 py-3 text-right font-mono text-ink">
                         {s.totalAmount != null ? formatCurrency(s.totalAmount) : '—'}
                       </td>
                       <td className="px-4 py-3 text-right">

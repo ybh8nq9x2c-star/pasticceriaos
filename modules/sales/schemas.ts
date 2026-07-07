@@ -26,14 +26,6 @@ export const manualSaleSchema = z.object({
 
 export type ManualSaleInput = z.infer<typeof manualSaleSchema>;
 
-export const linkProductSchema = z.object({
-  source: z.string().trim().min(1),
-  externalProductRef: z.string().trim().min(1),
-  recipeId: z.string().uuid('Ricetta non valida'),
-});
-
-export type LinkProductInput = z.infer<typeof linkProductSchema>;
-
 export const reverseSaleSchema = z.object({
   saleId: z.string().uuid(),
 });

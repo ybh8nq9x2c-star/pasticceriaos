@@ -150,26 +150,6 @@ export async function relinkSaleLinesRpc(saleId: string, lines: RelinkLine[], cl
   return (data as number) ?? 0;
 }
 
-/** Crea/aggiorna il mapping POS→ricetta (risolve i "non collegati" futuri). */
-export async function upsertMapping(
-  orgId: string,
-  source: string,
-  externalProductRef: string,
-  recipeId: string,
-): Promise<void> {
-  const supabase = await createClient();
-  const { error } = await supabase.from('product_mappings').upsert(
-    {
-      organization_id: orgId,
-      source,
-      external_product_ref: norm(externalProductRef),
-      recipe_id: recipeId,
-    },
-    { onConflict: 'organization_id,source,external_product_ref' },
-  );
-  if (error) throw mapSupabaseError(error);
-}
-
 // ── Viste di lettura ──────────────────────────────────────────────────────────
 
 export async function listRecentSales(orgId: string, limit = 50): Promise<SaleView[]> {

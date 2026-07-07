@@ -1,7 +1,7 @@
 'use client';
 
 // =============================================================================
-// app/(main)/settings/pos/PosMappingForm.tsx
+// app/(main)/sales/pos/PosMappingForm.tsx
 // Riga di mappatura POS→ricetta. Tre usi (stessa action):
 //  • edit di una mappatura esistente (posItemId fisso, valori precompilati)
 //  • collega un prodotto "Non collegato" visto in vendita (posItemId fisso)

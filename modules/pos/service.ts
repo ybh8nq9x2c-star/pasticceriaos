@@ -11,7 +11,8 @@ import { listRecipes } from '@/modules/catalog/service';
 import { listUnlinkedProducts } from '@/modules/sales/service';
 import { suggestProducts, type CatalogProductRef } from '@/modules/goods-receipts/matching';
 import type { UnlinkedProduct } from '@/modules/sales/types';
-import { upsertPosMappingSchema } from './schemas';
+import { savePosConfigSchema, upsertPosMappingSchema } from './schemas';
+import { derivePosCta, type PosCta, type PosHealthSnapshot } from './status';
 import { getPosAdapter, posSource, type IncomingSale } from './adapter';
 import { buildCanonicalSale } from './ingest';
 import { loadMappings } from './repository';
@@ -263,6 +264,125 @@ export async function getPosIntegrationStatus(provider = 'mipos'): Promise<PosIn
     lastEventAt: lastRes.data?.received_at ?? null,
     readyForLive:
       adapterRegistered && webhookSecretConfigured && configActive && storeConfigured && processedEventsCount > 0,
+  };
+}
+
+// ── Config POS self-service (wizard /sales/pos) ──────────────────────────────
+
+export interface PosConfigView {
+  storeId: string | null;
+  merchantCode: string | null;
+  isActive: boolean;
+}
+
+/** Config del provider per l'org corrente (null = mai configurato). */
+export async function getPosConfig(provider = 'mipos'): Promise<PosConfigView | null> {
+  const session = await requireSession();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('pos_configs')
+    .select('store_id, merchant_code, is_active')
+    .eq('organization_id', session.organizationId)
+    .eq('provider', provider)
+    .maybeSingle();
+  if (error) throw mapSupabaseError(error);
+  if (!data) return null;
+  return { storeId: data.store_id, merchantCode: data.merchant_code, isActive: data.is_active };
+}
+
+/**
+ * Crea/aggiorna la config POS dell'org (RLS pos_configs_write). Lo store/merchant
+ * è ciò che il webhook usa per risolvere l'organizzazione: senza, gli scontrini
+ * non sanno a chi appartengono. Unicità (provider, store_id) garantita dal DB:
+ * lo stesso store non può puntare a due organizzazioni.
+ */
+export async function savePosConfig(raw: unknown): Promise<void> {
+  const session = await requirePosWriter();
+  const input = savePosConfigSchema.parse(raw);
+  const supabase = await createClient();
+
+  const patch = {
+    store_id: input.storeId?.trim() || null,
+    merchant_code: input.merchantCode?.trim() || null,
+    is_active: input.isActive,
+  };
+
+  const { data: existing, error: selErr } = await supabase
+    .from('pos_configs')
+    .select('id')
+    .eq('organization_id', session.organizationId)
+    .eq('provider', input.provider)
+    .maybeSingle();
+  if (selErr) throw mapSupabaseError(selErr);
+
+  if (existing) {
+    const { error } = await supabase.from('pos_configs').update(patch).eq('id', existing.id);
+    if (error) throw mapSupabaseError(error);
+  } else {
+    const { error } = await supabase.from('pos_configs').insert({
+      organization_id: session.organizationId,
+      provider: input.provider,
+      ...patch,
+    });
+    if (error) throw mapSupabaseError(error);
+  }
+}
+
+// ── Salute POS: stato + contatori + CTA contestuale (card hub e wizard) ───────
+
+export interface PosHealth extends PosHealthSnapshot {
+  provider: string;
+  lastEventAt: string | null;
+  lastProcessedAt: string | null;
+  readyForLive: boolean;
+  cta: PosCta;
+}
+
+/** Fotografia unica per card stato e wizard: compone SOLO letture esistenti. */
+export async function getPosHealth(provider = 'mipos'): Promise<PosHealth> {
+  const session = await requireSession();
+  const supabase = await createClient();
+
+  const [status, unlinked, failedRes, lastOkRes] = await Promise.all([
+    getPosIntegrationStatus(provider),
+    listUnlinkedProducts(),
+    supabase
+      .from('pos_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', session.organizationId)
+      .eq('provider', provider)
+      .eq('status', 'failed'),
+    supabase
+      .from('pos_events')
+      .select('processed_at')
+      .eq('organization_id', session.organizationId)
+      .eq('provider', provider)
+      .in('status', ['processed', 'reversed'])
+      .order('processed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (failedRes.error) throw mapSupabaseError(failedRes.error);
+  if (lastOkRes.error) throw mapSupabaseError(lastOkRes.error);
+
+  const snapshot: PosHealthSnapshot = {
+    adapterRegistered: status.adapterRegistered,
+    webhookSecretConfigured: status.webhookSecretConfigured,
+    configActive: status.configActive,
+    storeConfigured: status.storeConfigured,
+    mappingsCount: status.mappingsCount,
+    processedEventsCount: status.processedEventsCount,
+    unmappedCount: unlinked.filter((u) => u.source.startsWith('pos:')).length,
+    failedCount: failedRes.count ?? 0,
+  };
+
+  return {
+    ...snapshot,
+    provider,
+    lastEventAt: status.lastEventAt,
+    lastProcessedAt: lastOkRes.data?.processed_at ?? null,
+    readyForLive: status.readyForLive,
+    cta: derivePosCta(snapshot),
   };
 }
 

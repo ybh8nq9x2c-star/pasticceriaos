@@ -8,7 +8,6 @@ import type { LucideIcon } from 'lucide-react';
 import {
   Home,
   ChefHat,
-  Cake,
   BookOpen,
   Truck,
   ShoppingCart,
@@ -33,11 +32,12 @@ export const CUSTOMER_NAV: NavSection[] = [
   {
     title: 'Operativo',
     items: [
-      { href: '/dashboard',  label: 'Oggi',           icon: Home },
-      { href: '/production', label: 'Produzione',     icon: ChefHat },
-      { href: '/sales',      label: 'Vendite',        icon: Receipt },
-      { href: '/customers',  label: 'Ordini clienti', icon: Cake },
-      { href: '/recipes',    label: 'Ricette',        icon: BookOpen },
+      { href: '/dashboard',  label: 'Oggi',       icon: Home },
+      { href: '/production', label: 'Produzione', icon: ChefHat },
+      // UNA sola voce commerciale: l'hub /sales contiene panoramica, ordini
+      // cliente (/customers, stesso ambito) e setup POS (/sales/pos).
+      { href: '/sales',      label: 'Vendite',    icon: Receipt },
+      { href: '/recipes',    label: 'Ricette',    icon: BookOpen },
     ],
   },
   {
@@ -100,6 +100,11 @@ export const SUPPLIER_BOTTOM: NavItem[] = [
 /** Longest-prefix active match (shared by every nav surface). */
 export function isActivePath(pathname: string, href: string): boolean {
   if (href === '/supplier') return pathname === href; // home: exact match only
+  // Area commerciale unica: /customers (ordini cliente) vive DENTRO "Vendite"
+  // (tab dell'hub /sales), quindi tiene accesa la stessa voce di menu.
+  if (href === '/sales' && (pathname === '/customers' || pathname.startsWith('/customers/'))) {
+    return true;
+  }
   return pathname === href || pathname.startsWith(href + '/');
 }
 

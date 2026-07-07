@@ -15,7 +15,7 @@
 // =============================================================================
 
 import type { BadgeVariant } from '@/components/ui/Badge';
-import type { ReceiptLineStatus } from '@/lib/database.types';
+import type { CustomerOrderStatus, ReceiptLineStatus } from '@/lib/database.types';
 import type { StockStatus } from '@/modules/reporting/types';
 import type { MarketplaceOrderStatus } from '@/modules/marketplace/types';
 
@@ -64,4 +64,18 @@ export const MARKETPLACE_ORDER_BADGE: Record<MarketplaceOrderStatus, BadgeVarian
   shipped:        'primary',
   delivered:      'success',
   cancelled:      'neutral',
+};
+
+/**
+ * Ordine cliente (prenotazione) → tono canonico. `ready` è il momento
+ * operativo (il cliente può ritirare) → success; `cancelled` neutral come da
+ * palette (il rosso resta alle anomalie).
+ */
+export const CUSTOMER_ORDER_BADGE: Record<CustomerOrderStatus, BadgeVariant> = {
+  pending:       'info',
+  confirmed:     'primary',
+  in_production: 'warning',
+  ready:         'success',
+  delivered:     'neutral',
+  cancelled:     'neutral',
 };

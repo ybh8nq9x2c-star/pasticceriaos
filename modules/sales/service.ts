@@ -11,7 +11,7 @@ import { AuthError } from '@/lib/errors';
 import type { Json } from '@/lib/database.types';
 import { requireSession } from '@/modules/identity/service';
 import { getAdapter } from './adapters';
-import { linkProductSchema, reverseSaleSchema } from './schemas';
+import { reverseSaleSchema } from './schemas';
 import { aggregateSaleStatus, type CanonicalSale, type IngestSummary, type SaleLineStatus } from './types';
 import * as repo from './repository';
 
@@ -139,17 +139,6 @@ export async function findSaleIdForExternal(
   client: repo.SalesDb,
 ): Promise<string | null> {
   return repo.findSaleIdByExternal(orgId, source, externalSaleId, client);
-}
-
-/**
- * Collega un prodotto POS a una ricetta. Le vendite FUTURE di quel prodotto
- * verranno dedotte automaticamente (le passate si possono ri-ingerire o restano
- * registrate come "non dedotte").
- */
-export async function linkProduct(raw: unknown): Promise<void> {
-  const session = await requireWriter();
-  const input = linkProductSchema.parse(raw);
-  await repo.upsertMapping(session.organizationId, input.source, input.externalProductRef, input.recipeId);
 }
 
 /**

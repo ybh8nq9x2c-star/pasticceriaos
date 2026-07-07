@@ -46,7 +46,7 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
 
       <p className="text-sm text-ink-muted mb-3">
         Ogni riga indica la <strong>ricetta</strong> da cui è stato scaricato il magazzino. Se non è quella giusta,
-        collega il prodotto alla ricetta corretta da <Link href="/sales" className="text-primary underline">Vendite</Link>.
+        correggi la mappatura in <Link href="/sales/pos#mappatura" className="text-primary underline">POS → Collega i prodotti</Link>.
       </p>
 
       <div className="overflow-hidden rounded-2xl border border-border">
@@ -73,7 +73,7 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
                     </Link>
                   ) : (
                     <Link
-                      href={`/settings/pos?highlight=${encodeURIComponent(l.externalProductRef)}`}
+                      href={`/sales/pos?highlight=${encodeURIComponent(l.externalProductRef)}`}
                       className="text-xs font-semibold text-primary hover:underline"
                     >
                       Collega «{l.externalProductRef}» →
@@ -121,7 +121,7 @@ export default async function SaleDetailPage({ params }: { params: { id: string 
                       <span className="inline-flex flex-wrap items-center gap-2">
                         <Badge variant="warning" size="sm">Prodotto non collegato</Badge>
                         <Link
-                          href={`/settings/pos?highlight=${encodeURIComponent(l.externalProductRef)}`}
+                          href={`/sales/pos?highlight=${encodeURIComponent(l.externalProductRef)}`}
                           className="text-xs font-semibold text-primary hover:underline"
                         >
                           Collega «{l.externalProductRef}» →

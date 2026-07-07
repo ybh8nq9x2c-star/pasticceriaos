@@ -54,7 +54,7 @@ export default async function PosInboxPage({ searchParams }: { searchParams: { t
         backLabel="Vendite"
         action={
           <Link
-            href="/settings/pos"
+            href="/sales/pos"
             className="px-4 py-2.5 border border-border rounded-xl text-sm font-semibold text-ink hover:bg-surface-offset transition-colors whitespace-nowrap"
           >
             Mappature →
@@ -128,7 +128,7 @@ export default async function PosInboxPage({ searchParams }: { searchParams: { t
                   {replayable && <ReplayButton eventId={e.id} />}
                   {e.unlinked.length > 0 && (
                     <Link
-                      href={`/settings/pos?highlight=${encodeURIComponent(e.unlinked[0])}`}
+                      href={`/sales/pos?highlight=${encodeURIComponent(e.unlinked[0])}`}
                       className="text-xs font-semibold text-primary hover:underline"
                     >
                       Collega prodotti →

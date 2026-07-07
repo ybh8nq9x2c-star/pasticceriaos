@@ -61,17 +61,6 @@ export async function reverseSaleAction(_prev: ActionState, formData: FormData):
   }
 }
 
-/** Collega un prodotto POS a una ricetta (deduzione automatica delle vendite future). */
-export async function linkProductAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  try {
-    await service.linkProduct({
-      source: formField(formData, 'source') || 'manual',
-      externalProductRef: formField(formData, 'externalProductRef'),
-      recipeId: formField(formData, 'recipeId'),
-    });
-    revalidateSales();
-    return { status: 'success', message: 'Prodotto collegato alla ricetta.' };
-  } catch (err) {
-    return { status: 'error', error: getErrorMessage(err) };
-  }
-}
+// NB: il collegamento prodotto→ricetta ora ha UNA sola superficie: il wizard
+// /sales/pos (upsertPosMappingAction, modules/pos). Il vecchio linkProductAction
+// duplicava la mappatura senza porzioni ed è stato rimosso.
