@@ -76,7 +76,7 @@ export async function listFinishedGoodsTheoretical(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('v_finished_goods_daily_theoretical')
-    .select('sellable_product_id, product_name, produced_qty, sold_qty, remaining_theoretical')
+    .select('sellable_product_id, product_name, produced_qty, sold_qty, wasted_qty, remaining_theoretical')
     .eq('organization_id', orgId)
     .eq('business_date', businessDate)
     .order('remaining_theoretical', { ascending: true }); // i più "scoperti"/in esaurimento prima

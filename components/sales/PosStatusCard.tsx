@@ -62,6 +62,7 @@ export function PosStatusCard({ health }: { health: PosHealth }) {
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Link
           href={cta.href}
+          data-testid="pos-status-cta"
           className="inline-flex items-center justify-center min-h-[40px] rounded-xl bg-primary px-4 text-sm font-semibold text-primary-fg hover:bg-primary-hover transition-colors"
         >
           {cta.label}

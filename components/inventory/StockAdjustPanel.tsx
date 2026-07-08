@@ -10,7 +10,7 @@
 // conferma esplicita prima di scrivere.
 // =============================================================================
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Boxes, Plus, Minus } from 'lucide-react';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { adjustStockAction, recordMovementAction } from '@/modules/inventory/actions';
@@ -31,14 +31,18 @@ export function StockAdjustPanel({
   ingredientId,
   ingredientName,
   unit,
+  initialQuantity,
+  canAdjust,
 }: {
   ingredientId: string;
   ingredientName: string;
   unit: UnitOfMeasure;
+  /** Giacenza corrente caricata dal SERVER (P0-1: niente fetch client muta). */
+  initialQuantity: number;
+  /** Ruolo verificato dal server: viewer = sola lettura. */
+  canAdjust: boolean;
 }) {
-  const [current, setCurrent] = useState<number | null>(null);
-  const [canAdjust, setCanAdjust] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [current, setCurrent] = useState<number | null>(initialQuantity);
   const [mode, setMode] = useState<Mode>('delta');
   const [sign, setSign] = useState<1 | -1>(1); // delta: aggiungi (+) / togli (−)
   const [reason, setReason] = useState<string>(REASONS[0]); // motivo rettifica (audit trail)
@@ -47,22 +51,6 @@ export function StockAdjustPanel({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    fetch(`/api/inventory/level/${ingredientId}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (active && d) {
-          setCurrent(d.currentQuantity);
-          setCanAdjust(d.canAdjust);
-        }
-      })
-      .finally(() => active && setLoading(false));
-    return () => {
-      active = false;
-    };
-  }, [ingredientId]);
 
   const num = parseFloat(value.replace(',', '.'));
   const hasNum = value.trim() !== '' && !Number.isNaN(num);
@@ -134,10 +122,7 @@ export function StockAdjustPanel({
         Aggiungi o togli quantità, oppure allinea al conteggio fisico. Viene registrato un movimento tracciato.
       </p>
 
-      {loading ? (
-        <div className="h-12 rounded-xl bg-surface-offset animate-pulse" />
-      ) : (
-        <>
+      <>
           <div className="flex items-baseline justify-between rounded-xl bg-bg border border-divider px-4 py-3 mb-4">
             <span className="text-sm text-ink-muted">Stock attuale (sistema)</span>
             <span className="font-mono text-lg font-semibold text-ink">
@@ -272,8 +257,7 @@ export function StockAdjustPanel({
           ) : (
             <p className="text-xs text-ink-muted">Solo il titolare o il responsabile possono rettificare lo stock.</p>
           )}
-        </>
-      )}
+      </>
 
       <ConfirmDialog
         open={confirmOpen}

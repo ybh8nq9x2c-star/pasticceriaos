@@ -20,6 +20,7 @@ const row = (over: Partial<FinishedGoodViewRow>): FinishedGoodViewRow => ({
   product_name: 'Cornetto',
   produced_qty: 0,
   sold_qty: 0,
+  wasted_qty: 0,
   remaining_theoretical: 0,
   ...over,
 });
@@ -75,6 +76,17 @@ describe('toFinishedGoodTheoretical (FASE 1)', () => {
     expect(out).toHaveLength(2);
     expect(out.map((o) => o.sellableProductId)).toEqual(['rec-1', 'rec-2']);
     expect(out.map((o) => o.remainingTheoretical)).toEqual([18, 5]);
+  });
+
+  // f) invenduto registrato (056): wasted copiato dalla vista, remaining già
+  //    al netto (produced − sold − wasted, calcolato in SQL, mai ricalcolato qui)
+  it('f) wasted_qty copiato as-is; NULL → 0', () => {
+    const out = toFinishedGoodTheoretical(
+      row({ produced_qty: 20, sold_qty: 12, wasted_qty: 5, remaining_theoretical: 3 }),
+    );
+    expect(out.wastedQty).toBe(5);
+    expect(out.remainingTheoretical).toBe(3);
+    expect(toFinishedGoodTheoretical(row({ wasted_qty: null })).wastedQty).toBe(0);
   });
 
   it('numeri come stringa (numeric SQL) → coerciati a number', () => {

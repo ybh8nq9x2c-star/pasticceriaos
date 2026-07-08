@@ -104,8 +104,26 @@ export const createBatchSchema = z.object({
   notes: z.string().trim().max(500).nullish().or(z.literal('')),
 });
 
+// ---------------------------------------------------------------------------
+// Invenduto / scarto PRODOTTI FINITI (P0-3) — dominio finished goods, MAI
+// materie prime. Motivi preset: finiscono nella nota del movimento (audit).
+// ---------------------------------------------------------------------------
+
+export const WASTE_REASONS = ['Invenduto', 'Danneggiato', 'Scaduto', 'Altro'] as const;
+
+export const recordFinishedGoodsWasteSchema = z.object({
+  recipeId: z.string().uuid('Prodotto non valido'),
+  quantity: z
+    .union([z.string(), z.number()])
+    .transform((v) => (typeof v === 'number' ? v : parseFloat(v.replace(',', '.'))))
+    .pipe(z.number().positive('La quantità deve essere maggiore di 0').max(100_000, 'Quantità fuori range')),
+  reason: z.enum(WASTE_REASONS),
+  note: z.string().trim().max(300).optional().or(z.literal('')),
+});
+
 export type CreateMovementInput  = z.infer<typeof createMovementSchema>;
 export type UpdateThresholdInput = z.infer<typeof updateThresholdSchema>;
 export type AdjustStockInput     = z.infer<typeof adjustStockSchema>;
 export type InitialStockInput    = z.infer<typeof initialStockSchema>;
 export type CreateBatchInput     = z.infer<typeof createBatchSchema>;
+export type RecordFinishedGoodsWasteInput = z.infer<typeof recordFinishedGoodsWasteSchema>;

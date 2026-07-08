@@ -1449,6 +1449,7 @@ export interface Database {
           product_name: string;
           produced_qty: number;
           sold_qty: number;
+          wasted_qty: number;
           remaining_theoretical: number;
         };
         Relationships: [];

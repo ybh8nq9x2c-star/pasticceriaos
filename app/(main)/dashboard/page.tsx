@@ -15,6 +15,7 @@ import {
   ShoppingCart, Cake, Recycle, Calculator, ChevronDown, ChefHat,
 } from 'lucide-react';
 import { getMobilePriorityTasks, type PriorityTaskKind } from '@/lib/priority-tasks';
+import { RecordWasteButton } from '@/components/inventory/RecordWasteButton';
 import { MobileTaskCard, type TaskTone } from '@/components/mobile/MobileTaskCard';
 import { MobileSectionHeader } from '@/components/mobile/MobileSectionHeader';
 import {
@@ -680,16 +681,25 @@ export default async function TodayPage() {
         ) : (
           <div className="divide-y divide-divider">
             {finishedGoods.map((g) => (
-              <div key={g.sellableProductId} className="flex items-center gap-3 px-5 py-3">
-                <span className="flex-1 text-sm text-ink truncate">{g.productName}</span>
+              <div key={g.sellableProductId} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3">
+                <span className="flex-1 min-w-0 text-sm text-ink truncate">{g.productName}</span>
                 <span className="text-xs font-mono text-ink-muted whitespace-nowrap">
                   {g.producedQty} prod · {g.soldQty} vend
+                  {g.wastedQty > 0 && <span className="text-danger"> · {g.wastedQty} buttati</span>}
                 </span>
                 <span
-                  className={`text-sm font-mono font-semibold w-16 text-right ${g.remainingTheoretical < 0 ? 'text-danger' : 'text-ink'}`}
+                  className={`text-sm font-mono font-semibold w-12 text-right ${g.remainingTheoretical < 0 ? 'text-danger' : 'text-ink'}`}
                 >
                   {g.remainingTheoretical}
                 </span>
+                {/* P0-3: il gesto di fine giornata dove si vede la rimanenza. */}
+                {g.remainingTheoretical > 0 && (
+                  <RecordWasteButton
+                    recipeId={g.sellableProductId}
+                    productName={g.productName}
+                    suggestedQty={g.remainingTheoretical}
+                  />
+                )}
               </div>
             ))}
           </div>

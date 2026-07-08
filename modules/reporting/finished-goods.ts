@@ -19,6 +19,7 @@ export interface FinishedGoodViewRow {
   product_name: string;
   produced_qty: number | string | null;
   sold_qty: number | string | null;
+  wasted_qty: number | string | null;
   remaining_theoretical: number | string | null;
 }
 
@@ -35,6 +36,7 @@ export function toFinishedGoodTheoretical(row: FinishedGoodViewRow): FinishedGoo
     productName:          row.product_name,
     producedQty:          toNum(row.produced_qty),
     soldQty:              toNum(row.sold_qty),
+    wastedQty:            toNum(row.wasted_qty),
     remainingTheoretical: toNum(row.remaining_theoretical),
   };
 }

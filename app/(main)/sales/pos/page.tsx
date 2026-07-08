@@ -25,6 +25,7 @@ import { PosMappingForm } from './PosMappingForm';
 import { PosConfigForm } from './PosConfigForm';
 import { DryRunTester } from './DryRunTester';
 import { HighlightScroll } from './HighlightScroll';
+import { RefreshStatusButton } from './RefreshStatusButton';
 
 export const metadata: Metadata = { title: 'Connetti il POS' };
 
@@ -86,12 +87,15 @@ export default async function PosWizardPage({ searchParams }: { searchParams: { 
         title="Connetti il tuo POS"
         subtitle="Sei passi e ogni scontrino entra da solo in BakeryOS, scalando i prodotti finiti."
         action={
-          <Link
-            href="/sales/inbox"
-            className="px-4 py-2.5 border border-border rounded-xl text-sm font-semibold text-ink hover:bg-surface-offset transition-colors whitespace-nowrap"
-          >
-            Inbox eventi →
-          </Link>
+          <div className="flex items-center gap-2">
+            <RefreshStatusButton />
+            <Link
+              href="/sales/inbox"
+              className="px-4 py-2.5 border border-border rounded-xl text-sm font-semibold text-ink hover:bg-surface-offset transition-colors whitespace-nowrap"
+            >
+              Inbox eventi →
+            </Link>
+          </div>
         }
       />
 

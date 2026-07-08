@@ -6,9 +6,69 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 import { getErrorMessage } from '@/lib/errors';
 import type { ActionState } from '@/lib/utils';
+import { getCustomerOrdersForDate } from '@/modules/customers/service';
 import * as service from './service';
+
+// ── Letture on-demand del form piano (P0-1: via le fetch client mute) ─────────
+// Contratto ONESTO: o dati, o un errore leggibile — mai [] su failure.
+
+const previewItemsSchema = z
+  .array(z.object({ recipeId: z.string().uuid(), batchCount: z.coerce.number().positive() }))
+  .max(200);
+
+export type PreviewRequirementsResult =
+  | { ok: true; requirements: Awaited<ReturnType<typeof service.computePlanRequirements>> }
+  | { ok: false; error: string };
+
+/** Fabbisogno LIVE per un piano non salvato (chiamato debounced dal form). */
+export async function previewRequirementsAction(rawItems: unknown): Promise<PreviewRequirementsResult> {
+  try {
+    const items = previewItemsSchema.parse(rawItems);
+    if (items.length === 0) return { ok: true, requirements: [] };
+    const requirements = await service.computePlanRequirements(items);
+    return { ok: true, requirements };
+  } catch (err) {
+    return { ok: false, error: getErrorMessage(err) };
+  }
+}
+
+export interface PlanDateOrder {
+  id: string;
+  customerName: string;
+  pickupTime: string | null;
+  items: { recipeId: string | null; recipeName: string | null; description: string; quantity: number }[];
+}
+
+export type OrdersForDateResult =
+  | { ok: true; orders: PlanDateOrder[] }
+  | { ok: false; error: string };
+
+/** Ordini clienti con ritiro nella data scelta (il piano li deve coprire). */
+export async function ordersForPlanDateAction(date: string): Promise<OrdersForDateResult> {
+  try {
+    const parsed = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data non valida').parse(date);
+    const orders = await getCustomerOrdersForDate(parsed);
+    return {
+      ok: true,
+      orders: orders.map((o) => ({
+        id: o.id,
+        customerName: o.customerName,
+        pickupTime: o.pickupTime,
+        items: o.items.map((i) => ({
+          recipeId: i.recipeId,
+          recipeName: i.recipeName,
+          description: i.description,
+          quantity: i.quantity,
+        })),
+      })),
+    };
+  } catch (err) {
+    return { ok: false, error: getErrorMessage(err) };
+  }
+}
 
 export async function createPlanAction(
   _prev: ActionState,

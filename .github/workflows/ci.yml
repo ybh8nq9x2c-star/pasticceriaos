@@ -71,6 +71,7 @@ jobs:
             supabase/tests/marketplace_rls.test.sql \
             supabase/tests/marketplace_place_receive.test.sql \
             supabase/tests/receipt_unit_guard.test.sql \
+            supabase/tests/finished_goods_waste.test.sql \
             supabase/tests/receipts_double_count.test.sql; do
             echo "── running $t"
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$t"

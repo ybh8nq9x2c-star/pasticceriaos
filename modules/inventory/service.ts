@@ -12,11 +12,13 @@ import {
   createMovementSchema,
   updateThresholdSchema,
   adjustStockSchema,
+  recordFinishedGoodsWasteSchema,
   initialStockSchema,
   createBatchSchema,
 } from './schemas';
 import type { InventoryLevel, InventoryMovement, LowStockAlert, IngredientBatch, ExpiringBatch } from './types';
-import type { CreateMovementInput, UpdateThresholdInput, AdjustStockInput, InitialStockInput, CreateBatchInput } from './schemas';
+import type { CreateMovementInput, UpdateThresholdInput, AdjustStockInput,
+  RecordFinishedGoodsWasteInput, InitialStockInput, CreateBatchInput } from './schemas';
 
 // ---------------------------------------------------------------------------
 // Levels
@@ -113,6 +115,31 @@ export async function recordMovement(raw: unknown): Promise<InventoryMovement> {
   if (!user) throw new AuthError();
 
   return repo.insertMovement(orgId, user.id, normalized);
+}
+
+/**
+ * P0-3 — Invenduto/scarto PRODOTTI FINITI (fine giornata). Scrive SOLO sul
+ * ledger finished_goods_movements ('waste', delta negativo, append-only): le
+ * materie prime non c'entrano — quelle si consumano in produzione. La vista
+ * teorica (056) sottrae il buttato dalla rimanenza del giorno.
+ * Riservata a owner/baker; il viewer è sola lettura.
+ */
+export async function recordFinishedGoodsWaste(raw: unknown): Promise<void> {
+  const session = await requireSession();
+  if (session.role === 'viewer') {
+    throw new AuthError('Non hai i permessi per registrare l\'invenduto.');
+  }
+  const input: RecordFinishedGoodsWasteInput = recordFinishedGoodsWasteSchema.parse(raw);
+
+  await repo.insertFinishedGoodsMovement({
+    organizationId: session.organizationId,
+    recipeId: input.recipeId,
+    movementType: 'waste',
+    quantityDelta: -input.quantity,
+    referenceType: 'manual',
+    performedBy: session.userId,
+    notes: `${input.reason}${input.note?.trim() ? ` — ${input.note.trim()}` : ''}`,
+  });
 }
 
 export interface AdjustStockResult {

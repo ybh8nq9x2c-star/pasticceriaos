@@ -117,3 +117,25 @@ export async function updateThresholdAction(
   revalidatePath('/inventory');
   return { status: 'success', message: 'Soglia minima aggiornata.' };
 }
+
+/** P0-3 — Invenduto/scarto prodotti finiti (dal blocco rimanenze teoriche). */
+export async function recordFinishedGoodsWasteAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    await service.recordFinishedGoodsWaste({
+      recipeId: formField(formData, 'recipeId'),
+      quantity: formField(formData, 'quantity'),
+      reason:   formField(formData, 'reason'),
+      note:     formField(formData, 'note'),
+    });
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+
+  revalidatePath('/dashboard');
+  revalidatePath('/sales');
+  revalidatePath('/analytics');
+  return { status: 'success', message: 'Invenduto registrato: rimanenza aggiornata.' };
+}

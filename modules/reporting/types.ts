@@ -35,7 +35,8 @@ export interface FinishedGoodTheoretical {
   productName: string;
   producedQty: number;
   soldQty: number;
-  remainingTheoretical: number; // produced - sold (può essere negativo: mostrato così)
+  wastedQty: number; // invenduto/scarto registrato (056)
+  remainingTheoretical: number; // produced - sold - wasted (può essere negativo: mostrato così)
 }
 
 // ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ export function SalesTabs({ active }: { active: SalesTabKey }) {
         <Link
           key={t.key}
           href={t.href}
+          data-testid={`sales-tab-${t.key}`}
           aria-current={t.key === active ? 'page' : undefined}
           className={cn(
             'whitespace-nowrap rounded-full px-3.5 min-h-[36px] inline-flex items-center text-sm border transition-colors',

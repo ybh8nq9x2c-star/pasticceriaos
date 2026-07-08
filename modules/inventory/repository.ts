@@ -244,6 +244,32 @@ function toLevel(row: any): InventoryLevel {
   };
 }
 
+/**
+ * Movimento sul ledger PRODOTTI FINITI (append-only; RLS fgm_insert per-org;
+ * la proiezione finished_goods_levels si aggiorna via trigger, mai da qui).
+ */
+export async function insertFinishedGoodsMovement(row: {
+  organizationId: string;
+  recipeId: string;
+  movementType: string;
+  quantityDelta: number;
+  referenceType: string | null;
+  performedBy: string | null;
+  notes: string | null;
+}): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from('finished_goods_movements').insert({
+    organization_id: row.organizationId,
+    recipe_id: row.recipeId,
+    movement_type: row.movementType,
+    quantity_delta: row.quantityDelta,
+    reference_type: row.referenceType,
+    performed_by: row.performedBy,
+    notes: row.notes,
+  } as never);
+  if (error) throw mapSupabaseError(error);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toMovement(row: any): InventoryMovement {
   return {

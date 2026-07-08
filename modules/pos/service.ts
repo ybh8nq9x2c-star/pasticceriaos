@@ -315,16 +315,27 @@ export async function savePosConfig(raw: unknown): Promise<void> {
     .maybeSingle();
   if (selErr) throw mapSupabaseError(selErr);
 
+  // Unicità (provider, store_id)/(provider, merchant_code) a livello DB: lo
+  // stesso store NON può puntare a due organizzazioni. 23505 → messaggio umano.
+  const friendly = (code: string | undefined) => {
+    if (code === '23505') {
+      throw new AuthError(
+        'Questo Store ID (o Merchant code) risulta già collegato a un\'altra organizzazione. ' +
+        'Controlla di aver copiato il codice giusto dal pannello della TUA cassa.',
+      );
+    }
+  };
+
   if (existing) {
     const { error } = await supabase.from('pos_configs').update(patch).eq('id', existing.id);
-    if (error) throw mapSupabaseError(error);
+    if (error) { friendly(error.code); throw mapSupabaseError(error); }
   } else {
     const { error } = await supabase.from('pos_configs').insert({
       organization_id: session.organizationId,
       provider: input.provider,
       ...patch,
     });
-    if (error) throw mapSupabaseError(error);
+    if (error) { friendly(error.code); throw mapSupabaseError(error); }
   }
 }
 
