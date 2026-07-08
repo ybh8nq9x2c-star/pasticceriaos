@@ -7,6 +7,8 @@ import { requireOrgId } from '@/modules/identity/service';
 import { createClient } from '@/lib/supabase/server';
 import { BusinessRuleError, mapSupabaseError, NotFoundError } from '@/lib/errors';
 import { dispatchOrderToSupplier } from '@/lib/order-dispatch';
+import { getLowStockAlerts } from '@/modules/inventory/service';
+import { listIngredients } from '@/modules/catalog/service';
 import * as repo from './repository';
 import * as reportingRepo from '@/modules/reporting/repository';
 import { createOrderSchema, updateOrderSchema, changeStatusSchema } from './schemas';
@@ -203,6 +205,63 @@ export interface DraftFromShortageResult {
   createdOrderIds: string[];
   /** Ingredienti in shortage senza fornitore in anagrafica: da ordinare a mano. */
   skippedIngredients: string[];
+}
+
+/**
+ * P1-A — bozze d'ordine dalle SCORTE SOTTO SOGLIA (una per fornitore), stessa
+ * meccanica delle bozze da shortage del piano: prima dal magazzino usciva un
+ * solo form monofornitore. Quantità = regola canonica 2×soglia. Ingredienti
+ * senza fornitore → skipped espliciti (mai bozze mute).
+ */
+export async function createDraftOrdersFromLowStock(): Promise<DraftFromShortageResult> {
+  const orgId = await requireOrgId();
+
+  const alerts = await getLowStockAlerts();
+  if (alerts.length === 0) {
+    throw new BusinessRuleError('Nessuna scorta sotto soglia: niente da ordinare.');
+  }
+
+  const ingredients = await listIngredients();
+  const byId = new Map(ingredients.map((i) => [i.id, i]));
+
+  type DraftLine = { ingredientProductId: string; quantity: number; unitSnapshot: string; unitPriceSnapshot: number | null };
+  const bySupplier = new Map<string, DraftLine[]>();
+  const skipped: string[] = [];
+  for (const a of alerts) {
+    const quantity = Math.max(0, Math.round((a.minThreshold * 2 - a.currentQuantity) * 1000) / 1000);
+    if (quantity <= 0) continue; // già sopra il riordino dopo arrotondamento
+    const product = byId.get(a.ingredientProductId);
+    if (!product?.supplierId) {
+      skipped.push(a.ingredientName);
+      continue;
+    }
+    const arr = bySupplier.get(product.supplierId) ?? [];
+    arr.push({
+      ingredientProductId: a.ingredientProductId,
+      quantity,
+      unitSnapshot: a.unit,
+      unitPriceSnapshot: product.unitPrice ?? null,
+    });
+    bySupplier.set(product.supplierId, arr);
+  }
+
+  const createdOrderIds: string[] = [];
+  for (const [supplierId, lineItems] of bySupplier) {
+    const order = await repo.insertOrder(
+      orgId,
+      {
+        supplierId,
+        orderDate: new Date().toISOString().slice(0, 10),
+        expectedDate: '',
+        notes: 'Bozza generata dalle scorte sotto soglia (riordino a 2× la soglia minima).',
+        lineItems,
+      } as CreateOrderInput,
+      'Generato automaticamente dalle scorte sotto soglia',
+    );
+    createdOrderIds.push(order.id);
+  }
+
+  return { createdOrderIds, skippedIngredients: skipped };
 }
 
 /**

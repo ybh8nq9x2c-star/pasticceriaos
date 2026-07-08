@@ -44,6 +44,15 @@ export async function ReceiptsIndexView({
   searchParams: { tab?: string; q?: string; supplier?: string };
 }) {
   const tab = TABS.find((t) => t.key === searchParams.tab) ?? TABS[0];
+
+  // P1-B: pulizia best-effort dei draft vuoti >7gg (gusci senza righe, zero
+  // ledger). Un errore qui non deve mai impedire di vedere la lista.
+  try {
+    await service.archiveStaleDraftReceipts();
+  } catch {
+    /* best-effort */
+  }
+
   const [receipts, suppliers] = await Promise.all([
     service.listReceipts({
       status: tab.statuses,

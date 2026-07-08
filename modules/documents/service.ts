@@ -99,7 +99,7 @@ interface OrderLineRow {
 export async function matchDocumentToOrder(
   documentId: string,
   purchaseOrderId?: string,
-): Promise<{ status: 'matched' | 'anomaly'; anomaliesCount: number }> {
+): Promise<{ status: 'matched' | 'anomaly'; anomaliesCount: number; pricesUpdated: number }> {
   const orgId = await requireOrgId();
   const doc = await repo.getDocumentById(documentId);
   if (doc.organizationId !== orgId) throw new NotFoundError('Documento');
@@ -271,6 +271,9 @@ export async function matchDocumentToOrder(
 
   // Fattura verificata senza anomalie -> i prezzi fattura diventano i prezzi
   // correnti degli ingredienti (source of truth della cache prezzo).
+  // P1-F: il beneficio della verifica deve essere VISIBILE — contiamo i prezzi
+  // aggiornati e li restituiamo alla UI ("i 2 minuti spesi valgono").
+  let pricesUpdated = 0;
   if (status === 'matched' && doc.documentType === 'invoice') {
     for (const line of doc.lines) {
       if (line.unitPrice !== null && line.ingredientProductId) {
@@ -279,11 +282,12 @@ export async function matchDocumentToOrder(
           .update({ unit_price: line.unitPrice })
           .eq('id', line.ingredientProductId);
         if (priceErr) throw mapSupabaseError(priceErr);
+        pricesUpdated += 1;
       }
     }
   }
 
-  return { status, anomaliesCount: anomalies.length };
+  return { status, anomaliesCount: anomalies.length, pricesUpdated };
 }
 
 // ---------------------------------------------------------------------------

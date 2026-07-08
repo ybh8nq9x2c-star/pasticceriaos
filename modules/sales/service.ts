@@ -115,7 +115,7 @@ export async function reverseSale(raw: unknown): Promise<{ saleId: string }> {
 }
 
 // ── Percorso di SISTEMA (bordo POS: webhook, nessuna sessione) ────────────────
-// Stesso motore (risoluzione + esplosione BOM + RPC idempotente), ma org esplicita
+// Stesso motore (risoluzione ricetta + RPC idempotente sui FINITI), ma org esplicita
 // e client service-role iniettato. Gli invarianti restano qui.
 
 export async function ingestSaleAsSystem(

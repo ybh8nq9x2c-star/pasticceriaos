@@ -27,9 +27,9 @@ import { ReverseSaleButton } from './ReverseSaleButton';
 export const metadata: Metadata = { title: 'Vendite' };
 
 const STATUS_CFG: Record<SaleStatus, { variant: BadgeVariant; label: string }> = {
-  processed: { variant: 'success', label: 'Dedotto' },
+  processed: { variant: 'success', label: 'Scalato' },
   partially_linked: { variant: 'warning', label: 'Parziale' },
-  unlinked: { variant: 'danger', label: 'Non dedotto' },
+  unlinked: { variant: 'danger', label: 'Da collegare' },
   reversed: { variant: 'neutral', label: 'Stornato' },
   void: { variant: 'neutral', label: 'Annullato' },
 };

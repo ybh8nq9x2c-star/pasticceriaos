@@ -36,6 +36,12 @@ export async function getIngredientRequirements(
   return repo.listIngredientRequirements(orgId, planId);
 }
 
+/** Conteggi per la checklist di attivazione giorno-1 (sola lettura, head-only). */
+export async function getActivationSnapshot(): Promise<repo.ActivationCountsRow> {
+  const orgId = await requireOrgId();
+  return repo.getActivationCounts(orgId);
+}
+
 export async function getInventoryStockFull(): Promise<InventoryStockFull[]> {
   const orgId = await requireOrgId();
   return repo.listInventoryStockFull(orgId);

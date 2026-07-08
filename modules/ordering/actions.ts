@@ -68,6 +68,40 @@ export async function createDraftsFromShortageAction(planId: string): Promise<Ac
   }
 }
 
+/** P1-A — bozze per fornitore dalle scorte sotto soglia (dal magazzino). */
+export async function createDraftsFromLowStockAction(): Promise<ActionState> {
+  try {
+    const result = await service.createDraftOrdersFromLowStock();
+    revalidatePath('/orders');
+    revalidatePath('/inventory');
+
+    const created = result.createdOrderIds.length;
+    const skipped = result.skippedIngredients.length;
+
+    if (created === 0) {
+      return {
+        status: 'error',
+        error:
+          skipped > 0
+            ? `Nessuna bozza creata: ${skipped} ingredient${skipped === 1 ? 'e è' : 'i sono'} senza fornitore ` +
+              `(${result.skippedIngredients.join(', ')}). Assegna un fornitore e riprova.`
+            : 'Nessuna bozza creata: le scorte sotto soglia sono già coperte.',
+      };
+    }
+
+    const skippedNote =
+      skipped > 0
+        ? ` Attenzione: ${skipped} ingredienti senza fornitore esclusi (${result.skippedIngredients.join(', ')}).`
+        : '';
+    return {
+      status: 'success',
+      message: `${created} bozz${created === 1 ? 'a' : 'e'} ordine create, una per fornitore.${skippedNote}`,
+    };
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+}
+
 export async function updateOrderAction(
   id: string,
   _prev: ActionState,

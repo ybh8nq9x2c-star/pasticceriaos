@@ -8,14 +8,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getInventoryStockFull } from '@/modules/reporting/service';
 import { UNIT_LABELS, formatCurrency } from '@/lib/utils';
-import { buildBulkOrderHref } from '@/lib/priority-tasks';
 import type { InventoryStockFull } from '@/modules/reporting/types';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Badge } from '@/components/ui/Badge';
 import { StickyActionBar } from '@/components/ui/StickyActionBar';
+import { BulkDraftOrdersButton } from '@/components/inventory/BulkDraftOrdersButton';
 import { STOCK_STATUS_BADGE } from '@/lib/status';
-import { Warehouse, Factory, AlertTriangle, ShoppingCart } from 'lucide-react';
+import { Warehouse, Factory, AlertTriangle } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Magazzino' };
 
@@ -117,6 +117,12 @@ function MobileStockCard({ lv }: { lv: InventoryStockFull }) {
           <> · <span className="font-mono">{formatCurrency(lv.unitPrice)}/{UNIT_LABELS[lv.unit]}</span></>
         )}
       </p>
+      {negative && (
+        <p className="text-xs text-ink-muted">
+          Sotto zero = registrato piu' consumo che carichi: di solito manca un ricevimento o un
+          conteggio vecchio. Conta e rettifica qui sotto.
+        </p>
+      )}
       <Link
         href={action.href}
         className={
@@ -165,12 +171,6 @@ export default async function InventoryPage({
   const showCritici = vista === undefined || vista === 'critici' || vista === 'tutti';
   const showAttenzione = vista === undefined || vista === 'attenzione' || vista === 'tutti';
   const showOk = vista === 'tutti';
-  // "Ordina tutti i mancanti": bozza prefillata con gli alert ordinabili (link
-  // centralizzato in lib/priority-tasks, stesso della dashboard).
-  const bulkOrderHref = buildBulkOrderHref(
-    alertItems.map((l) => ({ ingredientProductId: l.ingredientProductId, suggestedQty: suggestedReorderQty(l) })),
-  );
-
   const chips = [
     { key: 'critici',    label: 'Critici',    count: criticiItems.length,    active: showCritici && vista !== 'tutti' },
     { key: 'attenzione', label: 'Attenzione', count: attenzioneItems.length, active: showAttenzione && vista !== 'tutti' },
@@ -333,16 +333,11 @@ export default async function InventoryPage({
             )
           )}
 
-          {/* Quick action sticky: risolvi TUTTE le mancanze in un tap. */}
+          {/* Quick action sticky (P1-A): bozze REALI per fornitore in un tap,
+              come dal piano produzione — non piu' un form monofornitore. */}
           {alertItems.length > 0 && (
             <StickyActionBar>
-              <Link
-                href={bulkOrderHref}
-                className="flex items-center justify-center gap-2 h-12 w-full rounded-xl bg-primary text-primary-fg text-sm font-semibold hover:bg-primary-hover transition-colors"
-              >
-                <ShoppingCart size={16} aria-hidden="true" />
-                Ordina tutti i mancanti ({alertItems.length})
-              </Link>
+              <BulkDraftOrdersButton alertCount={alertItems.length} />
             </StickyActionBar>
           )}
         </div>

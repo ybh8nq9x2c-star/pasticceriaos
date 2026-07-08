@@ -1,7 +1,7 @@
 // =============================================================================
 // modules/pos/ingest.ts
 // Ingest di un evento POS: alimenta il MOTORE VENDITE esistente (ingestSaleAsSystem
-// → ingest_sale_system), che mantiene tutti gli invarianti (BOM, idempotenza,
+// → ingest_sale_system), che mantiene tutti gli invarianti (deduzione FINITI, idempotenza,
 // storno append-only, unlinked≠errore). Qui solo: ledger pos_events (idempotenza
 // primaria), risoluzione mapping per le porzioni, e instradamento sale/void.
 // =============================================================================
@@ -12,9 +12,9 @@ import * as salesService from '@/modules/sales/service';
 import type { CanonicalSale } from '@/modules/sales/types';
 import type { SalesDb } from '@/modules/sales/repository';
 import { posSource, type IncomingSale } from './adapter';
+import { normalizePosRef } from './normalize';
 import * as repo from './repository';
 
-const norm = (s: string) => s.trim().toLowerCase();
 
 export interface IngestResult {
   status: 'created' | 'duplicate' | 'reversed' | 'error';
@@ -41,7 +41,7 @@ export function buildCanonicalSale(
     customerId: null,
     notes: null,
     lines: incoming.lines.map((l, i) => {
-      const m = mappings.get(norm(l.pos_item_id));
+      const m = mappings.get(normalizePosRef(l.pos_item_id));
       if (!m) unlinked.push(l.pos_item_id); // nessun mapping → non collegato (riga registrata comunque)
       const portions = m?.portionsPerUnit ?? 1;
       return {
@@ -82,11 +82,11 @@ export async function ingestPosEvent(orgId: string, incoming: IncomingSale, clie
     if (incoming.is_reversal) {
       const saleId = await salesService.findSaleIdForExternal(orgId, source, incoming.external_receipt_id, client);
       if (!saleId) {
-        await repo.markFailed(client, event.id, 'Storno: vendita originale non trovata per questo scontrino.');
+        await repo.markFailed(client, orgId, event.id, 'Storno: vendita originale non trovata per questo scontrino.');
         return { status: 'error' };
       }
       await salesService.reverseSaleAsSystem(orgId, saleId, client);
-      await repo.markReversed(client, event.id, saleId);
+      await repo.markReversed(client, orgId, event.id, saleId);
       return { status: 'reversed', saleId };
     }
 
@@ -95,12 +95,13 @@ export async function ingestPosEvent(orgId: string, incoming: IncomingSale, clie
     const mappings = await repo.loadMappings(client, orgId, source, incoming.lines.map((l) => l.pos_item_id));
     const { canonical, unlinked } = buildCanonicalSale(incoming, mappings);
 
-    // 4) MOTORE esistente: risoluzione + esplosione BOM + scrittura atomica idempotente.
+    // 4) MOTORE esistente: risoluzione ricetta + scrittura atomica idempotente
+    //    (dominio 050: la vendita scala i PRODOTTI FINITI, mai le materie prime).
     const summary = await salesService.ingestSaleAsSystem(orgId, canonical, client);
-    await repo.markProcessed(client, event.id, summary.saleId, unlinked);
+    await repo.markProcessed(client, orgId, event.id, summary.saleId, unlinked);
     return { status: 'created', saleId: summary.saleId, unlinked: unlinked.length ? unlinked : undefined };
   } catch (err) {
-    await repo.markFailed(client, event.id, getErrorMessage(err));
+    await repo.markFailed(client, orgId, event.id, getErrorMessage(err));
     return { status: 'error' };
   }
 }

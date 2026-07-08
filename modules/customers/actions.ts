@@ -49,3 +49,21 @@ export async function changeCustomerOrderStatusAction(
   revalidatePath('/dashboard');
   return { status: 'success', message: 'Stato aggiornato.' };
 }
+
+/**
+ * P0-C — "Consegnato" chiude il ritiro E propone subito la vendita.
+ * Segna delivered (stessa validazione di sempre) poi porta al form vendita
+ * PRECOMPILATO dalle righe della prenotazione: il banco scala solo quando
+ * l'operatore conferma la vendita — mai stock implicito, tutto auditabile
+ * (la vendita nasce dal form, con nota che cita l'ordine).
+ */
+export async function deliverAndProposeSaleAction(orderId: string): Promise<ActionState> {
+  try {
+    await service.changeCustomerOrderStatus(orderId, { status: 'delivered' });
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+  revalidatePath('/customers');
+  revalidatePath('/dashboard');
+  redirect(`/sales/new?ordine=${orderId}`);
+}

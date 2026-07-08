@@ -99,6 +99,14 @@ export async function createReceipt(raw: unknown): Promise<string> {
   let status: ReceiptStatus = 'draft';
   let lines: Database['public']['Tables']['purchase_receipt_lines']['Insert'][] = [];
 
+  // P1-B: se per QUESTO ordine c'è già un ricevimento aperto, riusalo — mai
+  // doppioni da "Nuovo" premuto al posto di "riprendi" (stessa semantica di
+  // receiveOrderInFull).
+  if (input.purchaseOrderId) {
+    const existing = await repo.findOpenReceiptIdForOrder(orgId, input.purchaseOrderId);
+    if (existing) return existing;
+  }
+
   // Ricevimento ATTESO da ordine esistente: precompila le righe dall'ordine.
   if (input.purchaseOrderId) {
     const supabase = await createClient<Database>();
@@ -403,6 +411,19 @@ export async function addManualLine(raw: unknown): Promise<string> {
   if (receipt.organization_id !== orgId) throw new NotFoundError('Ricevimento');
   assertOpen(receipt.status);
 
+  // P1-E: l'incompatibilità di unità emerge QUANDO la riga nasce, non al
+  // completamento (quando il corriere è già andato via).
+  if (input.productId) {
+    const catalog = await repo.listCatalogRefs(orgId);
+    const product = catalog.find((p) => p.id === input.productId);
+    if (product && unitConversionFactor(input.unit, product.unit) === null) {
+      throw new BusinessRuleError(
+        `Unità incompatibili: "${product.name}" è a magazzino in ${product.unit}, la riga è in ${input.unit}. ` +
+        `Usa ${product.unit} (o un'unità convertibile) per questa riga.`,
+      );
+    }
+  }
+
   const detail = await repo.getReceiptDetail(input.receiptId);
   return repo.insertLine({
     receipt_id: input.receiptId,
@@ -646,6 +667,22 @@ export async function receiveOrderInFull(orderId: string): Promise<ReceiptStatus
     purchaseOrderId: orderId,
   });
   return receiveAllAndComplete(receiptId);
+}
+
+/**
+ * P1-B — pulizia liste: i draft VUOTI (zero righe) più vecchi di 7 giorni
+ * vengono archiviati (status 'cancelled': nessun ledger toccato, sono gusci).
+ * Best-effort e idempotente: la chiama l'indice ricevimenti al caricamento.
+ */
+export async function archiveStaleDraftReceipts(maxAgeDays = 7): Promise<number> {
+  const orgId = await requireOrgId();
+  const drafts = await repo.listReceipts(orgId, { status: ['draft'] });
+  const cutoff = Date.now() - maxAgeDays * 24 * 3600_000;
+  const stale = drafts.filter((r) => r.linesCount === 0 && new Date(r.createdAt).getTime() < cutoff);
+  for (const r of stale) {
+    await repo.patchReceipt(r.id, { status: 'cancelled' });
+  }
+  return stale.length;
 }
 
 export async function cancelReceipt(id: string): Promise<void> {

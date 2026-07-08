@@ -28,6 +28,44 @@ const num = (v: unknown): number => (v === null || v === undefined ? 0 : Number(
 const numOrNull = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
 
 // ---------------------------------------------------------------------------
+// Attivazione giorno-1: conteggi head-only per la checklist dashboard.
+// ---------------------------------------------------------------------------
+
+export interface ActivationCountsRow {
+  ingredients: number;
+  ingredientsWithThreshold: number;
+  ingredientsWithPrice: number;
+  recipes: number;
+  completedReceipts: number;
+  completedPlans: number;
+}
+
+export async function getActivationCounts(orgId: string): Promise<ActivationCountsRow> {
+  const supabase = await createClient();
+  const head = { count: 'exact' as const, head: true };
+
+  const [ing, thr, price, rec, receipts, plans] = await Promise.all([
+    supabase.from('ingredient_products').select('id', head).eq('organization_id', orgId).eq('is_active', true),
+    supabase.from('inventory_levels').select('id', head).eq('organization_id', orgId).gt('min_threshold', 0),
+    supabase.from('ingredient_products').select('id', head).eq('organization_id', orgId).gt('unit_price', 0),
+    supabase.from('recipes').select('id', head).eq('organization_id', orgId).eq('is_active', true),
+    supabase.from('purchase_receipts').select('id', head).eq('organization_id', orgId).eq('status', 'completed'),
+    supabase.from('production_plans').select('id', head).eq('organization_id', orgId).eq('status', 'completed'),
+  ]);
+  for (const r of [ing, thr, price, rec, receipts, plans]) {
+    if (r.error) throw mapSupabaseError(r.error);
+  }
+  return {
+    ingredients: ing.count ?? 0,
+    ingredientsWithThreshold: thr.count ?? 0,
+    ingredientsWithPrice: price.count ?? 0,
+    recipes: rec.count ?? 0,
+    completedReceipts: receipts.count ?? 0,
+    completedPlans: plans.count ?? 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Fabbisogno ingredienti per piano
 // ---------------------------------------------------------------------------
 

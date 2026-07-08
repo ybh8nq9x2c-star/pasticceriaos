@@ -16,8 +16,8 @@ import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 export const metadata: Metadata = { title: 'Dettaglio vendita' };
 
 const LINE_CFG: Record<SaleLineStatus, { variant: BadgeVariant; label: string }> = {
-  deducted: { variant: 'success', label: 'Dedotto' },
-  unlinked: { variant: 'danger', label: 'Non collegato' },
+  deducted: { variant: 'success', label: 'Scalato' },
+  unlinked: { variant: 'danger', label: 'Da collegare' },
   no_bom: { variant: 'warning', label: 'Senza ricetta' },
   unit_mismatch: { variant: 'warning', label: 'Unità incompatibile' },
 };

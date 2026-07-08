@@ -31,6 +31,25 @@ describe('unitConversionFactor', () => {
   });
 });
 
+describe('parità TS↔SQL (P0-H): matrice ESAUSTIVA 7×7', () => {
+  // Specchio letterale di unit_conversion_factor (migration 021): se questa
+  // tabella cambia, DEVE cambiare prima l'SQL — il test blocca il drift.
+  const UNITS = ['g', 'kg', 'ml', 'l', 'pz', 'bustina', 'foglio'] as const;
+  const SQL_TABLE: Record<string, number> = {
+    'g→kg': 0.001, 'kg→g': 1000, 'ml→l': 0.001, 'l→ml': 1000,
+  };
+
+  it('ogni coppia: identità=1, coppie SQL=fattore, tutto il resto=null', () => {
+    for (const from of UNITS) {
+      for (const to of UNITS) {
+        const got = unitConversionFactor(from, to);
+        const expected = from === to ? 1 : SQL_TABLE[`${from}→${to}`] ?? null;
+        expect(got, `${from}→${to}`).toBe(expected);
+      }
+    }
+  });
+});
+
 describe('convertQty', () => {
   it('caso audit: DDT "25 kg" su prodotto in grammi → 25000 g, non 25 g', () => {
     expect(convertQty(25, 'kg', 'g')).toBe(25000);

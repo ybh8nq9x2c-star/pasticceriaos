@@ -65,7 +65,7 @@ describe('ingestPosEvent', () => {
     expect(r.unlinked).toBeUndefined();
     const passed = vi.mocked(sales.ingestSaleAsSystem).mock.calls[0][1];
     expect(passed.lines[1].quantity).toBe(8); // torta scalata
-    expect(repo.markProcessed).toHaveBeenCalledWith(client, 'E1', 'SALE-1', []);
+    expect(repo.markProcessed).toHaveBeenCalledWith(client, 'ORG', 'E1', 'SALE-1', []);
   });
 
   it('alcune righe non collegate → vendita registrata + unlinked, nessun crash', async () => {
@@ -78,7 +78,7 @@ describe('ingestPosEvent', () => {
     const r = await ingestPosEvent('ORG', baseSale, client);
     expect(r.status).toBe('created');
     expect(r.unlinked).toEqual(['PLU-2']);
-    expect(repo.markProcessed).toHaveBeenCalledWith(client, 'E1', 'SALE-1', ['PLU-2']);
+    expect(repo.markProcessed).toHaveBeenCalledWith(client, 'ORG', 'E1', 'SALE-1', ['PLU-2']);
   });
 
   it('evento void → reverse_sale, status reversed', async () => {
@@ -90,7 +90,7 @@ describe('ingestPosEvent', () => {
     expect(r.status).toBe('reversed');
     expect(r.saleId).toBe('SALE-1');
     expect(sales.reverseSaleAsSystem).toHaveBeenCalledWith('ORG', 'SALE-1', client);
-    expect(repo.markReversed).toHaveBeenCalledWith(client, 'E1', 'SALE-1');
+    expect(repo.markReversed).toHaveBeenCalledWith(client, 'ORG', 'E1', 'SALE-1');
     expect(sales.ingestSaleAsSystem).not.toHaveBeenCalled();
   });
 

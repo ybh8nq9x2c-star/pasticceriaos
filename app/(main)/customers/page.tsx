@@ -7,7 +7,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { listCustomerOrders } from '@/modules/customers/service';
 import { CUSTOMER_ORDER_STATUS_LABELS, CUSTOMER_ORDER_TRANSITIONS } from '@/modules/customers/types';
-import { changeCustomerOrderStatusAction } from '@/modules/customers/actions';
+import { changeCustomerOrderStatusAction, deliverAndProposeSaleAction } from '@/modules/customers/actions';
 import { formatCurrency, IDLE_STATE } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Badge } from '@/components/ui/Badge';
@@ -26,6 +26,26 @@ function fmtDate(iso: string) {
 function AdvanceButton({ orderId, status }: { orderId: string; status: CustomerOrderStatus }) {
   const next = CUSTOMER_ORDER_TRANSITIONS[status].find((s) => s !== 'cancelled');
   if (!next) return null;
+
+  // P0-C: il ritiro NON finisce con "Consegnato" — la torta va anche scalata
+  // dal banco. Il bottone dice entrambe le cose e porta alla vendita
+  // precompilata (annullabile: il "consegnato" resta, la vendita no).
+  if (next === 'delivered') {
+    async function handleDeliver(): Promise<void> {
+      'use server';
+      await deliverAndProposeSaleAction(orderId);
+    }
+    return (
+      <form action={handleDeliver}>
+        <button
+          type="submit"
+          className="px-3 py-1.5 bg-primary text-primary-fg rounded-lg text-xs font-semibold hover:bg-primary-hover whitespace-nowrap"
+        >
+          → Consegnato · registra vendita
+        </button>
+      </form>
+    );
+  }
 
   async function handleAdvance(formData: FormData): Promise<void> {
     'use server';

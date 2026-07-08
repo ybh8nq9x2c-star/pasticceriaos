@@ -25,6 +25,14 @@ interface LineRow {
   unitPrice: string;
 }
 
+/** Riga di prefill (P0-C: vendita proposta dal ritiro di un ordine cliente). */
+export interface InitialSaleLine {
+  externalProductRef: string;
+  recipeId: string;
+  quantity: string;
+  unitPrice: string;
+}
+
 let keyCounter = 0;
 const newLine = (): LineRow => ({
   key: ++keyCounter, externalProductRef: '', recipeId: '', quantity: '1', unitPrice: '',
@@ -41,9 +49,21 @@ const defaultSaleId = () => {
   return `SC-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 };
 
-export function RecordSaleForm({ recipes }: { recipes: { id: string; name: string }[] }) {
+export function RecordSaleForm({
+  recipes,
+  initialLines,
+  contextBanner,
+}: {
+  recipes: { id: string; name: string }[];
+  initialLines?: InitialSaleLine[];
+  contextBanner?: string;
+}) {
   const [state, formAction] = useFormState(recordSaleAction, IDLE_STATE);
-  const [lines, setLines] = useState<LineRow[]>([newLine()]);
+  const [lines, setLines] = useState<LineRow[]>(() =>
+    initialLines && initialLines.length > 0
+      ? initialLines.map((l) => ({ key: ++keyCounter, ...l }))
+      : [newLine()],
+  );
 
   function update(key: number, field: keyof LineRow, value: string) {
     setLines((prev) =>
@@ -95,6 +115,13 @@ export function RecordSaleForm({ recipes }: { recipes: { id: string; name: strin
           Alla conferma, i prodotti finiti vengono scalati automaticamente (le materie prime si consumano in produzione).
         </p>
       </div>
+
+      {/* P0-C: contesto del ritiro — dice cosa succede confermando e come uscirne. */}
+      {contextBanner && (
+        <div role="status" className="mb-4 rounded-xl bg-primary-light border border-primary-soft p-3 text-sm text-ink">
+          🎂 {contextBanner}
+        </div>
+      )}
 
       {state.status === 'success' && (
         <div className="mb-4 rounded-xl bg-success-light border border-success-soft p-3 text-sm text-success-strong">

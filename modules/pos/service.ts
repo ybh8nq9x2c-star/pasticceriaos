@@ -13,6 +13,7 @@ import { suggestProducts, type CatalogProductRef } from '@/modules/goods-receipt
 import type { UnlinkedProduct } from '@/modules/sales/types';
 import { savePosConfigSchema, upsertPosMappingSchema } from './schemas';
 import { derivePosCta, type PosCta, type PosHealthSnapshot } from './status';
+import { normalizePosRef as norm } from './normalize';
 import { getPosAdapter, posSource, type IncomingSale } from './adapter';
 import { buildCanonicalSale } from './ingest';
 import { loadMappings } from './repository';
@@ -22,7 +23,6 @@ import * as salesService from '@/modules/sales/service';
 import * as salesRepo from '@/modules/sales/repository';
 import type { Json } from '@/lib/database.types';
 
-const norm = (s: string) => s.trim().toLowerCase();
 
 export interface PosMappingView {
   id: string;
@@ -513,6 +513,62 @@ export async function replayPosEvent(eventId: string): Promise<PosReplayResult> 
   }
 
   return { status: 'nothing_to_do' };
+}
+
+// ── Auto-relink post-mapping (P0-D) ──────────────────────────────────────────
+// Prima: mappavi il prodotto e dovevi RICORDARTI di andare nell'inbox a
+// premere "Riprova". Ora, salvata una mappatura, gli eventi già elaborati che
+// hanno quello SKU tra i non collegati vengono rielaborati QUI, riusando il
+// replay idempotente (scope stretto: solo processed+unlinked con quel ref,
+// mai eventi failed — quelli restano decisione umana nell'inbox).
+
+export interface AutoRelinkResult {
+  scanned: number;
+  /** RIGHE di scontrini ricollegate e scalate (non "vendite": un evento può averne più d'una). */
+  relinked: number;
+  failures: number;
+  /** Eventi FAILED dell'org, ESCLUSI dal relink by design: restano lavoro umano nell'inbox. */
+  failedRemaining: number;
+}
+
+export async function relinkEventsForRef(source: string, posItemId: string): Promise<AutoRelinkResult> {
+  const session = await requirePosWriter();
+  const supabase = await createClient();
+  const ref = norm(posItemId);
+  const provider = source.startsWith('pos:') ? source.slice(4) : source;
+
+  const [{ data, error }, failedRes] = await Promise.all([
+    supabase
+      .from('pos_events')
+      .select('id')
+      .eq('organization_id', session.organizationId)
+      .eq('provider', provider)
+      .eq('status', 'processed')
+      .contains('unlinked', JSON.stringify([ref]))
+      .order('received_at', { ascending: false })
+      .limit(25),
+    supabase
+      .from('pos_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', session.organizationId)
+      .eq('provider', provider)
+      .eq('status', 'failed'),
+  ]);
+  if (error) throw mapSupabaseError(error);
+  if (failedRes.error) throw mapSupabaseError(failedRes.error);
+
+  let relinked = 0;
+  let failures = 0;
+  for (const e of data ?? []) {
+    try {
+      const res = await replayPosEvent(e.id as string);
+      if (res.status === 'relinked') relinked += res.relinkedCount ?? 0;
+    } catch (err) {
+      failures += 1;
+      console.error('[pos] auto-relink fallito', { eventId: e.id, ref, error: (err as Error).message });
+    }
+  }
+  return { scanned: data?.length ?? 0, relinked, failures, failedRemaining: failedRes.count ?? 0 };
 }
 
 // ── Riconciliazione giornaliera (POS vs BakeryOS) ─────────────────────────────

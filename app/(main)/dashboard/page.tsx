@@ -25,7 +25,13 @@ import {
   getRecipeCosts,
   getIngredientPurchaseStats,
   getTodayFinishedGoodsTheoreticalSummary,
+  getActivationSnapshot,
 } from '@/modules/reporting/service';
+import { getPosConfig, getPosHealth } from '@/modules/pos/service';
+import { buildCloseDaySteps } from '@/lib/close-day';
+import { buildActivationTasks } from '@/lib/activation';
+import { CloseDayCard } from '@/components/dashboard/CloseDayCard';
+import { ActivationChecklist } from '@/components/dashboard/ActivationChecklist';
 import type { DashboardSummary } from '@/modules/reporting/types';
 import { getLowStockAlerts, getExpiringBatches } from '@/modules/inventory/service';
 import { listReceipts } from '@/modules/goods-receipts/service';
@@ -92,6 +98,9 @@ export default async function TodayPage() {
     listReceipts({ status: ['draft', 'expected', 'partial'] }),
     listPlans(),
     getTodayFinishedGoodsTheoreticalSummary(5),
+    getPosHealth('mipos'),
+    getActivationSnapshot(),
+    getPosConfig('mipos'),
   ]);
   const val = <T,>(r: PromiseSettledResult<T>, fb: T): T => (r.status === 'fulfilled' ? r.value : fb);
   const emptySummary: DashboardSummary = {
@@ -109,10 +118,52 @@ export default async function TodayPage() {
   const openReceiptsRaw = val(results[8] as PromiseSettledResult<Awaited<ReturnType<typeof listReceipts>>>, []);
   const allPlans = val(results[9] as PromiseSettledResult<Awaited<ReturnType<typeof listPlans>>>, []);
   const finishedGoods = val(results[10] as PromiseSettledResult<Awaited<ReturnType<typeof getTodayFinishedGoodsTheoreticalSummary>>>, []);
+  const posHealth = results[11].status === 'fulfilled'
+    ? (results[11].value as Awaited<ReturnType<typeof getPosHealth>>)
+    : null;
+  const activation = results[12].status === 'fulfilled'
+    ? (results[12].value as Awaited<ReturnType<typeof getActivationSnapshot>>)
+    : null;
+  const posConfig = results[13].status === 'fulfilled'
+    ? (results[13].value as Awaited<ReturnType<typeof getPosConfig>>)
+    : null;
   const dataDegraded = results.some((r) => r.status === 'rejected');
 
   // Piani passati non confermati (stato derivato, niente auto-completamento).
   const pendingPlans = allPlans.filter((p) => isPendingConfirmation(p.planDate, p.status));
+
+  // ── CHIUDI LA GIORNATA (P0-A): i 4 passi serali in un posto solo ────────────
+  // Ora locale della pasticceria (Europe/Rome): decide se il rito serale include
+  // anche il piano di OGGI e l'invenduto. Logica pura testata in lib/close-day.
+  const romeHour = Number(
+    new Intl.DateTimeFormat('it-IT', { hour: 'numeric', hour12: false, timeZone: 'Europe/Rome' })
+      .format(new Date()),
+  );
+  const openPlansForClose = allPlans
+    .filter((p) => p.status !== 'completed' && p.status !== 'cancelled' && p.planDate <= today)
+    .map((p) => ({ id: p.id, planDate: p.planDate }));
+  const closeDaySteps = buildCloseDaySteps({
+    pendingPlans: openPlansForClose,
+    leftoverProducts: finishedGoods
+      .filter((g) => g.remainingTheoretical > 0)
+      .map((g) => ({ name: g.productName, remaining: g.remainingTheoretical })),
+    openReceipts: openReceiptsRaw
+      .filter((r) => r.linesCount > 0)
+      .map((r) => ({ id: r.id, supplierName: r.supplierName })),
+    posFailed: posHealth?.failedCount ?? 0,
+    posUnmapped: posHealth?.unmappedCount ?? 0,
+    hour: romeHour,
+    today,
+  });
+
+  // ── ATTIVAZIONE GIORNO-1 (P0-E): sparisce da sola al 100% ───────────────────
+  const activationView = activation
+    ? buildActivationTasks({
+        ...activation,
+        posReady: posHealth?.readyForLive ?? false,
+        posConfigured: posConfig !== null,
+      })
+    : null;
 
   // Fabbisogno del piano di oggi (se esiste): copertura stock reale. Isolato: un
   // suo errore non deve togliere il resto della dashboard.
@@ -373,6 +424,12 @@ export default async function TodayPage() {
           Riprova tra poco — il resto della dashboard è aggiornato.
         </div>
       )}
+
+      {/* ── ATTIVAZIONE GIORNO-1 (P0-E): visibile solo finché incompleta ───── */}
+      {activationView && <ActivationChecklist tasks={activationView.tasks} pct={activationView.pct} />}
+
+      {/* ── CHIUDI LA GIORNATA (P0-A): il rito serale in un posto solo ─────── */}
+      <CloseDayCard steps={closeDaySteps} />
 
       {/* ── 0 · DA FARE ADESSO (mobile): max 2 task, un tap ciascuno ───────── */}
       {priorityTasks.length > 0 && (
@@ -659,7 +716,7 @@ export default async function TodayPage() {
       </div>
 
       {/* Rimanenze teoriche di oggi (FASE 1 — derivata da produzione confermata e vendite). */}
-      <div className="bg-surface-2 rounded-2xl border border-border overflow-hidden">
+      <div id="rimanenze" className="bg-surface-2 rounded-2xl border border-border overflow-hidden scroll-mt-4">
         <div className="flex items-center justify-between px-5 py-4 border-b border-divider">
           <div className="min-w-0">
             <h2 className="font-semibold text-[15px] text-ink">Rimanenze teoriche di oggi</h2>
@@ -699,6 +756,19 @@ export default async function TodayPage() {
                     productName={g.productName}
                     suggestedQty={g.remainingTheoretical}
                   />
+                )}
+                {/* P1-C: il rosso spiegato DOVE compare, con le 2 cause probabili. */}
+                {g.remainingTheoretical < 0 && (
+                  <p className="basis-full text-xs text-ink-muted">
+                    Venduto più di quanto risulta prodotto: o manca una{' '}
+                    <Link href="/production/quick" className="text-primary font-semibold hover:underline">
+                      produzione da registrare
+                    </Link>{' '}
+                    o un prodotto della cassa è{' '}
+                    <Link href="/sales/pos#mappatura" className="text-primary font-semibold hover:underline">
+                      collegato alla ricetta sbagliata
+                    </Link>.
+                  </p>
                 )}
               </div>
             ))}

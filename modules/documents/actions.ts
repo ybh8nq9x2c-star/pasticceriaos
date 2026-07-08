@@ -53,12 +53,17 @@ export async function runMatchingAction(
     revalidatePath(`/documents/${documentId}`);
     revalidatePath('/documents');
     revalidatePath('/dashboard');
+    // P1-F: mostra il VALORE prodotto dalla verifica, non solo lo stato.
+    const priceNote =
+      result.pricesUpdated > 0
+        ? ` Prezzi d'acquisto aggiornati per ${result.pricesUpdated} ingredient${result.pricesUpdated === 1 ? 'e' : 'i'}: il food cost ora usa i prezzi veri.`
+        : '';
     return {
       status: 'success',
       message:
         result.status === 'matched'
-          ? 'Documento verificato: nessuna anomalia.'
-          : `Matching eseguito: ${result.anomaliesCount} anomalie rilevate.`,
+          ? `Documento verificato: nessuna anomalia.${priceNote}`
+          : `Verifica eseguita: ${result.anomaliesCount} differenze da controllare.`,
     };
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };

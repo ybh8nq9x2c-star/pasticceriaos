@@ -10,10 +10,12 @@ import { formField, type ActionState } from '@/lib/utils';
 import * as service from './service';
 
 export async function upsertPosMappingAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const source = formField(formData, 'source') || 'pos:mipos';
+  const posItemId = formField(formData, 'posItemId');
   try {
     await service.upsertPosMapping({
-      source: formField(formData, 'source') || 'pos:mipos',
-      posItemId: formField(formData, 'posItemId'),
+      source,
+      posItemId,
       posItemName: formField(formData, 'posItemName'),
       recipeId: formField(formData, 'recipeId'),
       portionsPerUnit: formField(formData, 'portionsPerUnit') || '1',
@@ -21,9 +23,33 @@ export async function upsertPosMappingAction(_prev: ActionState, formData: FormD
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };
   }
+
+  // P0-D: chiudi il cerchio QUI — gli scontrini passati con questo prodotto si
+  // ricollegano da soli (replay idempotente). VERITÀ COMPLETA nel messaggio:
+  // cosa è stato recuperato (righe, non "vendite") E cosa resta lavoro umano
+  // (gli eventi falliti non vengono MAI toccati dall'automatismo).
+  let suffix = '';
+  if (posItemId) {
+    try {
+      const r = await service.relinkEventsForRef(source, posItemId);
+      if (r.relinked > 0) {
+        suffix = ` ${r.relinked} rig${r.relinked === 1 ? 'a di scontrini passati è stata scalata' : 'he di scontrini passati sono state scalate'} dal banco.`;
+      } else if (r.failures > 0) {
+        suffix = ' Alcuni scontrini passati non si sono ricollegati: riprovali dall\'inbox.';
+      }
+      if (r.failedRemaining > 0) {
+        suffix += ` Restano ${r.failedRemaining} scontrin${r.failedRemaining === 1 ? 'o fallito' : 'i falliti'} nell'inbox: quelli vanno riprovati a mano.`;
+      }
+    } catch (err) {
+      console.error('[pos] auto-relink post-mapping fallito', err);
+      suffix = ' Le vendite passate si ricollegano dall\'inbox con "Riprova".';
+    }
+  }
+
   revalidatePath('/sales/pos');
   revalidatePath('/sales');
-  return { status: 'success', message: 'Mappatura salvata.' };
+  revalidatePath('/sales/inbox');
+  return { status: 'success', message: `Prodotto collegato.${suffix}` };
 }
 
 /** Salva la config POS (store/merchant) dal wizard /sales/pos. */

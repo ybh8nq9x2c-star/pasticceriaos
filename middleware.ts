@@ -15,6 +15,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
+import { gateWorkspace } from '@/lib/workspace-gate';
 
 const PUBLIC_ROUTES = ['/login', '/signup', '/auth/callback', '/auth/confirm', '/auth/error'];
 const SEMI_AUTH_ROUTES = ['/onboarding'];
@@ -43,7 +44,6 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute   = PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + '/'));
   const isSemiAuthRoute = SEMI_AUTH_ROUTES.some((r) => pathname === r || pathname.startsWith(r + '/'));
   const isUnauthorized  = pathname === '/unauthorized';
-  const isSupplierRoute = pathname === SUPPLIER_PREFIX || pathname.startsWith(SUPPLIER_PREFIX + '/');
 
   // ── Unauthenticated ─────────────────────────────────────────────────────────
   if (!user) {
@@ -105,15 +105,16 @@ export async function middleware(request: NextRequest) {
 
   if (isUnauthorized) return supabaseResponse;
 
-  // ── Workspace gating ────────────────────────────────────────────────────────
-  // Redirect role-based SOLO se il tipo è stato risolto con certezza: con
-  // accountTypeKnown=false si passa oltre e decidono i layout guard (nessun
-  // 500, nessun redirect loop, nessun leak — il fetch dati è dopo i guard).
-  if (accountTypeKnown && accountType === 'supplier' && !isSupplierRoute) {
-    return NextResponse.redirect(new URL(SUPPLIER_PREFIX, request.url));
-  }
-  if (accountTypeKnown && accountType !== 'supplier' && isSupplierRoute) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+  // ── Workspace gating (P0-F: decisione pura + degradazione asimmetrica) ─────
+  // Logica in lib/workspace-gate.ts (unit-testata sui failure mode). Con tipo
+  // NON risolto: le rotte bakery passano (guard di layout fail-closed a valle),
+  // ma il perimetro /supplier NON si attraversa mai senza tipo confermato.
+  const gate = gateWorkspace({ pathname, accountType, accountTypeKnown });
+  if (gate.action === 'redirect') {
+    if (!accountTypeKnown) {
+      console.error('[middleware] gating degradato (account_type non risolto)', { pathname, to: gate.to });
+    }
+    return NextResponse.redirect(new URL(gate.to, request.url));
   }
 
   if (pathname === '/') {

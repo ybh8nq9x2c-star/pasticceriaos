@@ -9,7 +9,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getPlan } from '@/modules/production/service';
 import { getIngredientRequirements, getFinishedGoodsTheoretical } from '@/modules/reporting/service';
-import { completePlanAction, cancelPlanAction } from '@/modules/production/actions';
+import { cancelPlanAction } from '@/modules/production/actions';
+import { CompleteProductionButton } from './CompleteProductionButton';
 import { isPendingConfirmation } from '@/modules/production/status';
 import { DraftOrdersButton } from './DraftOrdersButton';
 import type { PlanStatus } from '@/modules/production/types';
@@ -76,11 +77,6 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
 
   // Inline server actions (void wrappers — PRESERVATI INVARIATI)
   const planId = plan.id;
-
-  async function handleComplete(_formData: FormData): Promise<void> {
-    'use server';
-    await completePlanAction(planId);
-  }
 
   async function handleCancel(_formData: FormData): Promise<void> {
     'use server';
@@ -379,20 +375,20 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
           )}
 
           {canComplete && (
-            <form action={handleComplete} className="hidden lg:block">
-              {/* Copy chiaro (non "Segna come completato"): l'azione scarica il magazzino.
-                  SubmitButton → disabilita + spinner (niente doppio click).
-                  Su mobile la stessa azione vive nella StickyActionBar in fondo. */}
-              <SubmitButton
-                pendingLabel="Confermo…"
-                className="w-full py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
-              >
-                ✓ Conferma produzione eseguita
-              </SubmitButton>
+            <div className="hidden lg:block">
+              {/* P0-B: ConfirmDialog con riepilogo (−ingredienti/+pezzi) prima
+                  del gesto contabile. Stessa action idempotente di sempre. */}
+              <CompleteProductionButton
+                planId={planId}
+                recipeCount={plan.items.length}
+                totalPortions={totalPortions}
+                ingredientCount={requirements.length}
+                shortageCount={shortageItems.length}
+              />
               <p className="mt-1.5 text-xs text-ink-muted text-center">
-                Scarica automaticamente dal magazzino gli ingredienti usati.
+                Scala gli ingredienti usati e mette a banco i pezzi prodotti.
               </p>
-            </form>
+            </div>
           )}
 
           {canCancel && (
@@ -412,14 +408,14 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
       {/* Mobile: CTA primaria sempre raggiungibile col pollice, sopra la tab bar */}
       {canComplete && (
         <StickyActionBar className="lg:hidden">
-          <form action={handleComplete}>
-            <SubmitButton
-              pendingLabel="Confermo…"
-              className="w-full h-12 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
-            >
-              ✓ Conferma produzione eseguita
-            </SubmitButton>
-          </form>
+          <CompleteProductionButton
+            planId={planId}
+            recipeCount={plan.items.length}
+            totalPortions={totalPortions}
+            ingredientCount={requirements.length}
+            shortageCount={shortageItems.length}
+            className="w-full h-12 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
+          />
         </StickyActionBar>
       )}
     </div>
