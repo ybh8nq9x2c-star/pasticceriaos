@@ -13,6 +13,8 @@ export interface CloseDayInput {
   leftoverProducts: { name: string; remaining: number }[];
   /** Ricevimenti ancora aperti con righe (merce fisica non a magazzino). */
   openReceipts: { id: string; supplierName: string | null }[];
+  /** Consegne marketplace NON registrate a magazzino (stessa gravità dei ricevimenti). */
+  deliveredMarketplaceOrders: { id: string; supplierName: string }[];
   /** Salute POS: eventi falliti + prodotti da collegare. */
   posFailed: number;
   posUnmapped: number;
@@ -23,7 +25,7 @@ export interface CloseDayInput {
 }
 
 export interface CloseDayStep {
-  key: 'production' | 'waste' | 'receipts' | 'pos';
+  key: 'production' | 'waste' | 'receipts' | 'marketplace' | 'pos';
   title: string;
   /** Conseguenza pratica se NON lo fai — mai gergo tecnico. */
   consequence: string;
@@ -84,6 +86,25 @@ export function buildCloseDaySteps(input: CloseDayInput): CloseDayStep[] {
       href: '/receipts?tab=open',
       cta: 'Chiudi',
       count: input.openReceipts.length,
+    });
+  }
+
+  // 3b) Consegne marketplace non registrate: stessa gravità dei ricevimenti
+  //     aperti — il fornitore ha consegnato, lo stock non lo sa ancora.
+  if (input.deliveredMarketplaceOrders.length > 0) {
+    const n = input.deliveredMarketplaceOrders.length;
+    const one = n === 1;
+    steps.push({
+      key: 'marketplace',
+      title: one
+        ? `Registra la consegna di ${input.deliveredMarketplaceOrders[0].supplierName}`
+        : `Registra ${n} consegne a magazzino`,
+      consequence: 'Il fornitore ha consegnato ma il magazzino non lo sa: giacenze e riordini sbagliano finché non registri.',
+      href: one
+        ? `/marketplace/orders/${input.deliveredMarketplaceOrders[0].id}`
+        : '/marketplace/orders',
+      cta: 'Registra',
+      count: n,
     });
   }
 

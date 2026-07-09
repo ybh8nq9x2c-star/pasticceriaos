@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { listOrders } from '@/modules/marketplace/service';
+import { listOrders, listDeliveredNotReceived } from '@/modules/marketplace/service';
 import { StatusBadge } from '@/components/marketplace/StatusBadge';
 import { formatCurrency } from '@/lib/utils';
 
@@ -9,8 +9,22 @@ function formatDateTime(iso: string | null) {
   return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+// Chip di verità accanto allo stato: "delivered" NON basta, la merce va
+// registrata a magazzino. Sparisce da solo dopo la registrazione.
+function ToRegisterChip() {
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-warning-light text-warning-strong whitespace-nowrap">
+      da registrare
+    </span>
+  );
+}
+
 export default async function CustomerOrdersPage() {
-  const orders = await listOrders();
+  const [orders, notReceived] = await Promise.all([
+    listOrders(),
+    listDeliveredNotReceived().catch(() => []),
+  ]);
+  const toRegister = new Set(notReceived.map((o) => o.orderId));
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
       <div className="flex items-center justify-between gap-3 mb-5 sm:mb-6">
@@ -34,7 +48,10 @@ export default async function CustomerOrdersPage() {
                 <Link href={`/marketplace/orders/${o.id}`} className="block bg-surface-2 rounded-2xl border border-border p-4 active:bg-surface-offset">
                   <div className="flex items-start justify-between gap-3">
                     <span className="font-semibold leading-tight">{o.counterpartyName}</span>
-                    <StatusBadge status={o.status} />
+                    <span className="flex items-center gap-1.5 shrink-0">
+                      {toRegister.has(o.id) && <ToRegisterChip />}
+                      <StatusBadge status={o.status} />
+                    </span>
                   </div>
                   <div className="mt-3 flex items-center justify-between text-sm text-ink-muted">
                     <span>{formatDateTime(o.submittedAt ?? o.createdAt)} · {o.lineCount} {o.lineCount === 1 ? 'riga' : 'righe'}</span>
@@ -56,7 +73,12 @@ export default async function CustomerOrdersPage() {
                   <tr key={o.id} className="border-t border-divider">
                     <td className="px-4 py-3 font-medium">{o.counterpartyName}</td>
                     <td className="px-4 py-3 text-xs font-mono text-ink-muted">{formatDateTime(o.submittedAt ?? o.createdAt)}</td>
-                    <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1.5">
+                        <StatusBadge status={o.status} />
+                        {toRegister.has(o.id) && <ToRegisterChip />}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-right">{o.lineCount}</td>
                     <td className="px-4 py-3 text-right">{formatCurrency(o.total)} €</td>
                     <td className="px-4 py-3 text-right"><Link href={`/marketplace/orders/${o.id}`} className="text-primary font-semibold hover:underline">Apri →</Link></td>

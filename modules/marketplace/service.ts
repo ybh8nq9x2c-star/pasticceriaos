@@ -399,6 +399,50 @@ export async function receiveMarketplaceOrderIntoInventory(orderId: string): Pro
   return data as string;
 }
 
+export interface DeliveredNotReceived {
+  orderId: string;
+  supplierName: string;
+  deliveredAt: string | null;
+}
+
+/**
+ * Ordini marketplace CONSEGNATI dal fornitore ma MAI registrati a magazzino
+ * (nessun purchase_order specchio). È merce fisicamente in casa che lo stock
+ * non conosce: la dashboard e il rito serale devono urlarlo finché non è
+ * registrata. Sola lettura, lato cliente.
+ */
+export async function listDeliveredNotReceived(): Promise<DeliveredNotReceived[]> {
+  const { orgId } = await requireCustomerSession();
+  const db = await createMarketplaceClient();
+
+  const { data: orders, error } = await db
+    .from('marketplace_orders')
+    .select('id, supplier_org_id, delivered_at')
+    .eq('customer_org_id', orgId)
+    .eq('status', 'delivered')
+    .order('delivered_at', { ascending: true })
+    .returns<{ id: string; supplier_org_id: string; delivered_at: string | null }[]>();
+  if (error) throw new AppError(error.message);
+  if (!orders || orders.length === 0) return [];
+
+  // Escludi quelli già registrati (specchio purchase_orders.marketplace_order_id).
+  const ids = orders.map((o) => o.id);
+  const [{ data: mirrors }, { data: orgs }] = await Promise.all([
+    db.from('purchase_orders').select('marketplace_order_id').in('marketplace_order_id', ids),
+    db.from('organizations').select('id, name').in('id', orders.map((o) => o.supplier_org_id)),
+  ]);
+  const received = new Set((mirrors ?? []).map((m) => m.marketplace_order_id));
+  const orgName = new Map((orgs ?? []).map((o) => [o.id, o.name]));
+
+  return orders
+    .filter((o) => !received.has(o.id))
+    .map((o) => ({
+      orderId: o.id,
+      supplierName: orgName.get(o.supplier_org_id) ?? '—',
+      deliveredAt: o.delivered_at,
+    }));
+}
+
 /**
  * Se l'ordine marketplace è già stato registrato a magazzino, ritorna l'id del
  * purchase_order locale; altrimenti null. Usato dalla UI per la CTA.

@@ -28,6 +28,7 @@ import {
   getActivationSnapshot,
 } from '@/modules/reporting/service';
 import { getPosConfig, getPosHealth } from '@/modules/pos/service';
+import { listDeliveredNotReceived } from '@/modules/marketplace/service';
 import { buildCloseDaySteps } from '@/lib/close-day';
 import { buildActivationTasks } from '@/lib/activation';
 import { partitionByExpiry, expiryPhrase } from '@/lib/expiry';
@@ -102,6 +103,7 @@ export default async function TodayPage() {
     getPosHealth('mipos'),
     getActivationSnapshot(),
     getPosConfig('mipos'),
+    listDeliveredNotReceived(),
   ]);
   const val = <T,>(r: PromiseSettledResult<T>, fb: T): T => (r.status === 'fulfilled' ? r.value : fb);
   const emptySummary: DashboardSummary = {
@@ -128,6 +130,10 @@ export default async function TodayPage() {
   const posConfig = results[13].status === 'fulfilled'
     ? (results[13].value as Awaited<ReturnType<typeof getPosConfig>>)
     : null;
+  const deliveredNotReceived = val(
+    results[14] as PromiseSettledResult<Awaited<ReturnType<typeof listDeliveredNotReceived>>>,
+    [],
+  );
   const dataDegraded = results.some((r) => r.status === 'rejected');
 
   // Piani passati non confermati (stato derivato, niente auto-completamento).
@@ -151,6 +157,9 @@ export default async function TodayPage() {
     openReceipts: openReceiptsRaw
       .filter((r) => r.linesCount > 0)
       .map((r) => ({ id: r.id, supplierName: r.supplierName })),
+    deliveredMarketplaceOrders: deliveredNotReceived.map((o) => ({
+      id: o.orderId, supplierName: o.supplierName,
+    })),
     posFailed: posHealth?.failedCount ?? 0,
     posUnmapped: posHealth?.unmappedCount ?? 0,
     hour: romeHour,
@@ -235,6 +244,18 @@ export default async function TodayPage() {
       text: `${openReceipts.length} riceviment${openReceipts.length === 1 ? 'o' : 'i'} non contabilizzat${openReceipts.length === 1 ? 'o' : 'i'}: il magazzino non è ancora aggiornato`,
       detail: openReceipts.map((r) => r.supplierName).filter(Boolean).slice(0, 3).join(', ') || 'conferma per aggiornare le giacenze',
       href: '/receipts?tab=open',
+    });
+  }
+
+  // Consegne marketplace non registrate: il fornitore ha consegnato, lo stock
+  // non lo sa. Stessa famiglia (e gravità) dei ricevimenti aperti.
+  if (deliveredNotReceived.length > 0) {
+    const n = deliveredNotReceived.length;
+    attention.push({
+      icon: Package, severity: 'red',
+      text: `${n} consegn${n === 1 ? 'a' : 'e'} da fornitore connesso non registrat${n === 1 ? 'a' : 'e'} a magazzino`,
+      detail: deliveredNotReceived.map((o) => o.supplierName).slice(0, 3).join(', '),
+      href: n === 1 ? `/marketplace/orders/${deliveredNotReceived[0].orderId}` : '/marketplace/orders',
     });
   }
 

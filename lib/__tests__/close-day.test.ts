@@ -5,6 +5,7 @@ const base: CloseDayInput = {
   pendingPlans: [],
   leftoverProducts: [],
   openReceipts: [],
+  deliveredMarketplaceOrders: [],
   posFailed: 0,
   posUnmapped: 0,
   hour: 19,
@@ -45,15 +46,37 @@ describe('buildCloseDaySteps', () => {
     expect(steps[0]?.title).toContain('4 pezzi');
   });
 
-  it('ordine dei passi: produzione → invenduto → ricevimenti → POS', () => {
+  it('ordine dei passi: produzione → invenduto → ricevimenti → consegne marketplace → POS', () => {
     const steps = buildCloseDaySteps({
       ...base,
       pendingPlans: [{ id: 'p1', planDate: '2026-07-03' }],
       leftoverProducts: [{ name: 'X', remaining: 2 }],
       openReceipts: [{ id: 'r1', supplierName: 'Molino' }],
+      deliveredMarketplaceOrders: [{ id: 'm1', supplierName: 'Grossista' }],
       posFailed: 1,
     });
-    expect(steps.map((s) => s.key)).toEqual(['production', 'waste', 'receipts', 'pos']);
+    expect(steps.map((s) => s.key)).toEqual(['production', 'waste', 'receipts', 'marketplace', 'pos']);
+  });
+
+  it('consegna marketplace non registrata: 1 sola → link diretto al dettaglio', () => {
+    const one = buildCloseDaySteps({
+      ...base,
+      deliveredMarketplaceOrders: [{ id: 'm1', supplierName: 'Grossista' }],
+    });
+    expect(one[0]?.key).toBe('marketplace');
+    expect(one[0]?.href).toBe('/marketplace/orders/m1');
+    expect(one[0]?.title).toContain('Grossista');
+    expect(one[0]?.consequence).toContain('magazzino');
+
+    const many = buildCloseDaySteps({
+      ...base,
+      deliveredMarketplaceOrders: [
+        { id: 'm1', supplierName: 'A' },
+        { id: 'm2', supplierName: 'B' },
+      ],
+    });
+    expect(many[0]?.href).toBe('/marketplace/orders');
+    expect(many[0]?.count).toBe(2);
   });
 
   it('POS: i falliti hanno priorità sui non collegati (mai entrambi)', () => {
