@@ -7,13 +7,15 @@
 // Barra azioni sticky in basso per l'uso da telefono.
 // =============================================================================
 
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import { UNIT_LABELS, formatCurrency, IDLE_STATE, cn } from '@/lib/utils';
 import { assignSupplierBulkAction } from '@/modules/catalog/actions';
 import { Badge } from '@/components/ui/Badge';
+import { BulkActionBar } from '@/components/ui/BulkActionBar';
+import { useRowSelection } from '@/lib/hooks/useRowSelection';
 import type { IngredientProduct } from '@/modules/catalog/types';
 
 // Riga memoizzata: la spunta di una checkbox aggiorna il Set di selezione nel
@@ -78,7 +80,7 @@ export function IngredientsManager({
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>('all');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const sel = useRowSelection();
   const [supplierId, setSupplierId] = useState('');
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
@@ -94,47 +96,34 @@ export function IngredientsManager({
   );
 
   const visibleIds = visible.map((i) => i.id);
-  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
-
-  // Stabile (nessuna dipendenza): non invalida il memo delle righe.
-  const toggle = useCallback((id: string) => {
-    setSelected((prev) => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
-  }, []);
-
-  function toggleAll() {
-    setSelected((prev) => {
-      const n = new Set(prev);
-      if (allVisibleSelected) visibleIds.forEach((id) => n.delete(id));
-      else visibleIds.forEach((id) => n.add(id));
-      return n;
-    });
-  }
+  const allVisibleSelected = sel.allSelected(visibleIds);
+  const chosenSupplier = suppliers.find((s) => s.id === supplierId);
+  // Quanti dei selezionati hanno GIÀ un fornitore: cambia la parola (Sposta vs Assegna).
+  const movingCount = useMemo(
+    () => items.filter((i) => sel.has(i.id) && i.supplierId).length,
+    [items, sel],
+  );
+  const verb = movingCount > 0 ? 'Sposta' : 'Assegna';
 
   async function assign() {
-    if (selected.size === 0 || !supplierId) return;
+    if (sel.count === 0 || !supplierId) return;
     setPending(true);
     setFeedback(null);
     const fd = new FormData();
-    fd.set('ingredientIds', JSON.stringify([...selected]));
+    fd.set('ingredientIds', JSON.stringify([...sel.selected]));
     fd.set('supplierId', supplierId);
-    const assignedIds = new Set(selected);
+    const assignedIds = new Set(sel.selected);
     const res = await assignSupplierBulkAction(IDLE_STATE, fd);
     setPending(false);
     if (res.status === 'success') {
       // Optimistic update: rifletti subito il nuovo fornitore sulle righe
       // assegnate (il server ha già persistito) → righe + conteggio aggiornati.
-      const sup = suppliers.find((s) => s.id === supplierId);
       setItems((prev) =>
         prev.map((i) =>
-          assignedIds.has(i.id) ? { ...i, supplierId, supplierName: sup?.name ?? i.supplierName } : i,
+          assignedIds.has(i.id) ? { ...i, supplierId, supplierName: chosenSupplier?.name ?? i.supplierName } : i,
         ),
       );
-      setSelected(new Set());
+      sel.clear();
       setSupplierId('');
       setFeedback({ kind: 'success', text: res.message ?? 'Fornitore assegnato.' });
       router.refresh(); // riconciliazione in background (supplierName autorevole)
@@ -201,8 +190,8 @@ export function IngredientsManager({
                   <input
                     type="checkbox"
                     checked={allVisibleSelected}
-                    onChange={toggleAll}
-                    aria-label="Seleziona tutti"
+                    onChange={() => sel.toggleMany(visibleIds)}
+                    aria-label="Seleziona tutti i visibili"
                     className="h-4 w-4 rounded border-border accent-primary"
                   />
                 </th>
@@ -216,47 +205,46 @@ export function IngredientsManager({
             </thead>
             <tbody className="divide-y divide-divider">
               {visible.map((ing) => (
-                <IngredientRow key={ing.id} ing={ing} checked={selected.has(ing.id)} onToggle={toggle} />
+                <IngredientRow key={ing.id} ing={ing} checked={sel.has(ing.id)} onToggle={sel.toggle} />
               ))}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* Barra azione massiva sticky */}
-      {selected.size > 0 && (
-        <div
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-divider bg-glass backdrop-blur px-4 py-3 lg:static lg:mt-4 lg:rounded-2xl lg:border lg:border-border lg:bg-surface-2"
-          style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      {/* Barra azione massiva (grammatica unica: BulkActionBar) — funziona su
+          QUALSIASI selezione: assegna un fornitore ai "senza", o SPOSTA a un
+          altro fornitore quelli che ne hanno già uno. */}
+      <BulkActionBar count={sel.count} onClear={sel.clear}>
+        <select
+          value={supplierId}
+          onChange={(e) => setSupplierId(e.target.value)}
+          aria-label="Fornitore da assegnare"
+          className="flex-1 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring"
         >
-          <div className="mx-auto flex max-w-5xl flex-col gap-2 sm:flex-row sm:items-center">
-            <span className="text-sm font-medium text-ink">
-              {selected.size} selezionat{selected.size === 1 ? 'o' : 'i'}
-            </span>
-            <div className="flex flex-1 items-center gap-2">
-              <select
-                value={supplierId}
-                onChange={(e) => setSupplierId(e.target.value)}
-                className="flex-1 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring"
-              >
-                <option value="">
-                  {suppliers.length === 0 ? '— Nessun fornitore: creane uno prima —' : '— Scegli fornitore —'}
-                </option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.email ? `${s.name} — ${s.email}` : s.name}</option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={!supplierId || pending}
-                onClick={assign}
-                className="shrink-0 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-fg hover:bg-primary-hover disabled:opacity-60 transition-colors"
-              >
-                {pending ? 'Assegno…' : `Assegna a ${selected.size}`}
-              </button>
-            </div>
-          </div>
-        </div>
+          <option value="">
+            {suppliers.length === 0 ? '— Nessun fornitore: creane uno prima —' : `— ${verb} a… —`}
+          </option>
+          {suppliers.map((s) => (
+            <option key={s.id} value={s.id}>{s.email ? `${s.name} — ${s.email}` : s.name}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={!supplierId || pending}
+          onClick={assign}
+          className="shrink-0 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-fg hover:bg-primary-hover disabled:opacity-60 transition-colors"
+        >
+          {pending ? '…' : `${verb} (${sel.count})`}
+        </button>
+      </BulkActionBar>
+
+      {/* Preview onesta dell'impatto, mostrata appena scelto il fornitore. */}
+      {sel.count > 0 && chosenSupplier && (
+        <p className="text-center text-xs text-ink-muted lg:text-left">
+          {sel.count} ingredient{sel.count === 1 ? 'e' : 'i'} → <strong className="text-ink">{chosenSupplier.name}</strong>
+          {movingCount > 0 && ` (${movingCount} cambiano fornitore)`}
+        </p>
       )}
     </div>
   );
