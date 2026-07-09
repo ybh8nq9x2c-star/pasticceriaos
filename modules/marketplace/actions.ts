@@ -93,6 +93,23 @@ export async function placeOrderAction(_prev: ActionState, formData: FormData): 
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };
   }
+
+  // Conversione bozza → ordine condiviso: la bozza PO email d'origine viene
+  // ANNULLATA (con nota tracciabile) solo DOPO il place riuscito. Best-effort:
+  // se l'annullo fallisce (es. già inviata nel frattempo) l'ordine condiviso
+  // resta valido e la bozza resta visibile — mai bloccare il flusso principale.
+  const fromDraftId = formData.get('fromDraftId');
+  if (typeof fromDraftId === 'string' && fromDraftId) {
+    try {
+      const { cancelOrder } = await import('@/modules/ordering/service');
+      await cancelOrder(fromDraftId, `Convertita in ordine condiviso ${orderId.slice(0, 8)}.`);
+      revalidatePath('/orders');
+      revalidatePath(`/orders/${fromDraftId}`);
+    } catch {
+      // la bozza resta: verrà comunque bloccata all'invio (guard fornitore connesso)
+    }
+  }
+
   revalidatePath('/marketplace/orders');
   redirect(`/marketplace/orders/${orderId}`);
 }

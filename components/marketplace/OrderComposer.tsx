@@ -6,9 +6,21 @@ import { IDLE_STATE } from '@/lib/utils';
 import { placeOrderAction } from '@/modules/marketplace/actions';
 import type { CatalogItem } from '@/modules/marketplace/types';
 
-export function OrderComposer({ connectionId, catalog }: { connectionId: string; catalog: CatalogItem[] }) {
+export function OrderComposer({
+  connectionId,
+  catalog,
+  initialQty,
+  fromDraftId,
+}: {
+  connectionId: string;
+  catalog: CatalogItem[];
+  /** Prefill quantità (conversione bozza → ordine condiviso). */
+  initialQty?: Record<string, string>;
+  /** Bozza PO d'origine: annullata dopo l'invio riuscito (vedi placeOrderAction). */
+  fromDraftId?: string;
+}) {
   const [state, formAction] = useFormState(placeOrderAction, IDLE_STATE);
-  const [qty, setQty] = useState<Record<string, string>>({});
+  const [qty, setQty] = useState<Record<string, string>>(initialQty ?? {});
   const idem = useRef<string>(typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString(36));
 
   const num = (v: string | undefined) => parseFloat((v ?? '0').replace(',', '.')) || 0;
@@ -22,6 +34,7 @@ export function OrderComposer({ connectionId, catalog }: { connectionId: string;
     formData.set('lines', JSON.stringify(lines));
     formData.set('connectionId', connectionId);
     formData.set('idempotencyKey', idem.current);
+    if (fromDraftId) formData.set('fromDraftId', fromDraftId);
     return formAction(formData);
   }
 
