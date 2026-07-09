@@ -122,8 +122,9 @@ Se la modifica tocca SQL/RPC: l'unico modo di applicarla è una nuova migration 
 
 ## 7. Rischi noti (vedi AGENTS.md dei moduli per il dettaglio)
 
-- **Tre write-path verso `inventory_movements`** (`receive_purchase_order`,
-  `receive_marketplace_order`, `complete_purchase_receipt`). Sono il punto più
+- **Due write-path ATTIVI verso `inventory_movements`** in ricezione
+  (`receive_marketplace_order`, `complete_purchase_receipt`) + uno storico
+  (`receive_purchase_order`, 019: DEPRECATA, execute revocato). Sono il punto più
   delicato per il doppio conteggio: vedi [`modules/inventory/AGENTS.md`](modules/inventory/AGENTS.md)
   e [`modules/goods-receipts/AGENTS.md`](modules/goods-receipts/AGENTS.md).
 - Pin Node fragile (solo `engines`, vedi §4).

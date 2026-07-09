@@ -5,7 +5,7 @@ DB Postgres gestito da Supabase: schema, **RLS**, **RPC transazionali**, viste, 
 ## Struttura
 
 ```
-migrations_v2/      ← ✅ migration ATTIVE. Ordine = prefisso numerico (001 → 035).
+migrations_v2/      ← ✅ migration ATTIVE. Ordine = prefisso numerico (001 → 057, in crescita).
 migrations/         ← ⚠️ legacy (001–003). Storico, NON la fonte attuale. Non estendere.
 functions/          ← Edge function Deno (expiry-alerts, cron). Esclusa dal tsconfig app.
 tests/              ← Test SQL (pgTAP-style) su RLS e RPC.
@@ -29,7 +29,7 @@ con check `current_organization_id()` esplicito. Inventario delle RPC che muovon
 
 | RPC | File | Effetto |
 |-----|------|---------|
-| `receive_purchase_order` | 019 | Ricezione PO totale → movimenti + stato `received` |
+| `receive_purchase_order` | 019 | ⚠️ DEPRECATA (execute revocato): ricezione solo via engine 035 |
 | `complete_production_plan` | 019 | Scarico stock da produzione |
 | `receive_marketplace_order` | 023 | Ordine marketplace consegnato → PO specchio + movimenti (idempotente) |
 | `complete_purchase_receipt` | 035 | **Goods Receipt Engine**: movimenti incrementali idempotenti + lotti |

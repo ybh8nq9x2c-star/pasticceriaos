@@ -12,7 +12,7 @@ app/auth/callback/ scambio OAuth/magic-link → pubblico
 app/(main)/        BAKERY / CUSTOMER        → layout guard: requireCustomerSession()
 app/supplier/      SUPPLIER                 → layout guard: requireSupplierSession()
 app/portal/[token] FORNITORE ESTERNO        → JWT nel path, NESSUNA sessione Supabase
-app/api/           catalog + customers/orders (route handler REST mirati)
+app/api/           pos/* (dry-run, replay, reconciliation, test-connection) + webhooks/[provider]
 ```
 
 **La separazione UI per ruolo è un vincolo di prodotto.** Una pagina bakery vive in
