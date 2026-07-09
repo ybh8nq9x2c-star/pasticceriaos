@@ -18,12 +18,12 @@ export default async function CustomerOrdersPage() {
           <h1 className="text-2xl sm:text-3xl font-bold mb-1">Ordini ai fornitori</h1>
           <p className="text-sm text-ink-muted">{orders.length} ordini</p>
         </div>
-        <Link href="/marketplace/suppliers" className="shrink-0 px-3 sm:px-4 py-2 rounded-xl bg-primary text-primary-fg text-sm font-semibold hover:bg-primary-hover">+ <span className="hidden sm:inline">Nuovo </span>Ordine</Link>
+        <Link href="/marketplace/orders/new" className="shrink-0 px-3 sm:px-4 py-2 rounded-xl bg-primary text-primary-fg text-sm font-semibold hover:bg-primary-hover">+ <span className="hidden sm:inline">Nuovo </span>Ordine</Link>
       </div>
 
       {orders.length === 0 ? (
         <div className="bg-surface-2 rounded-2xl border border-border p-8 sm:p-10 text-center text-ink-muted">
-          Nessun ordine. Collega un fornitore in <Link href="/marketplace/suppliers" className="text-primary underline">Fornitori</Link>.
+          Nessun ordine. Collega un fornitore in <Link href="/suppliers" className="text-primary underline">Fornitori</Link>.
         </div>
       ) : (
         <>

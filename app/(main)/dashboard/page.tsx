@@ -644,7 +644,10 @@ export default async function TodayPage() {
                       {o.totalAmount !== null && (
                         <span className="text-xs font-mono font-semibold text-ink">€{formatCurrency(o.totalAmount)}</span>
                       )}
-                      <span className="text-xs font-semibold text-primary group-hover:underline shrink-0">Invia →</span>
+                      {/* "Apri", non "Invia": per i fornitori collegati la
+                          prossima azione è la conversione in ordine condiviso —
+                          la CTA giusta vive nel dettaglio, unica per canale. */}
+                      <span className="text-xs font-semibold text-primary group-hover:underline shrink-0">Apri →</span>
                     </Link>
                   ))}
                 </div>

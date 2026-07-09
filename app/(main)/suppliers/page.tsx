@@ -41,10 +41,6 @@ export default async function SuppliersPage() {
     priceListCounts.set(r.supplier_id, (priceListCounts.get(r.supplier_id) ?? 0) + 1);
   }
 
-  // Connessioni marketplace non ancora legate a un'anagrafica (nessun ordine ricevuto).
-  const linkedOrgIds = new Set(suppliers.map((s) => s.supplierOrgId).filter(Boolean));
-  const unlinkedConnections = connections.filter((c) => !linkedOrgIds.has(c.supplierOrgId));
-
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       <PageHeader
@@ -90,24 +86,6 @@ export default async function SuppliersPage() {
           inviarti DDT e fatture direttamente.
         </p>
         <ConnectSupplierForm />
-        {unlinkedConnections.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-divider">
-            <p className="text-xs font-semibold text-ink-muted uppercase tracking-wide mb-2">
-              Collegati (in attesa del primo ordine ricevuto)
-            </p>
-            <ul className="space-y-1">
-              {unlinkedConnections.map((c) => (
-                <li key={c.connectionId} className="text-sm text-ink flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                  {c.supplierName}
-                  <Link href="/marketplace/orders/new" className="text-xs font-semibold text-primary hover:underline ml-1">
-                    Ordina dal catalogo →
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
 
       {/* Anagrafica con CANALE in primo piano + filtri rapidi */}
