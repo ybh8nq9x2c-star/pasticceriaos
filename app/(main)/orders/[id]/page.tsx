@@ -24,6 +24,8 @@ import { SubmitButton } from '@/components/ui/SubmitButton';
 import { StickyActionBar } from '@/components/ui/StickyActionBar';
 import { SupplierChannelBadge } from '@/components/suppliers/SupplierChannelBadge';
 import { orderChannel } from '@/lib/supplier-channel';
+import { getSupplierWithChannel } from '@/modules/catalog/service';
+import { Link2 } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Ordine' };
 
@@ -120,6 +122,24 @@ export default async function OrderDetailPage({
   const badge = orderStatusBadge(order.status, order.dispatchOutcome);
   const showManualSend = needsManualSend(order.status, order.dispatchOutcome);
 
+  // Bozza verso un fornitore COLLEGATO a BakeryOS (e non specchio marketplace):
+  // l'invio email è bloccato dal service → la CTA diventa la CONVERSIONE in
+  // ordine condiviso, con righe precompilate dal catalogo del fornitore.
+  let convertToShared: { connectionId: string } | null = null;
+  if (order.status === 'draft' && !order.marketplaceOrderId) {
+    try {
+      const sup = await getSupplierWithChannel(order.supplierId);
+      if (sup.channel === 'bakeryos' && sup.connectionId) {
+        convertToShared = { connectionId: sup.connectionId };
+      }
+    } catch {
+      convertToShared = null; // canale non determinabile → flusso standard
+    }
+  }
+  const convertHref = convertToShared
+    ? `/marketplace/orders/new?connection=${convertToShared.connectionId}&fromDraft=${order.id}`
+    : null;
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
       {/* Breadcrumb + header */}
@@ -164,8 +184,20 @@ export default async function OrderDetailPage({
       )}
 
       {/* Bozza: onesto sul fatto che il fornitore NON l'ha ancora ricevuta.
-          Badge "Bozza" in testata + CTA "Invia ordine" più in basso completano il quadro. */}
-      {order.status === 'draft' && (
+          Fornitore COLLEGATO → la via giusta è la conversione in ordine condiviso
+          (l'invio email è bloccato dal service). Non collegato → invio standard. */}
+      {order.status === 'draft' && (convertHref ? (
+        <div className="mb-6 rounded-2xl border border-primary-soft bg-primary-light/60 px-5 py-4">
+          <p className="inline-flex items-center gap-1.5 font-semibold text-ink">
+            <Link2 size={15} aria-hidden="true" className="shrink-0 text-primary" /> Fornitore collegato a BakeryOS
+          </p>
+          <p className="text-sm text-ink-muted mt-1">
+            Questa bozza non si invia via email: <strong className="text-ink">{order.supplierName}</strong> riceve
+            gli ordini direttamente nel suo workspace. Convertila in ordine condiviso — le righe vengono
+            precompilate dal suo catalogo.
+          </p>
+        </div>
+      ) : (
         <div className="mb-6 rounded-2xl border border-border bg-surface-2 px-5 py-4">
           <p className="font-semibold text-ink">Ordine non ancora inviato</p>
           <p className="text-sm text-ink-muted mt-1">
@@ -174,7 +206,7 @@ export default async function OrderDetailPage({
             {order.supplierEmail ? <> a <span className="font-medium text-ink">{order.supplierEmail}</span></> : null}.
           </p>
         </div>
-      )}
+      ))}
 
       {/* Invio non attestato: stato ONESTO + azione chiara (mandalo tu al fornitore). */}
       {showManualSend && (
@@ -480,8 +512,16 @@ export default async function OrderDetailPage({
             </Link>
           )}
 
-          {/* Azione avanzamento stato (non tocca il magazzino) */}
-          {nextAction && (
+          {/* Azione avanzamento stato (non tocca il magazzino). Fornitore
+              collegato → la CTA è la CONVERSIONE, mai l'invio email. */}
+          {convertHref ? (
+            <Link
+              href={convertHref}
+              className="hidden lg:block w-full py-3 text-center rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
+            >
+              Crea ordine condiviso
+            </Link>
+          ) : nextAction && (
             <form action={handleAdvance} className="hidden lg:block">
               <input type="hidden" name="status" value={nextAction.toStatus} />
               <SubmitButton
@@ -512,7 +552,7 @@ export default async function OrderDetailPage({
       </div>
 
       {/* Mobile: una sola CTA primaria, sticky sopra la tab bar */}
-      {(canReceive || nextAction) && (
+      {(canReceive || nextAction || convertHref) && (
         <StickyActionBar className="lg:hidden mt-6">
           {canReceive ? (
             <Link
@@ -520,6 +560,13 @@ export default async function OrderDetailPage({
               className="flex items-center justify-center w-full h-12 rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
             >
               <Package size={15} className="mr-1.5" aria-hidden="true" /> Ricevi merce
+            </Link>
+          ) : convertHref ? (
+            <Link
+              href={convertHref}
+              className="flex items-center justify-center w-full h-12 rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
+            >
+              <Link2 size={15} className="mr-1.5" aria-hidden="true" /> Crea ordine condiviso
             </Link>
           ) : nextAction ? (
             <form action={handleAdvance}>

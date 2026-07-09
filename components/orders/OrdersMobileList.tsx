@@ -35,15 +35,25 @@ function fmtDate(iso: string) {
   });
 }
 
-export function OrdersMobileList({ orders }: { orders: PurchaseOrderListItem[] }) {
+export function OrdersMobileList({
+  orders,
+  connectedSupplierIds = [],
+}: {
+  orders: PurchaseOrderListItem[];
+  /** Fornitori collegati a BakeryOS: le loro bozze si CONVERTONO, non si inviano via email. */
+  connectedSupplierIds?: string[];
+}) {
   const [receiveOrder, setReceiveOrder] = useState<PurchaseOrderListItem | null>(null);
   const sel = useRowSelection();
+  const connected = new Set(connectedSupplierIds);
 
   const open = orders.filter((o) => OPEN_STATUSES.includes(o.status));
   const closed = orders.filter((o) => !OPEN_STATUSES.includes(o.status));
 
-  const draftIds = open.filter((o) => o.status === 'draft').map((o) => o.id);
-  const selectedDrafts = open.filter((o) => o.status === 'draft' && sel.has(o.id));
+  // Selezionabili per invio email massivo: SOLO bozze di fornitori non collegati.
+  const sendableDraft = (o: PurchaseOrderListItem) => o.status === 'draft' && !connected.has(o.supplierId);
+  const draftIds = open.filter(sendableDraft).map((o) => o.id);
+  const selectedDrafts = open.filter((o) => sendableDraft(o) && sel.has(o.id));
 
   return (
     <div className="space-y-4">
@@ -68,7 +78,8 @@ export function OrdersMobileList({ orders }: { orders: PurchaseOrderListItem[] }
           {open.map((o) => {
             const badge = orderStatusBadge(o.status, o.dispatchOutcome);
             const receivable = RECEIVABLE.includes(o.status);
-            const isDraft = o.status === 'draft';
+            const isDraft = sendableDraft(o);
+            const isConvertibleDraft = o.status === 'draft' && connected.has(o.supplierId);
             const checked = sel.has(o.id);
             return (
               <div
@@ -117,7 +128,7 @@ export function OrdersMobileList({ orders }: { orders: PurchaseOrderListItem[] }
                           href={`/orders/${o.id}`}
                           className="flex items-center justify-center h-11 w-full rounded-md border border-border text-sm font-semibold text-ink hover:bg-surface-offset transition-colors"
                         >
-                          Apri e invia →
+                          {isConvertibleDraft ? 'Apri e converti →' : 'Apri e invia →'}
                         </Link>
                       )}
                     </div>

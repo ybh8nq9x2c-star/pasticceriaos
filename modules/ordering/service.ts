@@ -93,7 +93,7 @@ export async function createOrder(raw: unknown): Promise<PurchaseOrder> {
 }
 
 /** True se il fornitore locale è collegato a BakeryOS con connessione ATTIVA. */
-async function assertSupplierNotConnected(orgId: string, supplierId: string): Promise<void> {
+async function isSupplierConnected(orgId: string, supplierId: string): Promise<boolean> {
   const supabase = await createClient();
   const { data: sup } = await supabase
     .from('suppliers')
@@ -101,7 +101,7 @@ async function assertSupplierNotConnected(orgId: string, supplierId: string): Pr
     .eq('id', supplierId)
     .maybeSingle();
   const supplierOrgId = (sup as { supplier_org_id: string | null } | null)?.supplier_org_id ?? null;
-  if (!supplierOrgId) return; // solo-email: PO standard corretto
+  if (!supplierOrgId) return false; // solo-email: PO standard corretto
 
   const { data: conn } = await supabase
     .from('supplier_customer_connections')
@@ -110,7 +110,11 @@ async function assertSupplierNotConnected(orgId: string, supplierId: string): Pr
     .eq('supplier_org_id', supplierOrgId)
     .eq('status', 'active')
     .maybeSingle();
-  if (conn) {
+  return conn !== null;
+}
+
+async function assertSupplierNotConnected(orgId: string, supplierId: string): Promise<void> {
+  if (await isSupplierConnected(orgId, supplierId)) {
     throw new BusinessRuleError(
       'Questo fornitore è collegato a BakeryOS: crea un ordine condiviso dal suo catalogo, non un ordine email/manuale.',
     );
@@ -163,6 +167,20 @@ export async function changeOrderStatus(
   await assertOrderInOrg(existing);
 
   assertTransition(existing.status, input.status);
+
+  // Guard "niente doppia verità" ANCHE all'invio: una bozza verso un fornitore
+  // COLLEGATO (es. generata dall'auto-riordino, che bypassa createOrder) non deve
+  // partire via email/manuale. Il canale giusto è l'ordine condiviso: la UI del
+  // dettaglio bozza offre la conversione con righe precompilate dal catalogo.
+  // Vale solo per gli ordini NON specchio (i mirror non transitano mai per 'sent').
+  if (input.status === 'sent' && !existing.marketplaceOrderId) {
+    if (await isSupplierConnected(existing.organizationId, existing.supplierId)) {
+      throw new BusinessRuleError(
+        `${existing.supplierName} è collegato a BakeryOS: questa bozza non si invia via email. ` +
+          'Aprila e usa "Crea ordine condiviso" per convertirla (righe precompilate dal catalogo).',
+      );
+    }
+  }
 
   const supabase = await createClient();
 

@@ -27,11 +27,21 @@ function formatCurrency(n: number | null) {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(n);
 }
 
-export function OrdersDesktopTable({ orders }: { orders: PurchaseOrderListItem[] }) {
+export function OrdersDesktopTable({
+  orders,
+  connectedSupplierIds = [],
+}: {
+  orders: PurchaseOrderListItem[];
+  /** Fornitori collegati a BakeryOS: le loro bozze si CONVERTONO, non si inviano via email. */
+  connectedSupplierIds?: string[];
+}) {
   const sel = useRowSelection();
-  const draftIds = orders.filter((o) => o.status === 'draft').map((o) => o.id);
+  const connected = new Set(connectedSupplierIds);
+  // Selezionabili per invio email massivo: SOLO bozze di fornitori non collegati.
+  const sendableDraft = (o: PurchaseOrderListItem) => o.status === 'draft' && !connected.has(o.supplierId);
+  const draftIds = orders.filter(sendableDraft).map((o) => o.id);
   const hasDrafts = draftIds.length > 0;
-  const selectedDrafts = orders.filter((o) => o.status === 'draft' && sel.has(o.id));
+  const selectedDrafts = orders.filter((o) => sendableDraft(o) && sel.has(o.id));
 
   return (
     <>
@@ -60,7 +70,7 @@ export function OrdersDesktopTable({ orders }: { orders: PurchaseOrderListItem[]
           </thead>
           <tbody className="divide-y divide-divider">
             {orders.map((order) => {
-              const isDraft = order.status === 'draft';
+              const isSendableDraft = sendableDraft(order);
               const badge = orderStatusBadge(order.status, order.dispatchOutcome);
               return (
                 <tr
@@ -68,7 +78,7 @@ export function OrdersDesktopTable({ orders }: { orders: PurchaseOrderListItem[]
                   className={sel.has(order.id) ? 'bg-primary-light/40' : 'hover:bg-surface-offset transition-colors'}
                 >
                   <td className="px-4 py-4">
-                    {isDraft && (
+                    {isSendableDraft && (
                       <input
                         type="checkbox"
                         checked={sel.has(order.id)}

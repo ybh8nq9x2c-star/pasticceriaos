@@ -6,6 +6,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { listOrders } from '@/modules/ordering/service';
+import { listSuppliersWithChannel } from '@/modules/catalog/service';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { OrdersMobileList } from '@/components/orders/OrdersMobileList';
@@ -15,7 +16,15 @@ import { ShoppingCart } from 'lucide-react';
 export const metadata: Metadata = { title: 'Ordini' };
 
 export default async function OrdersPage() {
-  const orders = await listOrders();
+  const [orders, suppliersWithChannel] = await Promise.all([
+    listOrders(),
+    listSuppliersWithChannel().catch(() => []),
+  ]);
+  // Fornitori COLLEGATI: le loro bozze non si inviano via email (si convertono
+  // in ordini condivisi dal dettaglio) → escluse dall'invio massivo.
+  const connectedSupplierIds = suppliersWithChannel
+    .filter((s) => s.channel === 'bakeryos')
+    .map((s) => s.id);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
@@ -44,11 +53,11 @@ export default async function OrdersPage() {
         <>
           {/* Mobile: card azionabili, default "da gestire", storico collassato. */}
           <div className="md:hidden">
-            <OrdersMobileList orders={orders} />
+            <OrdersMobileList orders={orders} connectedSupplierIds={connectedSupplierIds} />
           </div>
 
           {/* Desktop: tabella con selezione multipla delle bozze per invio in blocco. */}
-          <OrdersDesktopTable orders={orders} />
+          <OrdersDesktopTable orders={orders} connectedSupplierIds={connectedSupplierIds} />
         </>
       )}
     </div>
