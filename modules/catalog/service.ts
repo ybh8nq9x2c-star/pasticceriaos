@@ -8,6 +8,8 @@ import { requireOrgId } from '@/modules/identity/service';
 import { getErrorMessage, NotFoundError, BusinessRuleError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 import { isUnitConvertible } from '@/lib/units';
+import { withSupplierChannel, type SupplierChannelInfo } from '@/lib/supplier-channel';
+import { listConnectedSuppliers } from '@/modules/marketplace/service';
 import type { UnitOfMeasure } from '@/lib/database.types';
 import * as repo from './repository';
 import {
@@ -56,6 +58,31 @@ export async function updateSupplier(id: string, raw: unknown): Promise<Supplier
 
 export async function deactivateSupplier(id: string): Promise<Supplier> {
   return repo.patchSupplier(id, { isActive: false });
+}
+
+export type SupplierWithChannel = Supplier & SupplierChannelInfo;
+
+/**
+ * Fornitori con il CANALE risolto (BakeryOS interno vs email/manuale), unendo
+ * l'anagrafica locale con le connessioni marketplace attive. Le connessioni si
+ * leggono in contesto cliente: se il contesto non è un cliente marketplace,
+ * degrada onestamente a "tutti email" invece di rompere la pagina.
+ */
+export async function listSuppliersWithChannel(activeOnly = true): Promise<SupplierWithChannel[]> {
+  const [suppliers, connections] = await Promise.all([
+    listSuppliers(activeOnly),
+    listConnectedSuppliers().catch(() => []),
+  ]);
+  return withSupplierChannel(suppliers, connections);
+}
+
+/** Come sopra per un singolo fornitore (scheda). */
+export async function getSupplierWithChannel(id: string): Promise<SupplierWithChannel> {
+  const [supplier, connections] = await Promise.all([
+    getSupplier(id),
+    listConnectedSuppliers().catch(() => []),
+  ]);
+  return withSupplierChannel([supplier], connections)[0];
 }
 
 // ---------------------------------------------------------------------------
