@@ -14,7 +14,9 @@ import { ChevronDown } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/Button';
 import { orderStatusBadge } from '@/modules/ordering/status-display';
+import { useRowSelection } from '@/lib/hooks/useRowSelection';
 import { OrderReceiveSheet } from './OrderReceiveSheet';
+import { OrdersBulkSend } from './OrdersBulkSend';
 import type { PurchaseOrderListItem, OrderStatus } from '@/modules/ordering/types';
 
 const OPEN_STATUSES: OrderStatus[] = ['draft', 'sent', 'confirmed', 'partial'];
@@ -33,9 +35,13 @@ function fmtDate(iso: string) {
 
 export function OrdersMobileList({ orders }: { orders: PurchaseOrderListItem[] }) {
   const [receiveOrder, setReceiveOrder] = useState<PurchaseOrderListItem | null>(null);
+  const sel = useRowSelection();
 
   const open = orders.filter((o) => OPEN_STATUSES.includes(o.status));
   const closed = orders.filter((o) => !OPEN_STATUSES.includes(o.status));
+
+  const draftIds = open.filter((o) => o.status === 'draft').map((o) => o.id);
+  const selectedDrafts = open.filter((o) => o.status === 'draft' && sel.has(o.id));
 
   return (
     <div className="space-y-4">
@@ -46,38 +52,71 @@ export function OrdersMobileList({ orders }: { orders: PurchaseOrderListItem[] }
         </p>
       ) : (
         <div className="space-y-3">
+          {/* Più bozze → offri l'invio in blocco (grammatica bulk unica). */}
+          {draftIds.length >= 2 && (
+            <button
+              type="button"
+              onClick={() => sel.toggleMany(draftIds)}
+              className="text-xs font-semibold text-primary hover:underline"
+            >
+              {sel.allSelected(draftIds) ? 'Deseleziona bozze' : `Seleziona le ${draftIds.length} bozze`}
+            </button>
+          )}
+
           {open.map((o) => {
             const badge = orderStatusBadge(o.status, o.dispatchOutcome);
             const receivable = RECEIVABLE.includes(o.status);
+            const isDraft = o.status === 'draft';
+            const checked = sel.has(o.id);
             return (
-              <div key={o.id} className="rounded-2xl border border-border bg-surface-2 overflow-hidden">
-                {/* Testata cliccabile → dettaglio (zona ampia, nessun bottone annidato) */}
-                <Link href={`/orders/${o.id}`} className="block px-4 pt-3.5 pb-2 active:bg-surface-offset transition-colors">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-md font-semibold text-ink truncate">{o.supplierName}</p>
-                    <StatusBadge label={badge.label} variant={badge.variant} />
-                  </div>
-                  <p className="text-sm text-ink-muted mt-1">
-                    {fmtDate(o.orderDate)} · {o.lineItemsCount} prodott{o.lineItemsCount === 1 ? 'o' : 'i'}
-                    {o.totalAmount !== null && (
-                      <> · <span className="font-mono font-medium text-ink">{fmtCurrency(o.totalAmount)}</span></>
-                    )}
-                  </p>
-                </Link>
-                {/* UNA primary action per card */}
-                <div className="px-4 pb-3.5 pt-1">
-                  {receivable ? (
-                    <Button fullWidth size="lg" onClick={() => setReceiveOrder(o)}>
-                      {o.status === 'partial' ? 'Ricevi il resto' : 'Ricevuto'}
-                    </Button>
-                  ) : (
-                    <Link
-                      href={`/orders/${o.id}`}
-                      className="flex items-center justify-center h-11 w-full rounded-md border border-border text-sm font-semibold text-ink hover:bg-surface-offset transition-colors"
-                    >
-                      Apri e invia →
-                    </Link>
+              <div
+                key={o.id}
+                className={`rounded-2xl border overflow-hidden ${checked ? 'border-primary bg-primary-light/30' : 'border-border bg-surface-2'}`}
+              >
+                <div className="flex items-stretch">
+                  {/* Checkbox selezione: SOLO bozze (le uniche inviabili). Fuori dal
+                      Link per non collidere col tap sulla testata. */}
+                  {isDraft && (
+                    <label className="flex shrink-0 items-center pl-4 pr-1 active:bg-surface-offset">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => sel.toggle(o.id)}
+                        aria-label={`Seleziona bozza ${o.supplierName}`}
+                        className="h-5 w-5 rounded border-border accent-primary"
+                      />
+                    </label>
                   )}
+                  <div className="min-w-0 flex-1">
+                    {/* Testata cliccabile → dettaglio (zona ampia, nessun bottone annidato) */}
+                    <Link href={`/orders/${o.id}`} className="block px-4 pt-3.5 pb-2 active:bg-surface-offset transition-colors">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-md font-semibold text-ink truncate">{o.supplierName}</p>
+                        <StatusBadge label={badge.label} variant={badge.variant} />
+                      </div>
+                      <p className="text-sm text-ink-muted mt-1">
+                        {fmtDate(o.orderDate)} · {o.lineItemsCount} prodott{o.lineItemsCount === 1 ? 'o' : 'i'}
+                        {o.totalAmount !== null && (
+                          <> · <span className="font-mono font-medium text-ink">{fmtCurrency(o.totalAmount)}</span></>
+                        )}
+                      </p>
+                    </Link>
+                    {/* UNA primary action per card */}
+                    <div className="px-4 pb-3.5 pt-1">
+                      {receivable ? (
+                        <Button fullWidth size="lg" onClick={() => setReceiveOrder(o)}>
+                          {o.status === 'partial' ? 'Ricevi il resto' : 'Ricevuto'}
+                        </Button>
+                      ) : (
+                        <Link
+                          href={`/orders/${o.id}`}
+                          className="flex items-center justify-center h-11 w-full rounded-md border border-border text-sm font-semibold text-ink hover:bg-surface-offset transition-colors"
+                        >
+                          Apri e invia →
+                        </Link>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             );
@@ -117,6 +156,11 @@ export function OrdersMobileList({ orders }: { orders: PurchaseOrderListItem[] }
         order={receiveOrder}
         open={receiveOrder !== null}
         onClose={() => setReceiveOrder(null)}
+      />
+
+      <OrdersBulkSend
+        selected={selectedDrafts.map((o) => ({ id: o.id, supplierName: o.supplierName }))}
+        onClear={sel.clear}
       />
     </div>
   );
