@@ -46,6 +46,16 @@ export async function createOrderAction(
   redirect(`/orders/${orderId}?flash=${encodeURIComponent('Bozza creata — ora invia l\'ordine')}`);
 }
 
+// Esito channel-aware: le bozze verso fornitori connessi NON si inviano via
+// email — si convertono in ordini condivisi. Dirlo QUI, alla creazione, evita
+// di scoprirlo davanti a un invio bloccato.
+function convertNote(connectedDrafts: number): string {
+  if (connectedDrafts === 0) return '';
+  return connectedDrafts === 1
+    ? ' 1 è verso un fornitore connesso: aprila e usa “Crea ordine condiviso”.'
+    : ` ${connectedDrafts} sono verso fornitori connessi: aprile e usa “Crea ordine condiviso”.`;
+}
+
 /** A1: genera bozze d'ordine reali, una per fornitore, dalle shortage del piano. */
 export async function createDraftsFromShortageAction(planId: string): Promise<ActionState> {
   try {
@@ -74,7 +84,7 @@ export async function createDraftsFromShortageAction(planId: string): Promise<Ac
         : '';
     return {
       status: 'success',
-      message: `${created} bozz${created === 1 ? 'a' : 'e'} ordine create.${skippedNote}`,
+      message: `${created} bozz${created === 1 ? 'a' : 'e'} ordine create.${skippedNote}${convertNote(result.connectedDrafts)}`,
     };
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };
@@ -108,7 +118,7 @@ export async function createDraftsFromLowStockAction(): Promise<ActionState> {
         : '';
     return {
       status: 'success',
-      message: `${created} bozz${created === 1 ? 'a' : 'e'} ordine create, una per fornitore.${skippedNote}`,
+      message: `${created} bozz${created === 1 ? 'a' : 'e'} ordine create, una per fornitore.${skippedNote}${convertNote(result.connectedDrafts)}`,
     };
   } catch (err) {
     return { status: 'error', error: getErrorMessage(err) };

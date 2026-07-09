@@ -255,6 +255,30 @@ export interface DraftFromShortageResult {
   createdOrderIds: string[];
   /** Ingredienti in shortage senza fornitore in anagrafica: da ordinare a mano. */
   skippedIngredients: string[];
+  /** Bozze verso fornitori CONNESSI a BakeryOS: non si inviano via email, si
+      convertono in ordini condivisi dal dettaglio. L'esito deve dirlo subito. */
+  connectedDrafts: number;
+}
+
+/** Quanti dei supplierIds hanno una connessione BakeryOS ATTIVA (batch). */
+async function countConnectedSuppliers(orgId: string, supplierIds: string[]): Promise<number> {
+  if (supplierIds.length === 0) return 0;
+  const supabase = await createClient();
+  const { data: sups } = await supabase
+    .from('suppliers')
+    .select('id, supplier_org_id')
+    .in('id', supplierIds)
+    .not('supplier_org_id', 'is', null);
+  const orgIds = [...new Set((sups ?? []).map((s) => s.supplier_org_id as string))];
+  if (orgIds.length === 0) return 0;
+  const { data: conns } = await supabase
+    .from('supplier_customer_connections')
+    .select('supplier_org_id')
+    .eq('customer_org_id', orgId)
+    .eq('status', 'active')
+    .in('supplier_org_id', orgIds);
+  const connected = new Set((conns ?? []).map((c) => c.supplier_org_id));
+  return (sups ?? []).filter((s) => connected.has(s.supplier_org_id as string)).length;
 }
 
 /**
@@ -296,6 +320,7 @@ export async function createDraftOrdersFromLowStock(): Promise<DraftFromShortage
   }
 
   const createdOrderIds: string[] = [];
+  const createdSupplierIds: string[] = [];
   for (const [supplierId, lineItems] of bySupplier) {
     const order = await repo.insertOrder(
       orgId,
@@ -309,9 +334,11 @@ export async function createDraftOrdersFromLowStock(): Promise<DraftFromShortage
       'Generato automaticamente dalle scorte sotto soglia',
     );
     createdOrderIds.push(order.id);
+    createdSupplierIds.push(supplierId);
   }
 
-  return { createdOrderIds, skippedIngredients: skipped };
+  const connectedDrafts = await countConnectedSuppliers(orgId, createdSupplierIds);
+  return { createdOrderIds, skippedIngredients: skipped, connectedDrafts };
 }
 
 /**
@@ -342,6 +369,7 @@ export async function createDraftOrdersFromShortage(planId: string): Promise<Dra
   }
 
   const createdOrderIds: string[] = [];
+  const createdSupplierIds: string[] = [];
   for (const [supplierId, lines] of bySupplier) {
     // Arrotonda a 3 decimali (precisione DB) e SCARTA le righe che si azzerano:
     // uno shortage trascurabile non deve generare quantity_ordered = 0 (CHECK DB)
@@ -369,7 +397,9 @@ export async function createDraftOrdersFromShortage(planId: string): Promise<Dra
       'Generato automaticamente da shortage piano',
     );
     createdOrderIds.push(order.id);
+    createdSupplierIds.push(supplierId);
   }
 
-  return { createdOrderIds, skippedIngredients: skipped };
+  const connectedDrafts = await countConnectedSuppliers(orgId, createdSupplierIds);
+  return { createdOrderIds, skippedIngredients: skipped, connectedDrafts };
 }
