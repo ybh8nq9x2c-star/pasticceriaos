@@ -52,6 +52,23 @@ export async function createReceiptAction(
   redirect(`${basePath(mode)}/${receiptId}`);
 }
 
+/**
+ * Un tap dall'ordine al ricevimento: crea (o RIUSA, idempotente per ordine) il
+ * ricevimento atteso con righe/fornitore precompilati e atterra sul dettaglio
+ * con lo scanner attivo — niente form intermedio. Se l'ordine non è ricevibile,
+ * ripiega su /receipts/new?order=… dove i messaggi onesti spiegano il perché.
+ */
+export async function openReceiptForOrderAction(orderId: string): Promise<void> {
+  let receiptId: string;
+  try {
+    receiptId = await service.createReceipt({ mode: 'bakery', purchaseOrderId: orderId });
+  } catch {
+    redirect(`/receipts/new?order=${orderId}`);
+  }
+  revalidateReceipt('bakery', receiptId);
+  redirect(`/receipts/${receiptId}`);
+}
+
 export async function importDdtAction(
   _prev: ActionState,
   formData: FormData,

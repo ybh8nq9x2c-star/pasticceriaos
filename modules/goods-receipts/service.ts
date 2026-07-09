@@ -98,6 +98,7 @@ export async function createReceipt(raw: unknown): Promise<string> {
 
   let status: ReceiptStatus = 'draft';
   let lines: Database['public']['Tables']['purchase_receipt_lines']['Insert'][] = [];
+  let supplierId = input.supplierId || null;
 
   // P1-B: se per QUESTO ordine c'è già un ricevimento aperto, riusalo — mai
   // doppioni da "Nuovo" premuto al posto di "riprendi" (stessa semantica di
@@ -125,6 +126,10 @@ export async function createReceipt(raw: unknown): Promise<string> {
         'Puoi creare un ricevimento solo da ordini inviati o confermati.',
       );
     }
+
+    // Backfill fornitore dall'ordine: chi collega un ordine non deve (ri)dire
+    // chi è il fornitore, e nessun caller futuro può dimenticarselo.
+    if (!supplierId) supplierId = order.supplier_id;
 
     const { data: orderLines, error: linesErr } = await supabase
       .from('order_line_items')
@@ -156,7 +161,7 @@ export async function createReceipt(raw: unknown): Promise<string> {
   const receiptId = await repo.insertReceipt({
     organization_id: orgId,
     mode: input.mode,
-    supplier_id: input.supplierId || null,
+    supplier_id: supplierId,
     purchase_order_id: input.purchaseOrderId || null,
     ddt_number: input.ddtNumber || null,
     ddt_date: input.ddtDate || null,

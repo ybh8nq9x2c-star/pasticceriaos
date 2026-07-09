@@ -10,11 +10,10 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { CheckCircle2, Package } from 'lucide-react';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
-import { receiveOrderInFullAction } from '@/modules/goods-receipts/actions';
+import { receiveOrderInFullAction, openReceiptForOrderAction } from '@/modules/goods-receipts/actions';
 import type { PurchaseOrderListItem } from '@/modules/ordering/types';
 
 function fmtCurrency(n: number | null) {
@@ -91,13 +90,16 @@ export function OrderReceiveSheet({
           {isPartial ? 'Conferma arrivo del resto' : 'Conferma ricezione'}
         </Button>
 
-        {/* Uscita secondaria: quantità diverse → flusso riga-per-riga (engine). */}
-        <Link
-          href={`/receipts/new?order=${order.id}`}
-          className="flex items-center justify-center min-h-[44px] text-sm font-semibold text-primary hover:underline"
-        >
-          Quantità diverse? Ricevi riga per riga →
-        </Link>
+        {/* Uscita secondaria: quantità diverse → flusso riga-per-riga (engine).
+            UN TAP: apre (o riprende) il ricevimento precompilato, senza form. */}
+        <form action={openReceiptForOrderAction.bind(null, order.id)}>
+          <button
+            type="submit"
+            className="flex w-full items-center justify-center min-h-[44px] text-sm font-semibold text-primary hover:underline"
+          >
+            Quantità diverse? Ricevi riga per riga →
+          </button>
+        </form>
       </div>
     </BottomSheet>
   );

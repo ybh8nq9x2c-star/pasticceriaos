@@ -10,6 +10,7 @@ import { notFound } from 'next/navigation';
 import { getOrder, getOrderHistory } from '@/modules/ordering/service';
 import { getBatchesForOrder } from '@/modules/inventory/service';
 import { changeOrderStatusAction, cancelOrderAction } from '@/modules/ordering/actions';
+import { openReceiptForOrderAction } from '@/modules/goods-receipts/actions';
 import { RegisterBatchForm } from './RegisterBatchForm';
 import { IDLE_STATE, UNIT_LABELS, UNIT_SHORT } from '@/lib/utils';
 import type { OrderStatus } from '@/modules/ordering/types';
@@ -115,6 +116,12 @@ export default async function OrderDetailPage({
   async function handleCancel(_formData: FormData): Promise<void> {
     'use server';
     await cancelOrderAction(orderId);
+  }
+
+  // Un tap → ricevimento aperto (creato o ripreso) con righe precompilate.
+  async function handleOpenReceipt(_formData: FormData): Promise<void> {
+    'use server';
+    await openReceiptForOrderAction(orderId);
   }
 
   const isCancelled = order.status === 'cancelled';
@@ -274,12 +281,14 @@ export default async function OrderDetailPage({
                     {openLines.length} rig{openLines.length === 1 ? 'a' : 'he'} ancora apert{openLines.length === 1 ? 'a' : 'e'}: è arrivata solo una parte dell'ordine.
                   </p>
                 </div>
-                <Link
-                  href={`/receipts/new?order=${order.id}`}
-                  className="sm:shrink-0 px-3 py-2.5 rounded-xl text-xs font-semibold text-center bg-primary text-primary-fg hover:bg-primary-hover transition-colors whitespace-nowrap"
-                >
-                  Ricevi il resto
-                </Link>
+                <form action={handleOpenReceipt} className="sm:shrink-0">
+                  <SubmitButton
+                    pendingLabel="Apro…"
+                    className="w-full px-3 py-2.5 rounded-xl text-xs font-semibold text-center bg-primary text-primary-fg hover:bg-primary-hover transition-colors whitespace-nowrap"
+                  >
+                    Ricevi il resto
+                  </SubmitButton>
+                </form>
               </div>
 
               {/* Mobile: righe aperte come row-stack */}
@@ -501,15 +510,18 @@ export default async function OrderDetailPage({
           )}
 
           {/* Ricevi merce → Goods Receipt Engine (preview editabile, poi conferma).
-              Unica via di ingresso a magazzino: niente posting istantaneo.
+              Unica via di ingresso a magazzino: niente posting istantaneo. UN TAP:
+              crea/riprende il ricevimento precompilato e atterra sul dettaglio.
               Su mobile la stessa azione vive nella StickyActionBar in fondo. */}
           {canReceive && (
-            <Link
-              href={`/receipts/new?order=${order.id}`}
-              className="hidden lg:block w-full py-3 text-center rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
-            >
-              <Package size={15} className="inline-block mr-1.5 -mt-0.5" aria-hidden="true" /> Ricevi merce
-            </Link>
+            <form action={handleOpenReceipt} className="hidden lg:block">
+              <SubmitButton
+                pendingLabel="Apro il ricevimento…"
+                className="w-full py-3 text-center rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
+              >
+                <Package size={15} className="inline-block mr-1.5 -mt-0.5" aria-hidden="true" /> Ricevi merce
+              </SubmitButton>
+            </form>
           )}
 
           {/* Azione avanzamento stato (non tocca il magazzino). Fornitore
@@ -555,12 +567,14 @@ export default async function OrderDetailPage({
       {(canReceive || nextAction || convertHref) && (
         <StickyActionBar className="lg:hidden mt-6">
           {canReceive ? (
-            <Link
-              href={`/receipts/new?order=${order.id}`}
-              className="flex items-center justify-center w-full h-12 rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
-            >
-              <Package size={15} className="mr-1.5" aria-hidden="true" /> Ricevi merce
-            </Link>
+            <form action={handleOpenReceipt}>
+              <SubmitButton
+                pendingLabel="Apro il ricevimento…"
+                className="flex items-center justify-center w-full h-12 rounded-xl text-sm font-semibold bg-primary text-primary-fg hover:bg-primary-hover transition-colors"
+              >
+                <Package size={15} className="mr-1.5" aria-hidden="true" /> Ricevi merce
+              </SubmitButton>
+            </form>
           ) : convertHref ? (
             <Link
               href={convertHref}
