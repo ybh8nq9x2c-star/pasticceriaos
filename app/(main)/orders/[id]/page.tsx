@@ -55,7 +55,13 @@ function formatCurrency(n: number | null) {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(n);
 }
 
-export default async function OrderDetailPage({ params }: { params: { id: string } }) {
+export default async function OrderDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: { flash?: string };
+}) {
   // L'ordine è l'entità primaria: se manca → 404. Lo storico è ancillare: un suo
   // errore NON deve far sparire un ordine esistente (degrada a lista vuota).
   let order;
@@ -136,6 +142,26 @@ export default async function OrderDetailPage({ params }: { params: { id: string
           />
         </div>
       </div>
+
+      {/* Conferma creazione (arrivo da /orders/new): la bozza esiste, ora si invia. */}
+      {searchParams?.flash && (
+        <div className="mb-4 rounded-xl bg-success-light border border-success/30 px-4 py-2.5 text-sm text-success-strong">
+          ✓ {searchParams.flash}
+        </div>
+      )}
+
+      {/* Bozza: onesto sul fatto che il fornitore NON l'ha ancora ricevuta.
+          Badge "Bozza" in testata + CTA "Invia ordine" più in basso completano il quadro. */}
+      {order.status === 'draft' && (
+        <div className="mb-6 rounded-2xl border border-border bg-surface-2 px-5 py-4">
+          <p className="font-semibold text-ink">Ordine non ancora inviato</p>
+          <p className="text-sm text-ink-muted mt-1">
+            Questa è una <strong className="text-ink">bozza</strong>: il fornitore non l&apos;ha ancora ricevuta.
+            Controlla le righe e premi <strong className="text-ink">“Invia ordine”</strong> per recapitarla
+            {order.supplierEmail ? <> a <span className="font-medium text-ink">{order.supplierEmail}</span></> : null}.
+          </p>
+        </div>
+      )}
 
       {/* Invio non attestato: stato ONESTO + azione chiara (mandalo tu al fornitore). */}
       {showManualSend && (

@@ -7,11 +7,10 @@
 // nessun fetch client, nessun dato statico.
 // =============================================================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFormState } from 'react-dom';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, AlertTriangle } from 'lucide-react';
 import { IDLE_STATE } from '@/lib/utils';
 import { createOrderAction } from '@/modules/ordering/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -50,21 +49,67 @@ export function NewOrderForm({
   initialRows?: PrefillRow[];
   prefillNote?: string;
 }) {
-  const router = useRouter();
   const [rows, setRows] = useState<LineRow[]>(
     initialRows && initialRows.length > 0
       ? initialRows.map((r) => ({ ...r, key: ++keyCounter }))
       : [EMPTY_ROW()],
   );
+  const [supplierId, setSupplierId] = useState(initialSupplierId ?? '');
 
   const [state, formAction] = useFormState(createOrderAction, IDLE_STATE);
   // Caso standard (Task 2): solo i campi indispensabili. Data/consegna/note e
   // unità/prezzo per riga (auto-compilati dall'ingrediente) stanno dietro "dettagli".
   const [showDetails, setShowDetails] = useState(false);
 
+  // Flusso onesto (Task 2): comporre → RIVEDERE → creare bozza. Nessun invio
+  // cieco: il primo pulsante porta alla preview, non alla creazione.
+  const [reviewing, setReviewing] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  // Se il server torna un errore (validazione lato service), esci dalla review
+  // così l'utente rivede il form con il messaggio in cima.
   useEffect(() => {
-    if (state.status === 'success') router.push(`/orders?flash=${encodeURIComponent('Ordine creato')}`);
-  }, [state, router]);
+    if (state.status === 'error') setReviewing(false);
+  }, [state]);
+
+  const ingName = useMemo(() => {
+    const m = new Map(ingredients.map((i) => [i.id, i.name]));
+    return (id: string) => m.get(id) ?? '—';
+  }, [ingredients]);
+
+  // Righe valide = ingrediente scelto E quantità > 0. Solo queste finiranno in bozza.
+  const validRows = useMemo(
+    () => rows.filter((r) => r.ingredientProductId && (parseFloat(r.quantity) || 0) > 0),
+    [rows],
+  );
+  // Righe compilate a metà (ingrediente senza qtà, o qtà senza ingrediente): da segnalare.
+  const partialRows = useMemo(
+    () =>
+      rows.filter((r) => {
+        const hasIng = !!r.ingredientProductId;
+        const hasQty = (parseFloat(r.quantity) || 0) > 0;
+        return hasIng !== hasQty; // esattamente uno dei due
+      }),
+    [rows],
+  );
+  const missingPriceCount = useMemo(
+    () => validRows.filter((r) => !((parseFloat(r.unitPriceSnapshot) || 0) > 0)).length,
+    [validRows],
+  );
+  const chosenSupplier = suppliers.find((s) => s.id === supplierId);
+
+  function goToReview() {
+    setLocalError(null);
+    if (!supplierId) {
+      setLocalError('Scegli un fornitore prima di continuare.');
+      return;
+    }
+    if (validRows.length === 0) {
+      setLocalError('Aggiungi almeno una riga con ingrediente e quantità.');
+      return;
+    }
+    setReviewing(true);
+  }
 
   function addRow() {
     setRows((p) => [...p, EMPTY_ROW()]);
@@ -91,7 +136,10 @@ export function NewOrderForm({
   }
 
   function handleSubmit(formData: FormData) {
-    const lineItems = rows.map((r) => ({
+    // Invia SOLO le righe valide (ingrediente + quantità): coerente con la
+    // preview, che promette l'esclusione delle righe incomplete, ed evita il
+    // rifiuto server per quantità 0 / ingrediente mancante.
+    const lineItems = validRows.map((r) => ({
       ingredientProductId: r.ingredientProductId,
       quantity:            r.quantity,
       unitSnapshot:        r.unitSnapshot,
@@ -126,12 +174,15 @@ export function NewOrderForm({
       )}
 
       <form action={handleSubmit} className="space-y-6">
-        {state.status === 'error' && (
+        {(state.status === 'error' || localError) && (
           <div className="rounded-xl bg-danger-light border border-danger-soft p-3 text-sm text-danger">
-            {state.error}
+            {state.status === 'error' ? state.error : localError}
           </div>
         )}
 
+        {/* --- FASE COMPOSIZIONE: nascosta (non smontata) durante la review, così
+            i campi restano nel DOM e vengono inviati col submit finale. --- */}
+        <div className={reviewing ? 'hidden' : 'space-y-6'}>
         {/* Testata ordine */}
         <div className="bg-surface-2 rounded-2xl border border-border p-6 space-y-5">
           <div className="flex items-center justify-between">
@@ -152,7 +203,8 @@ export function NewOrderForm({
             <select
               name="supplierId"
               required
-              defaultValue={initialSupplierId ?? ''}
+              value={supplierId}
+              onChange={(e) => setSupplierId(e.target.value)}
               className="w-full rounded-xl border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-ring bg-surface-2"
             >
               <option value="">Seleziona fornitore…</option>
@@ -304,21 +356,109 @@ export function NewOrderForm({
             </div>
           )}
         </div>
-
-        <div className="flex gap-3">
-          <Link
-            href="/orders"
-            className="flex-1 py-3 text-center rounded-xl border border-border text-sm font-semibold text-ink hover:bg-surface-offset"
-          >
-            Annulla
-          </Link>
-          <SubmitButton
-            pendingLabel="Creazione…"
-            className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
-          >
-            Crea ordine
-          </SubmitButton>
         </div>
+        {/* --- fine FASE COMPOSIZIONE --- */}
+
+        {/* --- FASE REVIEW: riepilogo prima della scrittura. Nessuna bozza è
+            ancora stata salvata. --- */}
+        {reviewing && (
+          <div className="bg-surface-2 rounded-2xl border border-border p-6 space-y-4">
+            <div>
+              <h2 className="text-base font-bold text-ink">Rivedi prima di creare la bozza</h2>
+              <p className="text-xs text-ink-muted mt-1">
+                Niente è ancora stato salvato. Controlla e poi crea la bozza — l&apos;invio al
+                fornitore avverrà dopo, dal dettaglio ordine.
+              </p>
+            </div>
+
+            <dl className="text-sm">
+              <div className="flex justify-between py-1.5 border-b border-divider">
+                <dt className="text-ink-muted">Fornitore</dt>
+                <dd className="font-semibold text-ink">{chosenSupplier?.name ?? '—'}</dd>
+              </div>
+            </dl>
+
+            <ul className="divide-y divide-divider rounded-xl border border-border">
+              {validRows.map((r) => {
+                const q = parseFloat(r.quantity) || 0;
+                const p = parseFloat(r.unitPriceSnapshot) || 0;
+                return (
+                  <li key={r.key} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                    <span className="font-medium text-ink">{ingName(r.ingredientProductId)}</span>
+                    <span className="font-mono text-ink-muted whitespace-nowrap">
+                      {q} {r.unitSnapshot}
+                      {p > 0 && (
+                        <span className="text-ink-faint"> · {new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(q * p)}</span>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Avvisi onesti su cosa NON entrerà o è incompleto */}
+            {(partialRows.length > 0 || missingPriceCount > 0) && (
+              <div className="rounded-xl bg-warning-light border border-warning-soft p-3 text-xs text-warning-strong space-y-1">
+                {partialRows.length > 0 && (
+                  <p className="flex items-start gap-1.5">
+                    <AlertTriangle size={13} aria-hidden="true" className="shrink-0 mt-0.5" />
+                    {partialRows.length} rig{partialRows.length === 1 ? 'a' : 'he'} incomplet{partialRows.length === 1 ? 'a' : 'e'} (senza ingrediente o quantità): {partialRows.length === 1 ? 'sarà esclusa' : 'saranno escluse'}.
+                  </p>
+                )}
+                {missingPriceCount > 0 && (
+                  <p className="flex items-start gap-1.5">
+                    <AlertTriangle size={13} aria-hidden="true" className="shrink-0 mt-0.5" />
+                    {missingPriceCount} rig{missingPriceCount === 1 ? 'a' : 'he'} senza prezzo: la bozza si crea comunque, il totale sarà parziale.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {lineTotal > 0 && (
+              <div className="flex justify-end text-sm">
+                <span className="text-ink-muted">Totale stimato:&nbsp;</span>
+                <span className="font-mono font-semibold text-ink">
+                  {new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(lineTotal)}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Azioni: in composizione → "Rivedi"; in review → "Torna a modificare" + "Crea bozza". */}
+        {reviewing ? (
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setReviewing(false)}
+              className="flex-1 py-3 text-center rounded-xl border border-border text-sm font-semibold text-ink hover:bg-surface-offset"
+            >
+              ← Torna a modificare
+            </button>
+            <SubmitButton
+              pendingLabel="Creazione…"
+              className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
+            >
+              Crea bozza
+            </SubmitButton>
+          </div>
+        ) : (
+          <div className="flex gap-3">
+            <Link
+              href="/orders"
+              className="flex-1 py-3 text-center rounded-xl border border-border text-sm font-semibold text-ink hover:bg-surface-offset"
+            >
+              Annulla
+            </Link>
+            <button
+              type="button"
+              onClick={goToReview}
+              className="flex-1 py-3 bg-primary text-primary-fg rounded-xl text-sm font-semibold hover:bg-primary-hover transition-colors"
+            >
+              Rivedi ordine
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );
