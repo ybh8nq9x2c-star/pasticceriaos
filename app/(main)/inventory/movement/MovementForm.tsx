@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { recordMovementAction } from '@/modules/inventory/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
+import { HelpInlineHint } from '@/components/help/HelpInlineHint';
 
 export interface IngredientOption { id: string; name: string; unit: string }
 
@@ -59,6 +60,12 @@ export function MovementForm({ ingredients }: { ingredients: IngredientOption[] 
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
+          {movType === 'purchase_receipt' && (
+            <HelpInlineHint tone="warning" className="mt-1.5">
+              Per una consegna vera del fornitore usa <a href="/receipts/new" className="underline font-semibold">Ricevimenti</a>:
+              registra lotti, scadenza e collega l’ordine. Qui è solo per correzioni fuori ciclo.
+            </HelpInlineHint>
+          )}
         </div>
 
         <div>

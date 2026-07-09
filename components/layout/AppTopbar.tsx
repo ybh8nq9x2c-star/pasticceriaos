@@ -12,6 +12,7 @@ import { usePathname } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { NotificationBell } from '@/components/shared/NotificationBell';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
+import { HelpLauncher } from '@/components/help/HelpLauncher';
 import {
   CUSTOMER_NAV,
   SUPPLIER_NAV,
@@ -71,6 +72,7 @@ export function AppTopbar({ variant = 'customer', lowStockCount = 0 }: AppTopbar
               : `${lowStockCount} ordini da evadere`
           }
         />
+        {variant === 'customer' && <HelpLauncher className="inline-flex items-center justify-center w-9 h-9 rounded-md text-ink-muted hover:text-ink hover:bg-surface-offset transition-colors" />}
         <ThemeToggle />
       </div>
     </header>

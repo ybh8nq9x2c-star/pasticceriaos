@@ -16,6 +16,7 @@ import {
   Wheat,
   BarChart3,
   Settings,
+  LifeBuoy,
   Inbox,
   Package,
   PackageCheck,
@@ -55,6 +56,7 @@ export const CUSTOMER_NAV: NavSection[] = [
     title: 'Sistema',
     items: [
       { href: '/analytics', label: 'Analytics',    icon: BarChart3 },
+      { href: '/help',      label: 'Guida',        icon: LifeBuoy },
       { href: '/settings',  label: 'Impostazioni', icon: Settings },
     ],
   },

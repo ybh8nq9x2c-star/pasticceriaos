@@ -17,6 +17,7 @@ import { signOutAction } from '@/modules/identity/actions';
 import { LogoMark } from '@/components/shared/Logo';
 import { NotificationBell } from '@/components/shared/NotificationBell';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
+import { HelpLauncher } from '@/components/help/HelpLauncher';
 import { Badge } from '@/components/ui/Badge';
 import {
   CUSTOMER_NAV, CUSTOMER_BOTTOM, SUPPLIER_NAV, SUPPLIER_BOTTOM,
@@ -71,6 +72,7 @@ export function MobileChrome({ variant, orgName, userEmail, lowStockCount = 0 }:
             <LogoMark size={24} />
           </Link>
           <h2 className="flex-1 min-w-0 truncate text-md font-semibold text-ink">{title}</h2>
+          {variant === 'customer' && <HelpLauncher className="inline-flex items-center justify-center w-10 h-10 rounded-md text-ink-muted hover:text-ink active:bg-surface-offset transition-colors shrink-0" />}
           <NotificationBell
             count={variant === 'customer' ? lowStockCount : 0}
             href={variant === 'customer' ? '/inventory' : '/supplier/orders'}
