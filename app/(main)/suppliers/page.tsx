@@ -10,27 +10,16 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { listSuppliers } from '@/modules/catalog/service';
 import { listConnectedSuppliers } from '@/modules/marketplace/service';
+import { withSupplierChannel } from '@/lib/supplier-channel';
 import { createClient } from '@/lib/supabase/server';
 import { requireOrgId } from '@/modules/identity/service';
 import { ConnectSupplierForm } from '@/components/marketplace/ConnectSupplierForm';
+import { SuppliersDirectory } from '@/components/suppliers/SuppliersDirectory';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Truck, ShoppingCart, Link2, ReceiptText, ChartColumn } from 'lucide-react';
 
 export const metadata: Metadata = { title: 'Fornitori' };
-
-function LevelBadge({ level }: { level: 1 | 2 | 3 }) {
-  const cfg = {
-    1: { label: 'L1 · Email', cls: 'bg-neutral-light text-ink-muted' },
-    2: { label: 'L2 · Collegato', cls: 'bg-primary-light text-primary' },
-    3: { label: 'L3 · Listino attivo', cls: 'bg-neutral-light text-ink' },
-  }[level];
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${cfg.cls}`}>
-      {cfg.label}
-    </span>
-  );
-}
 
 export default async function SuppliersPage() {
   const orgId = await requireOrgId();
@@ -38,6 +27,7 @@ export default async function SuppliersPage() {
     listSuppliers(),
     listConnectedSuppliers().catch(() => []),
   ]);
+  const enriched = withSupplierChannel(suppliers, connections);
 
   // Listini attivi per fornitore (L3): conteggio reale da supplier_price_list.
   const supabase = await createClient();
@@ -120,7 +110,7 @@ export default async function SuppliersPage() {
         )}
       </div>
 
-      {/* Anagrafica con livelli */}
+      {/* Anagrafica con CANALE in primo piano + filtri rapidi */}
       {suppliers.length === 0 ? (
         <EmptyState
           icon={Truck}
@@ -130,47 +120,17 @@ export default async function SuppliersPage() {
           ctaLabel="Aggiungi fornitore"
         />
       ) : (
-        <div className="bg-surface-2 rounded-2xl border border-border overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-bg border-b border-border">
-              <tr>
-                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Nome</th>
-                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Contatti</th>
-                <th className="text-left px-6 py-3.5 font-semibold text-ink-muted text-xs uppercase tracking-wide">Connessione</th>
-                <th className="px-6 py-3.5" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-divider">
-              {suppliers.map((s) => {
-                // L3 = listino consolidato (>= 5 voci attive), a prescindere dal
-                // canale: anche un fornitore solo-email con listino è "attivo".
-                const hasPriceList = (priceListCounts.get(s.id) ?? 0) >= 5;
-                const level: 1 | 2 | 3 = hasPriceList ? 3 : s.supplierOrgId ? 2 : 1;
-                return (
-                  <tr key={s.id} className="hover:bg-surface-offset transition-colors">
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-ink">{s.name}</p>
-                      {!s.isActive && <p className="text-xs text-danger">disattivato</p>}
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-ink-muted">{s.email}</p>
-                      {s.phone && <p className="text-xs font-mono text-ink-muted">{s.phone}</p>}
-                    </td>
-                    <td className="px-6 py-4"><LevelBadge level={level} /></td>
-                    <td className="px-6 py-4 text-right">
-                      <Link
-                        href={`/suppliers/${s.id}`}
-                        className="text-primary text-xs font-semibold hover:underline"
-                      >
-                        Scheda →
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <SuppliersDirectory
+          suppliers={enriched.map((s) => ({
+            id: s.id,
+            name: s.name,
+            email: s.email,
+            phone: s.phone,
+            isActive: s.isActive,
+            channel: s.channel,
+            hasPriceList: (priceListCounts.get(s.id) ?? 0) >= 5,
+          }))}
+        />
       )}
     </div>
   );

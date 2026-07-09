@@ -12,7 +12,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { SupplierChannelBadge } from '@/components/suppliers/SupplierChannelBadge';
 import { Button } from '@/components/ui/Button';
+import { orderChannel } from '@/lib/supplier-channel';
 import { orderStatusBadge } from '@/modules/ordering/status-display';
 import { useRowSelection } from '@/lib/hooks/useRowSelection';
 import { OrderReceiveSheet } from './OrderReceiveSheet';
@@ -100,6 +102,9 @@ export function OrdersMobileList({ orders }: { orders: PurchaseOrderListItem[] }
                           <> · <span className="font-mono font-medium text-ink">{fmtCurrency(o.totalAmount)}</span></>
                         )}
                       </p>
+                      <div className="mt-1.5">
+                        <SupplierChannelBadge channel={orderChannel(o.marketplaceOrderId)} />
+                      </div>
                     </Link>
                     {/* UNA primary action per card */}
                     <div className="px-4 pb-3.5 pt-1">

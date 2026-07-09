@@ -7,9 +7,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getSupplier } from '@/modules/catalog/service';
+import { ArrowRight } from 'lucide-react';
+import { getSupplierWithChannel } from '@/modules/catalog/service';
 import { NotFoundError } from '@/lib/errors';
 import { Badge } from '@/components/ui/Badge';
+import { SupplierChannelBadge } from '@/components/suppliers/SupplierChannelBadge';
 import { PortalLinkPanel } from '@/components/suppliers/PortalLinkPanel';
 import { SupplierEditForm } from './SupplierEditForm';
 
@@ -18,12 +20,14 @@ export const metadata: Metadata = { title: 'Fornitore' };
 export default async function SupplierDetailPage({ params }: { params: { id: string } }) {
   let supplier;
   try {
-    supplier = await getSupplier(params.id);
+    supplier = await getSupplierWithChannel(params.id);
   } catch (err) {
     if (err instanceof NotFoundError) notFound();
     throw err;
   }
   if (!supplier) notFound();
+
+  const isConnected = supplier.channel === 'bakeryos' && !!supplier.connectionId;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
@@ -31,9 +35,35 @@ export default async function SupplierDetailPage({ params }: { params: { id: str
         <Link href="/suppliers" className="text-sm text-ink-muted hover:text-ink transition-colors">
           ← Fornitori
         </Link>
-        <div className="flex items-center justify-between mt-3">
+        <div className="flex items-center justify-between gap-3 mt-3">
           <h1 className="text-3xl font-bold text-ink">{supplier.name}</h1>
           {supplier.isActive && <Badge variant="success">Attivo</Badge>}
+        </div>
+      </div>
+
+      {/* Hero canale: stato connessione onesto + azione coerente. */}
+      <div
+        className={`mb-6 rounded-2xl border p-5 ${
+          isConnected ? 'border-primary-soft bg-primary-light/60' : 'border-border bg-surface-2'
+        }`}
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <SupplierChannelBadge channel={supplier.channel} variant="full" size="md" />
+            <p className="mt-2 text-sm text-ink-muted">
+              {isConnected
+                ? 'Gli ordini sono condivisi internamente su BakeryOS: il fornitore li vede subito nella sua coda, li conferma e può inviarti DDT e fatture.'
+                : 'Gli ordini vengono inviati via email o gestiti a mano. Se il fornitore usa BakeryOS, collegalo con la sua chiave dalla pagina Fornitori.'}
+            </p>
+          </div>
+          {isConnected && (
+            <Link
+              href={`/marketplace/orders/new?connection=${supplier.connectionId}`}
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-fg hover:bg-primary-hover transition-colors"
+            >
+              Ordina internamente <ArrowRight size={16} aria-hidden="true" />
+            </Link>
+          )}
         </div>
       </div>
 

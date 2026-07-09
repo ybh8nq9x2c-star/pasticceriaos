@@ -22,6 +22,8 @@ import {
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { SubmitButton } from '@/components/ui/SubmitButton';
 import { StickyActionBar } from '@/components/ui/StickyActionBar';
+import { SupplierChannelBadge } from '@/components/suppliers/SupplierChannelBadge';
+import { orderChannel } from '@/lib/supplier-channel';
 
 export const metadata: Metadata = { title: 'Ordine' };
 
@@ -134,6 +136,17 @@ export default async function OrderDetailPage({
               {formatDate(order.orderDate)}
               {order.expectedDate && ` · consegna ${formatDate(order.expectedDate)}`}
             </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <SupplierChannelBadge channel={orderChannel(order.marketplaceOrderId)} />
+              {order.marketplaceOrderId && (
+                <Link
+                  href={`/marketplace/orders/${order.marketplaceOrderId}`}
+                  className="text-xs font-semibold text-primary hover:underline"
+                >
+                  Vedi ordine condiviso →
+                </Link>
+              )}
+            </div>
           </div>
           <StatusBadge
             label={badge.label}

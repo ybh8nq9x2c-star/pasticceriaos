@@ -9,6 +9,8 @@
 
 import Link from 'next/link';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { SupplierChannelBadge } from '@/components/suppliers/SupplierChannelBadge';
+import { orderChannel } from '@/lib/supplier-channel';
 import { orderStatusBadge } from '@/modules/ordering/status-display';
 import { useRowSelection } from '@/lib/hooks/useRowSelection';
 import { OrdersBulkSend } from './OrdersBulkSend';
@@ -80,6 +82,9 @@ export function OrdersDesktopTable({ orders }: { orders: PurchaseOrderListItem[]
                     <Link href={`/orders/${order.id}`} className="font-semibold text-ink hover:text-primary">
                       {order.supplierName}
                     </Link>
+                    <div className="mt-1">
+                      <SupplierChannelBadge channel={orderChannel(order.marketplaceOrderId)} />
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-ink-muted font-mono text-xs">{formatDate(order.orderDate)}</td>
                   <td className="px-6 py-4 text-ink-muted font-mono text-xs">
