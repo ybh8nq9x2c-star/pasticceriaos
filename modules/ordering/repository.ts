@@ -49,6 +49,7 @@ export async function listOrders(orgId: string): Promise<PurchaseOrderListItem[]
       totalAmount:    total,
       sentAt:         r.sent_at,
       dispatchOutcome: r.dispatch_outcome,
+      marketplaceOrderId: r.marketplace_order_id ?? null,
       createdAt:      r.created_at,
     };
   });
@@ -235,6 +236,7 @@ function toOrder(row: any): PurchaseOrder {
     notes:          row.notes,
     emailMessageId: row.email_message_id,
     dispatchOutcome: row.dispatch_outcome ?? null,
+    marketplaceOrderId: row.marketplace_order_id ?? null,
     sentAt:         row.sent_at,
     createdAt:      row.created_at,
     updatedAt:      row.updated_at,

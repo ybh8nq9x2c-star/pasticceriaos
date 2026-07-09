@@ -6,7 +6,7 @@
 // =============================================================================
 
 import type { Metadata } from 'next';
-import { listSuppliers, listIngredients } from '@/modules/catalog/service';
+import { listSuppliersWithChannel, listIngredients } from '@/modules/catalog/service';
 import { getIngredientRequirements } from '@/modules/reporting/service';
 import { NewOrderForm, type PrefillRow } from './NewOrderForm';
 
@@ -23,7 +23,7 @@ export default async function NewOrderPage({
   searchParams: { plan?: string; ingredient?: string; qty?: string; ingredients?: string };
 }) {
   const [suppliers, ingredients] = await Promise.all([
-    listSuppliers(),
+    listSuppliersWithChannel(),
     listIngredients(),
   ]);
 
@@ -115,7 +115,9 @@ export default async function NewOrderPage({
 
   return (
     <NewOrderForm
-      suppliers={suppliers.map((s) => ({ id: s.id, name: s.name, email: s.email }))}
+      suppliers={suppliers.map((s) => ({
+        id: s.id, name: s.name, email: s.email, channel: s.channel, connectionId: s.connectionId,
+      }))}
       ingredients={ingredients.map((i) => ({
         id: i.id, name: i.name, unit: i.unit, unitPrice: i.unitPrice,
       }))}

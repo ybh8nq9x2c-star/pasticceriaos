@@ -80,9 +80,41 @@ export async function createOrder(raw: unknown): Promise<PurchaseOrder> {
   const orgId = await requireOrgId();
   const input: CreateOrderInput = createOrderSchema.parse(raw);
 
+  // Guard "niente doppia verità": un fornitore COLLEGATO a BakeryOS non deve mai
+  // produrre un ordine standard email/manuale. Il canale corretto è l'ordine
+  // condiviso dal catalogo (marketplace). La UI già instrada lì; questo è il
+  // confine lato write-path. NB: vale solo per la creazione interattiva — le
+  // bozze da auto-riordino chiamano repo.insertOrder direttamente.
+  await assertSupplierNotConnected(orgId, input.supplierId);
+
   // Header + righe + history iniziale (null -> draft) in UNA transazione (RPC).
   // Nessun ordine può più nascere senza la sua riga di history.
   return repo.insertOrder(orgId, input);
+}
+
+/** True se il fornitore locale è collegato a BakeryOS con connessione ATTIVA. */
+async function assertSupplierNotConnected(orgId: string, supplierId: string): Promise<void> {
+  const supabase = await createClient();
+  const { data: sup } = await supabase
+    .from('suppliers')
+    .select('supplier_org_id')
+    .eq('id', supplierId)
+    .maybeSingle();
+  const supplierOrgId = (sup as { supplier_org_id: string | null } | null)?.supplier_org_id ?? null;
+  if (!supplierOrgId) return; // solo-email: PO standard corretto
+
+  const { data: conn } = await supabase
+    .from('supplier_customer_connections')
+    .select('id')
+    .eq('customer_org_id', orgId)
+    .eq('supplier_org_id', supplierOrgId)
+    .eq('status', 'active')
+    .maybeSingle();
+  if (conn) {
+    throw new BusinessRuleError(
+      'Questo fornitore è collegato a BakeryOS: crea un ordine condiviso dal suo catalogo, non un ordine email/manuale.',
+    );
+  }
 }
 
 export async function updateOrder(id: string, raw: unknown): Promise<PurchaseOrder> {

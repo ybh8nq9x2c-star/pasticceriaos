@@ -33,6 +33,8 @@ export interface PurchaseOrder {
   emailMessageId: string | null;
   /** Esito invio: 'delivered' = recapito attestato; altrimenti da inviare a mano. */
   dispatchOutcome: DispatchOutcome | null;
+  /** Se valorizzato, questo PO è lo specchio interno di un ordine marketplace (canale BakeryOS). */
+  marketplaceOrderId: string | null;
   sentAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +53,8 @@ export interface PurchaseOrderListItem {
   totalAmount: number | null;
   sentAt: string | null;
   dispatchOutcome: DispatchOutcome | null;
+  /** Se valorizzato, l'ordine è lo specchio interno di un ordine marketplace. */
+  marketplaceOrderId: string | null;
   createdAt: string;
 }
 

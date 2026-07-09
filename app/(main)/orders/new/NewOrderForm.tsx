@@ -10,12 +10,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useFormState } from 'react-dom';
 import Link from 'next/link';
-import { ClipboardList, AlertTriangle } from 'lucide-react';
+import { ClipboardList, AlertTriangle, Link2, ArrowRight } from 'lucide-react';
 import { IDLE_STATE } from '@/lib/utils';
 import { createOrderAction } from '@/modules/ordering/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
+import { SupplierChannelBadge } from '@/components/suppliers/SupplierChannelBadge';
+import { CHANNEL_COPY, type SupplierChannel } from '@/lib/supplier-channel';
 
-export interface SupplierOption   { id: string; name: string; email?: string | null }
+export interface SupplierOption   {
+  id: string;
+  name: string;
+  email?: string | null;
+  channel: SupplierChannel;
+  /** connectionId marketplace quando channel === 'bakeryos'. */
+  connectionId?: string | null;
+}
 export interface IngredientOption { id: string; name: string; unit: string; unitPrice: number | null }
 export interface PrefillRow {
   ingredientProductId: string;
@@ -97,6 +106,12 @@ export function NewOrderForm({
     [validRows],
   );
   const chosenSupplier = suppliers.find((s) => s.id === supplierId);
+  // Fornitore collegato a BakeryOS → l'ordine è INTERNO condiviso (marketplace),
+  // non un PO email/manuale: instradiamo al composer del catalogo del fornitore.
+  const connectedSupplier =
+    chosenSupplier && chosenSupplier.channel === 'bakeryos' && chosenSupplier.connectionId
+      ? chosenSupplier
+      : null;
 
   function goToReview() {
     setLocalError(null);
@@ -218,6 +233,25 @@ export function NewOrderForm({
                 <Link href="/suppliers/new" className="underline">Creane uno</Link> prima di ordinare.
               </p>
             )}
+
+            {/* Canale visibile SUBITO alla selezione, prima di comporre l'ordine.
+                Solo-email: riga sobria. Collegato: banner (il flusso cambia). */}
+            {chosenSupplier && chosenSupplier.channel === 'email' && (
+              <p className="mt-2 flex items-center gap-2 text-xs text-ink-muted">
+                <SupplierChannelBadge channel="email" />
+                {CHANNEL_COPY.email.sub}
+              </p>
+            )}
+            {connectedSupplier && (
+              <div className="mt-2 flex items-start gap-2.5 rounded-xl border border-primary-soft bg-primary-light px-3.5 py-3">
+                <Link2 size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-primary" />
+                <p className="text-sm text-ink">
+                  <strong className="font-semibold">{connectedSupplier.name}</strong> è collegato a BakeryOS:
+                  l&apos;ordine sarà <strong>condiviso internamente</strong> e comparirà subito nella sua coda,
+                  non inviato via email.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Avanzati: restano nel DOM (la data di default si invia comunque) ma
@@ -263,7 +297,9 @@ export function NewOrderForm({
           </div>
         </div>
 
-        {/* Righe ordine */}
+        {/* Righe ordine — solo per fornitori NON collegati (ordine standard con
+            ingredienti locali). Per i collegati si compone dal catalogo (sotto). */}
+        {!connectedSupplier && (
         <div className="bg-surface-2 rounded-2xl border border-border p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-ink">
@@ -356,6 +392,25 @@ export function NewOrderForm({
             </div>
           )}
         </div>
+        )}
+
+        {/* Fornitore collegato: l'ordine interno si compone dal CATALOGO pubblicato
+            dal fornitore, non dagli ingredienti locali. CTA che porta al composer
+            marketplace (già preselezionato sulla connessione). */}
+        {connectedSupplier && (
+          <div className="rounded-2xl border border-primary-soft bg-primary-light/60 p-6">
+            <p className="text-sm text-ink">
+              Ordine interno condiviso con <strong>{connectedSupplier.name}</strong>: componi le righe
+              scegliendo dal suo catalogo. Il fornitore lo vedrà subito nella sua coda ordini.
+            </p>
+            <Link
+              href={`/marketplace/orders/new?connection=${connectedSupplier.connectionId}`}
+              className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-fg hover:bg-primary-hover transition-colors sm:w-auto"
+            >
+              Crea ordine condiviso <ArrowRight size={16} aria-hidden="true" />
+            </Link>
+          </div>
+        )}
         </div>
         {/* --- fine FASE COMPOSIZIONE --- */}
 
@@ -425,8 +480,10 @@ export function NewOrderForm({
           </div>
         )}
 
-        {/* Azioni: in composizione → "Rivedi"; in review → "Torna a modificare" + "Crea bozza". */}
-        {reviewing ? (
+        {/* Azioni standard (solo fornitore NON collegato): in composizione → "Rivedi";
+            in review → "Torna a modificare" + "Crea bozza". Per il collegato l'azione
+            è la CTA "Crea ordine condiviso" sopra. */}
+        {!connectedSupplier && (reviewing ? (
           <div className="flex gap-3">
             <button
               type="button"
@@ -458,7 +515,7 @@ export function NewOrderForm({
               Rivedi ordine
             </button>
           </div>
-        )}
+        ))}
       </form>
     </div>
   );
