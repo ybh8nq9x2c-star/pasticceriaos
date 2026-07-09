@@ -30,6 +30,7 @@ import {
 import { getPosConfig, getPosHealth } from '@/modules/pos/service';
 import { buildCloseDaySteps } from '@/lib/close-day';
 import { buildActivationTasks } from '@/lib/activation';
+import { partitionByExpiry, expiryPhrase } from '@/lib/expiry';
 import { CloseDayCard } from '@/components/dashboard/CloseDayCard';
 import { ActivationChecklist } from '@/components/dashboard/ActivationChecklist';
 import type { DashboardSummary } from '@/modules/reporting/types';
@@ -264,11 +265,22 @@ export default async function TodayPage() {
       href: '/documents?stato=anomaly',
     });
   }
-  if (expiring.length > 0) {
+  // Scaduti e in-scadenza sono cose diverse: il conteggio "entro 3 giorni" non
+  // deve inglobare i già scaduti (che la vista include ancora, qty>0).
+  const { expired: expiredBatches, upcoming: upcomingBatches } = partitionByExpiry(expiring);
+  if (expiredBatches.length > 0) {
+    attention.push({
+      icon: Ban, severity: 'red',
+      text: `${expiredBatches.length} ${expiredBatches.length === 1 ? 'lotto già scaduto' : 'lotti già scaduti'} ancora in magazzino`,
+      detail: expiredBatches.slice(0, 3).map((b) => b.ingredientName).join(', '),
+      href: '/inventory/batches',
+    });
+  }
+  if (upcomingBatches.length > 0) {
     attention.push({
       icon: Hourglass, severity: 'red',
-      text: `${expiring.length} ${expiring.length === 1 ? 'lotto scade' : 'lotti scadono'} entro 3 giorni`,
-      detail: expiring.slice(0, 3).map((b) => b.ingredientName).join(', '),
+      text: `${upcomingBatches.length} ${upcomingBatches.length === 1 ? 'lotto scade' : 'lotti scadono'} entro 3 giorni`,
+      detail: upcomingBatches.slice(0, 3).map((b) => b.ingredientName).join(', '),
       href: '/inventory/batches',
     });
   }
@@ -331,7 +343,8 @@ export default async function TodayPage() {
     if (b.suggestedRecipes.length > 0) {
       suggested.push({
         icon: Recycle,
-        text: `${b.quantityRemaining} ${b.unit} di ${b.ingredientName} ${b.daysToExpiry <= 0 ? 'scadono oggi' : `scadono tra ${b.daysToExpiry}g`} — usali in: ${b.suggestedRecipes.slice(0, 2).join(', ')}`,
+        // 3 rami: già scaduto ≠ scade oggi ≠ scade tra Ng (mai "scadono oggi" su un negativo).
+        text: `${b.quantityRemaining} ${b.unit} di ${b.ingredientName} — ${expiryPhrase(b.daysToExpiry)}: usali in ${b.suggestedRecipes.slice(0, 2).join(', ')}`,
         cta: 'Vedi lotti',
         href: '/inventory/batches',
       });

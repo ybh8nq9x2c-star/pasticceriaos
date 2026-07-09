@@ -414,6 +414,9 @@ export function NewPlanForm({
             <h2 className="text-base font-bold text-ink">Fabbisogno ingredienti</h2>
             <span className="text-xs text-ink-muted">{reqLoading ? 'Aggiorno…' : 'Aggiornato'}</span>
           </div>
+          {/* Row-stack (come il dettaglio piano): nome + stato su una riga,
+              i numeri e la CTA su una seconda riga → il nome ingrediente non
+              viene MAI sacrificato dalla truncation su schermo stretto. */}
           <div className="space-y-2">
             {requirements.map((req) => {
               const cfg =
@@ -423,22 +426,33 @@ export function NewPlanForm({
                     ? { dot: 'bg-warning', txt: 'text-warning-strong' }
                     : { dot: 'bg-success', txt: 'text-success-strong' };
               return (
-                <div key={req.ingredientProductId} className="flex items-center gap-3 text-sm">
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
-                  <span className="flex-1 text-ink truncate">{req.ingredientName}</span>
-                  <span className="font-mono text-xs text-ink-muted">
-                    {req.totalRequired} / {req.currentStock} {UNIT_LABELS[req.unit]}
-                  </span>
-                  {req.shortage > 0 ? (
-                    <Link
-                      href={`/orders/new?ingredient=${req.ingredientProductId}&qty=${req.shortage}`}
-                      className={`shrink-0 text-xs font-semibold ${cfg.txt} hover:underline whitespace-nowrap`}
-                    >
-                      manca {req.shortage} {UNIT_LABELS[req.unit]} · Ordina →
-                    </Link>
-                  ) : (
-                    <span className="shrink-0 text-xs text-success-strong">OK</span>
-                  )}
+                <div key={req.ingredientProductId} className="border-b border-divider pb-2 last:border-0 last:pb-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+                    <span className="flex-1 min-w-0 text-sm font-medium text-ink truncate">{req.ingredientName}</span>
+                    {req.shortage > 0 ? (
+                      <span className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-danger-light ${cfg.txt}`}>
+                        manca {req.shortage} {UNIT_LABELS[req.unit]}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-success-light text-success-strong">
+                        OK
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-3 pl-4">
+                    <span className="text-xs font-mono text-ink-muted">
+                      serve {req.totalRequired} {UNIT_LABELS[req.unit]} · in casa {req.currentStock} {UNIT_LABELS[req.unit]}
+                    </span>
+                    {req.shortage > 0 && (
+                      <Link
+                        href={`/orders/new?ingredient=${req.ingredientProductId}&qty=${req.shortage}`}
+                        className={`shrink-0 text-xs font-semibold ${cfg.txt} hover:underline whitespace-nowrap`}
+                      >
+                        Ordina →
+                      </Link>
+                    )}
+                  </div>
                 </div>
               );
             })}

@@ -35,9 +35,13 @@ Deno.serve(async (req: Request) => {
     return new Response('Unauthorized', { status: 401 });
   }
 
+  const todayIso = new Date().toISOString().split('T')[0];
   const threeDaysLater = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
     .toISOString().split('T')[0];
 
+  // La vista NON ha lower bound: include anche i lotti GIÀ SCADUTI ancora
+  // presenti (qty>0). Vanno mostrati — vanno smaltiti — ma NON chiamati "in
+  // scadenza": qui si distinguono scaduti (< oggi) vs in scadenza (oggi..+3).
   const { data: expiring, error } = await supabase
     .from('v_expiring_batches')
     .select('organization_id, ingredient_name, expiry_date, quantity_remaining, unit, suggested_recipes')
@@ -80,12 +84,24 @@ Deno.serve(async (req: Request) => {
       continue;
     }
 
+    // Partiziona scaduti vs in scadenza: titolo e tempo verbale devono dire il
+    // vero (un lotto scaduto ieri NON è "entro 3 giorni").
+    const expired = batches.filter((b) => b.expiry_date < todayIso);
+    const upcoming = batches.filter((b) => b.expiry_date >= todayIso);
+
+    const titleParts: string[] = [];
+    if (expired.length > 0) titleParts.push(`${expired.length} già scadut${expired.length === 1 ? 'o' : 'i'}`);
+    if (upcoming.length > 0) titleParts.push(`${upcoming.length} entro 3 giorni`);
+
     await supabase.from('notifications').insert({
       organization_id: orgId,
-      type: 'warn',
-      title: `Scadenze ingredienti: ${batches.length} ${batches.length > 1 ? 'lotti' : 'lotto'} entro 3 giorni`,
+      type: expired.length > 0 ? 'error' : 'warn',
+      title: `Scadenze ingredienti: ${titleParts.join(' · ')}`,
       message: batches
-        .map((b) => `${b.ingredient_name}: ${b.quantity_remaining} ${b.unit} (scade ${b.expiry_date})`)
+        .map((b) => {
+          const verb = b.expiry_date < todayIso ? 'scaduto il' : 'scade il';
+          return `${b.ingredient_name}: ${b.quantity_remaining} ${b.unit} (${verb} ${b.expiry_date})`;
+        })
         .join('\n'),
       href: '/inventory/batches',
     });
@@ -109,8 +125,8 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             from: 'PasticceriaOS <alert@pasticceriaos.it>',
             to: org.email,
-            subject: `⚠️ ${batches.length} ingredienti in scadenza — ${org.name}`,
-            html: buildExpiryEmailHtml(org.name, batches, appUrl),
+            subject: `⚠️ ${titleParts.join(' · ')} — ${org.name}`,
+            html: buildExpiryEmailHtml(org.name, batches, appUrl, todayIso),
           }),
         });
         if (res.ok) emailed++;
@@ -130,27 +146,30 @@ Deno.serve(async (req: Request) => {
   );
 });
 
-function buildExpiryEmailHtml(orgName: string, batches: ExpiringRow[], appUrl: string): string {
+function buildExpiryEmailHtml(orgName: string, batches: ExpiringRow[], appUrl: string, todayIso: string): string {
   const rows = batches
     .map(
-      (b) => `
+      (b) => {
+        const isExpired = b.expiry_date < todayIso;
+        return `
     <tr>
       <td style="padding:8px;border-bottom:1px solid #eee">${escapeHtml(b.ingredient_name)}</td>
       <td style="padding:8px;border-bottom:1px solid #eee">${b.quantity_remaining} ${escapeHtml(b.unit)}</td>
-      <td style="padding:8px;border-bottom:1px solid #eee">${b.expiry_date}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee${isExpired ? ';color:#b91c1c;font-weight:600' : ''}">${isExpired ? 'scaduto ' : ''}${b.expiry_date}</td>
       <td style="padding:8px;border-bottom:1px solid #eee">${
         b.suggested_recipes && b.suggested_recipes.length > 0
           ? escapeHtml(b.suggested_recipes.slice(0, 3).join(', '))
           : '—'
       }</td>
-    </tr>`,
+    </tr>`;
+      },
     )
     .join('');
 
   return `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
       <h2>Ciao ${escapeHtml(orgName)},</h2>
-      <p>Questi lotti scadono entro i prossimi 3 giorni:</p>
+      <p>Lotti da controllare (già scaduti e in scadenza entro 3 giorni):</p>
       <table style="width:100%;border-collapse:collapse">
         <thead>
           <tr style="background:#f5f5f5">
