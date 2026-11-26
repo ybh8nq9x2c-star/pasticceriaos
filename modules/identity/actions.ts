@@ -7,6 +7,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { safeNextPath } from '@/lib/safe-next';
 import { revalidatePath } from 'next/cache';
 import { getErrorMessage } from '@/lib/errors';
 import type { ActionState } from '@/lib/utils';
@@ -61,9 +62,8 @@ export async function signInAction(
 
   // Honor il deep-link `next` (impostato dal middleware), altrimenti '/' →
   // il middleware smista a /dashboard o /supplier secondo account_type (1 hop).
-  const next = formData.get('next');
-  const dest = typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : '/';
-  redirect(dest);
+  // F-10: `/\evil.com` passava il vecchio controllo (i browser lo leggono come //evil.com).
+  redirect(safeNextPath(formData.get('next'), '/'));
 }
 
 // ---------------------------------------------------------------------------

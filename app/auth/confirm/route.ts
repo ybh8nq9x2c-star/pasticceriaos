@@ -12,11 +12,10 @@ import { NextResponse } from 'next/server';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { publicOrigin } from '@/lib/public-origin';
+import { safeNextPath } from '@/lib/safe-next';
 
-/** Solo path interni relativi (no open-redirect). */
-function safeNext(raw: string | null): string {
-  return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/onboarding';
-}
+/** Solo path interni (no open-redirect, F-10): vedi lib/safe-next.ts. */
+const safeNext = (raw: string | null): string => safeNextPath(raw, '/onboarding');
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

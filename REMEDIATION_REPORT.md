@@ -310,7 +310,7 @@ Il ledger resta coerente con `qty_received`. Fix suggerito: incremento atomico i
 | F-05 webhook bloccato dal middleware | **fatto** | baseline + formalizzato in W5 (`lib/server-routes.ts`, test sul matcher) |
 | F-06 squatting store_id | **fatto** | 062: segreto per config + prova di possesso; messaggio generico |
 | F-07 ledger scrivibili / viewer | **fatto** per ledger e proiezioni (059) e per le nuove RPC (viewer escluso) · **parziale** per il ruolo viewer sulle altre tabelle, dove la RLS non distingue i ruoli |
-| F-08 prezzi forgiati nelle righe marketplace | **aperto** | non incluso in W0–W6; fix proposto: unico write-path `place_marketplace_order` o trigger che rifà lo snapshot dal catalogo |
+| F-08 prezzi forgiati nelle righe marketplace | **fatto** | 064: trigger che ricalcola lo snapshot dal catalogo (vedi §7) |
 | F-09 costi import AI | **aperto** | non incluso; serve una quota per org |
 | F-10 open redirect `/\` | **aperto** | non incluso; fix da una riga in `safeNext` |
 | F-11 header di sicurezza | **aperto** | non incluso (CSP da progettare con gli script inline esistenti) |
@@ -341,3 +341,19 @@ Il ledger resta coerente con `qty_received`. Fix suggerito: incremento atomico i
 - **Rollout delle migration in prod**: le 059 e 061 possono emettere un WARNING (invece di fallire) se
   trovano dati storici incoerenti. Prima del deploy eseguire `supabase/diagnostics/tenant_coherence.sql`
   e `receipts_open_duplicates.sql` sullo staging/prod in sola lettura.
+
+
+---
+
+## 7. Finding rapidi chiusi dopo W6 (F-08, F-10)
+
+| Finding | Fix | Verifica |
+|---|---|---|
+| **F-08** prezzi forgiati nelle righe marketplace | `064_marketplace_line_snapshot_guard.sql`: sulle scritture client (anche `place_marketplace_order`, che è INVOKER) nome, sku, unità e prezzo della riga vengono **sempre** ricalcolati dal catalogo del fornitore dell'ordine. Prodotto mancante, di un altro fornitore o disattivato → `P0305`. Il client sceglie solo prodotto e quantità | **Controllo negativo** senza il trigger: riga "Burro OMAGGIO" a 0,01 € arriva come ordine `submitted`. Con la 064 (`supabase/tests/marketplace_line_snapshot.test.sql`): insert e update forgiati riallineati a 9,50 €/kg; riga senza prodotto, di altro fornitore o disattivata → `P0305`; `place_marketplace_order` invariato (`submitted`, 9,50) |
+| **F-10** open redirect `/\evil.com` | `lib/safe-next.ts`: solo path interni, niente `\` né caratteri di controllo, origine verificata dopo il parsing URL. Usato dalla server action di login (dove avviene la redirect) e dalle route `auth/confirm` e `auth/callback` | `lib/__tests__/safe-next.test.ts`: `/\evil.com`, `//`, tab/newline, URL assoluti → fallback; path interni con query e hash conservati |
+
+**Esecuzione:** catena 001…064 da zero, `✓ test SQL verdi: 14 suite`; typecheck pulito e **389/389** unit
+sull'albero condiviso con la sessione W7 (Next 15 in corso). `next build` non eseguito qui, per non
+interferire con la build della sessione W7.
+**Nota:** `app/(auth)/login/page.tsx` ha ancora il vecchio controllo per precompilare il campo nascosto.
+Non l'ho toccato perché è in migrazione nella sessione W7. È innocuo: la redirect vera la valida la server action.

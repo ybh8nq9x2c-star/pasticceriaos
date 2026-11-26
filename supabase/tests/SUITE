@@ -14,3 +14,4 @@ production_fefo_lots.test.sql
 partial_receipts.test.sql
 pos_binding.test.sql
 daily_use.test.sql
+marketplace_line_snapshot.test.sql

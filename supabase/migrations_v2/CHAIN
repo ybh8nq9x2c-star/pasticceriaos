@@ -68,3 +68,4 @@
 061_partial_receipts_coherence.sql
 062_pos_binding_recovery.sql
 063_daily_use_fixes.sql
+064_marketplace_line_snapshot_guard.sql

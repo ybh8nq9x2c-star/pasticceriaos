@@ -9,10 +9,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { publicOrigin } from '@/lib/public-origin';
+import { safeNextPath } from '@/lib/safe-next';
 
-function safeNext(raw: string | null): string {
-  return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/dashboard';
-}
+/** Solo path interni (no open-redirect, F-10): vedi lib/safe-next.ts. */
+const safeNext = (raw: string | null): string => safeNextPath(raw, '/dashboard');
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
