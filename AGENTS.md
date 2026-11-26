@@ -63,6 +63,16 @@ Non hardcodare voci di menu altrove.
 dall'istanza (usa `this.rest`): una chiamata "unbound" crasha in prod con
 `Cannot read properties of undefined (reading 'rest')` → 500. Vedi i commenti nel file.
 
+⚠️ **`/api/webhooks/*` è FUORI dal middleware** (matcher + early-return): i webhook
+non hanno sessione, l'autenticazione è l'HMAC nel route handler. Se il middleware li
+intercetta, la cassa riceve un 307 verso `/login` e gli scontrini si perdono.
+
+⚠️ **Guard di colonna (migration 058)**: sulle scritture dirette del client
+(`current_user` = `authenticated`) le parti di `supplier_customer_connections` e
+`marketplace_orders` sono immutabili, una connessione si può solo revocare e
+`inventory_levels` accetta solo `min_threshold`. Un nuovo write-path che deve cambiare
+queste colonne va scritto come **RPC SECURITY DEFINER**, non come UPDATE da PostgREST.
+
 ## 3. Anatomia di un modulo (`modules/<dominio>/`)
 
 Pattern uniforme — **rispettalo, non inventarne altri.** Dettaglio in [`modules/AGENTS.md`](modules/AGENTS.md).
@@ -128,4 +138,7 @@ Se la modifica tocca SQL/RPC: l'unico modo di applicarla è una nuova migration 
   delicato per il doppio conteggio: vedi [`modules/inventory/AGENTS.md`](modules/inventory/AGENTS.md)
   e [`modules/goods-receipts/AGENTS.md`](modules/goods-receipts/AGENTS.md).
 - Pin Node fragile (solo `engines`, vedi §4).
+- **Sicurezza:** finding aperti in [`SECURITY_REPORT.md`](SECURITY_REPORT.md): Next 14 da
+  aggiornare (optimizer immagini spento come mitigazione), secret POS globale
+  (va reso per-org prima del 2° cliente POS), insert diretti sui ledger, ruolo `viewer` non in RLS.
 - Documenti di analisi nella cartella padre potenzialmente disallineati dal codice.

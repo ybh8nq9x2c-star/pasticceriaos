@@ -18,7 +18,11 @@ const nextConfig = {
   poweredByHeader: false,
 
   images: {
-    formats: ['image/avif', 'image/webp'],
+    // SECURITY (F-01, SECURITY_REPORT.md): l'app non usa next/image. L'Image
+    // Optimization API di Next 14 ha advisory RCE critiche (GHSA-2xp9-vwfh-vxw4,
+    // GHSA-2464-fhr4-w9xw) ed è raggiungibile senza auth su /_next/image.
+    // `unoptimized` spegne l'optimizer finché non si aggiorna Next (≥15.5.28).
+    unoptimized: true,
   },
 
   async headers() {

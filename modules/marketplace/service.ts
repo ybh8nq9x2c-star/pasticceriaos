@@ -52,6 +52,11 @@ function mapPgError(code: string | undefined, fallback: string): never {
     P0202: 'Non sei il cliente di questo ordine.',
     P0203: 'Non sei il fornitore di questo ordine.',
     P0212: 'Unità della riga non compatibile con il prodotto a magazzino: correggi l\'unità del prodotto o della riga prima di registrare il carico.',
+    // 058 — guard di colonna (SECURITY_REPORT F-02/F-03)
+    P0204: 'Cliente, fornitore e connessione di un ordine non sono modificabili.',
+    P0310: 'Le parti di un collegamento non sono modificabili.',
+    P0311: 'Per ricollegarti serve una nuova chiave del fornitore.',
+    P0312: 'Questo collegamento è già stato revocato.',
   };
   throw new BusinessRuleError(code && map[code] ? map[code] : fallback);
 }

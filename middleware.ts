@@ -31,6 +31,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Webhook server-to-server (POS): nessuna sessione Supabase per costruzione.
+  // L'autenticazione è la firma HMAC verificata nel route handler. Senza questo
+  // early-return il gate sotto reindirizzava la cassa a /login (F-05,
+  // SECURITY_REPORT.md). Doppia difesa insieme all'esclusione nel matcher.
+  if (pathname.startsWith('/api/webhooks/')) {
+    return NextResponse.next();
+  }
+
   const { supabaseResponse, user, supabase } = await updateSession(request);
 
   if (
@@ -127,6 +135,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Esclusi: asset statici, manifest e il portale fornitore token-based.
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|portal/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|portal/|api/webhooks/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
