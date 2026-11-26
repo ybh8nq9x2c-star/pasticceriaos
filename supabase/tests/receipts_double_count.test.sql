@@ -134,22 +134,30 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', v_user::text, 'role','authenticated')::text, true);
 
   -- STEP 1: ricevimento parziale via engine (4/10). Richiede il fix di B.
+  -- Dalla 049 l'ordine "racconta la verità": dopo un parziale è 'partial'
+  -- (prima di 049 restava 'confirmed'; aspettativa aggiornata in W1, 2026-11).
   perform public.complete_purchase_receipt(v_receipt);
   select status into v_po_mid from purchase_orders where id = v_order;
-  if v_po_mid <> 'confirmed' then
-    raise exception 'STEP1 FAIL: il PO doveva restare confirmed dopo il parziale, trovato %', v_po_mid; end if;
+  if v_po_mid <> 'partial' then
+    raise exception 'STEP1 FAIL: il PO doveva essere partial dopo il parziale (049), trovato %', v_po_mid; end if;
 
-  -- STEP 2: path legacy sullo stesso PO ancora 'confirmed'.
-  perform public.receive_purchase_order(v_order);
+  -- STEP 2: il path legacy sullo stesso PO deve essere RIFIUTATO (accetta solo
+  -- 'confirmed', 037) → nessuna possibilità di doppio conteggio. Lo stock resta 4.
+  begin
+    perform public.receive_purchase_order(v_order);
+    raise exception 'TEST2 FAIL: receive_purchase_order doveva rifiutare un PO partial';
+  exception when sqlstate 'P0040' then
+    raise notice 'TEST 2: path legacy rifiutato su PO partial (P0040) come atteso.';
+  end;
   select current_quantity into v_lvl_final from inventory_levels
     where organization_id=v_org and ingredient_product_id=v_ing;
 
-  raise notice 'OSSERVATO stock finale = % (ordinati 10, ricevuti 4 via engine + legacy)', v_lvl_final;
+  raise notice 'OSSERVATO stock finale = % (ordinati 10, ricevuti 4 via engine; legacy rifiutato)', v_lvl_final;
   if v_lvl_final = 14 then
-    raise exception 'BUG A CONFERMATO (DOPPIO CONTEGGIO): ordinati 10, a magazzino 14. receive_purchase_order ha ricontabilizzato l''intera quantità ignorando i 4 già caricati.'; end if;
-  if v_lvl_final <> 10 then
-    raise exception 'TEST2 FAIL: stock finale atteso 10, trovato %', v_lvl_final; end if;
-  raise notice 'TEST 2 PASS: nessun doppio conteggio — stock finale=10.';
+    raise exception 'BUG A CONFERMATO (DOPPIO CONTEGGIO): ordinati 10, a magazzino 14.'; end if;
+  if v_lvl_final <> 4 then
+    raise exception 'TEST2 FAIL: stock finale atteso 4 (solo il parziale), trovato %', v_lvl_final; end if;
+  raise notice 'TEST 2 PASS: nessun doppio conteggio — stock finale=4, legacy bloccato.';
 end
 $test2$;
 rollback;

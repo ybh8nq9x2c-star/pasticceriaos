@@ -1,0 +1,65 @@
+# =============================================================================
+# CHAIN — unica fonte di verità della catena di migration (W1).
+# Letta da: scripts/db/chain.sh (CI, locale, documentazione).
+# Regole: una migration per riga, in ordine di applicazione. Le righe '#' sono
+# commenti. I rollback (*_down.sql) NON stanno nella catena: vanno elencati in
+# '!exclude' perché chain.sh rifiuta file numerati non classificati.
+# =============================================================================
+001_enums.sql
+002_identity.sql
+003_catalog.sql
+004_recipes.sql
+005_inventory.sql
+006_production.sql
+007_ordering.sql
+008_views.sql
+009_rls.sql
+010_indexes.sql
+011_rpc_create_organization.sql
+012_marketplace_account_type.sql
+013_marketplace_connections_catalog.sql
+014_marketplace_orders.sql
+015_marketplace_audit_and_rpc.sql
+016_marketplace_rls.sql
+!exclude 017_marketplace_down.sql   # rollback marketplace 012–016: mai in avanti (PRODUCTION_ROLLOUT §7)
+018_marketplace_harden.sql
+019_ordering_production_txn.sql
+020_views_security_invoker.sql
+021_reporting_food_cost.sql
+022_supplier_analytics.sql
+023_marketplace_receipt_bridge.sql
+024_advisor_hardening.sql
+025_terminal_status_guard.sql
+026_supplier_price_list.sql
+027_commercial_documents.sql
+028_ingredient_batches_fefo.sql
+029_customer_orders.sql
+030_advisor_hardening_2.sql
+031_storage_documents.sql
+032_notifications_portal_version.sql
+033_perf_indexes.sql
+034_expiry_alerts_cron.sql
+035_goods_receipts.sql
+036_inventory_reference_type_receipt.sql
+037_receive_order_residual.sql
+038_organization_fiscal_profile.sql
+039_gs1_receiving_traceability.sql
+040_stock_truth_production_guard.sql
+041_sale_movement_types.sql
+042_sales_deduction.sql
+043_production_unit_conversion.sql
+044_pos_integration.sql
+045_production_week_template.sql
+046_finished_goods_theoretical.sql
+047_orders_honest_sent.sql
+048_orders_atomic_writes.sql
+049_orders_partial.sql
+050_finished_goods_domain.sql
+051_marketplace_place_order_atomic.sql
+052_marketplace_hardening.sql
+053_receive_unit_compat.sql
+054_receipt_unit_guard.sql
+055_nightly_reconciliation.sql
+056_finished_goods_waste.sql
+057_connect_bridges_anagrafica.sql
+058_security_column_guards.sql

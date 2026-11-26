@@ -69,3 +69,54 @@ _(aggiornato a ogni commit: vedi sezioni seguenti)_
 - Altri hit della scansione (`ghp_`, `github_pat_`, `sk-ant-`, `AIza`, JWT, `sb_secret_`, URL Postgres con
   password, letterali `password/secret`): solo valori non sensibili, cioè la password di default del
   Postgres **locale** della CI (`127.0.0.1:54322`) e due `const SECRET` fittizi nei test unitari POS.
+
+### W1 — Database da zero riproducibile · ✅ fatto (eseguito)
+
+**Problema riprodotto prima del fix** (glob identico alla vecchia CI, su `supabase/postgres:15.20.0.005`):
+```
+── migrations_v2/017_marketplace_down.sql
+── migrations_v2/018_marketplace_harden.sql
+psql:migrations_v2/018_marketplace_harden.sql:63: ERROR:  type marketplace_order_status does not exist
+```
+Quindi la catena "da zero" **non si è mai applicata** con il glob: il job `sql` non poteva essere verde.
+
+**Cosa è cambiato**
+| Elemento | Prima | Dopo |
+|---|---|---|
+| Ordine della catena | glob `[0-9]*.sql` (includeva il rollback 017) | manifest **`supabase/migrations_v2/CHAIN`**: una riga per migration; `017_marketplace_down.sql` in `!exclude` |
+| Entry point | loop inline in CI, lista `-f` duplicata in `package.json` | **`scripts/db/chain.sh`** (`check` / `apply` / `test` / `all`), letto da CI, locale e README |
+| Ambiente locale | nessuno (Docker spento, niente `psql`) | **`scripts/db/local.sh`**: `supabase/postgres` effimero in Docker, `psql` dentro il container, nessuna installazione sull'host |
+| Lista test | duplicata in CI e `package.json` (e diversa) | **`supabase/tests/SUITE`** (7 suite, inclusa `ordering_production_rpc` che prima non girava) |
+| Guardia | nessuna | `chain.sh check` fallisce se un file numerato non è in `CHAIN` (verificato con un file sonda `999_probe.sql` → exit 1) |
+| README / `supabase/AGENTS.md` | `supabase db push` (legge la cartella legacy!) | catena `migrations_v2` + `CHAIN`, ruolo della cartella legacy, comandi per CI, locale e deploy |
+
+**Bootstrap solo-test** (`supabase/tests/bootstrap/`, attivo solo con `CHAIN_TEST_BOOTSTRAP=1`): due
+oggetti che su Supabase hosted crea la **piattaforma** e non il DB, quindi assenti in un Postgres nudo.
+- `00_storage_stub.sql`: tabelle `storage.buckets` e `storage.objects` + `storage.foldername()` (servono alla 031).
+- `01_auth_gotrue_helpers.sql`: `auth.uid()`/`auth.role()` nella forma GoTrue corrente (leggono anche `request.jwt.claims`).
+  L'immagine ha la forma storica, con cui **tutti** i test risultavano "utente non autenticato".
+
+**Bug degli script trovati e corretti durante W1** (per trasparenza):
+- La prima versione di `chain.sh` stampava "✓ test SQL verdi" anche con test rossi: `set -e` è inattivo
+  dentro le liste `a && b`. Ora ogni `psql` ha un controllo esplicito e il riepilogo elenca i test falliti.
+- `receipts_double_count.test.sql` aveva un'aspettativa **anteriore alla 049** (ordine `confirmed`
+  dopo un parziale). Aggiornata a `partial`. Lo STEP 2 ora verifica che il path legacy venga **rifiutato**
+  (P0040) e che lo stock resti 4: invariante più forte del precedente "finale = 10".
+
+**Esecuzione (output reale, `scripts/db/local.sh all` poi `test`):**
+```
+✓ CHAIN coerente: 57 migration, 1 escluse
+✓ catena applicata: 57 migration          (001…058, senza 017)
+ALL MARKETPLACE RLS ASSERTIONS PASSED
+ALL PLACE/RECEIVE ASSERTIONS PASSED
+ALL RECEIPT UNIT GUARD ASSERTIONS PASSED
+FG WASTE ASSERTIONS PASSED
+TEST 1 PASS: engine contabilizza correttamente (+4).
+TEST 2 PASS: nessun doppio conteggio — stock finale=4, legacy bloccato.
+TEST 1 PASS / TEST 2 PASS / TEST 3a/3b/3c PASS (ordering_production_rpc)
+security_column_guards: OK                (058: F-02, F-03, F-07 parziale — prima esecuzione)
+✓ test SQL verdi: 7 suite
+✓ riconciliazione eseguita
+```
+**Non verificato:** il job `sql` su GitHub Actions (`gh` non autenticato). Il job ora chiama lo
+stesso `scripts/db/local.sh all` eseguito qui; Docker è disponibile su `ubuntu-latest`.

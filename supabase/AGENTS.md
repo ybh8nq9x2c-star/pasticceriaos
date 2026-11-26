@@ -19,7 +19,9 @@ migrations_v2/NOTES.md, PRODUCTION_ROLLOUT.md  ← leggi prima di applicare in p
   prefisso numerico successivo. Lo storico è immutabile.
 - Stile dominante: **additivo & sicuro** — nuove tabelle/enum/colonne *nullable* + RPC.
   Evita modifiche distruttive al comportamento dei write-path esistenti.
-- Applicazione: Supabase CLI (`supabase db push`) o SQL Editor, **in ordine numerico**.
+- Applicazione: **in ordine di `migrations_v2/CHAIN`** (unico punto di verità; i `*_down.sql` sono `!exclude`).
+  Locale/CI: `npm run db:local` (Docker). Contro un DB: `npm run db:chain`. **Non** usare `supabase db push`
+  (legge la cartella legacy `migrations/`). Nuova migration = file + riga in `CHAIN`.
 - Dopo modifiche allo schema, **rigenera `lib/database.types.ts`** (non editarlo a mano).
 
 ## RPC = unità transazionali (write-path critici)

@@ -1,0 +1,11 @@
+# =============================================================================
+# SUITE — test SQL eseguiti da scripts/db/chain.sh test (CI, locale, npm run test:sql).
+# Ogni test gira in transazione e fa ROLLBACK; fallisce con RAISE/ASSERT.
+# =============================================================================
+marketplace_rls.test.sql
+marketplace_place_receive.test.sql
+receipt_unit_guard.test.sql
+finished_goods_waste.test.sql
+receipts_double_count.test.sql
+ordering_production_rpc.test.sql
+security_column_guards.test.sql

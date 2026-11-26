@@ -55,17 +55,30 @@ Copia `.env.example` → `.env.local` e compila i valori. **Non committare `.env
 
 ## Database
 
-Il database è gestito da Supabase. Le migration si trovano in `supabase/migrations_v2/` e vanno applicate manualmente tramite la Supabase Dashboard o CLI:
+Il database è gestito da Supabase. **La catena attiva è `supabase/migrations_v2/`**, nell'ordine
+elencato in [`supabase/migrations_v2/CHAIN`](supabase/migrations_v2/CHAIN): è l'unico punto di
+verità, letto da CI, ambiente locale e deploy.
+
+- `supabase/migrations/` (001–003) è la serie **legacy, morta** (schema pre-rewrite): non va
+  mai applicata. Per questo **non** si usa `supabase db push`, che leggerebbe quella cartella.
+- I rollback (`*_down.sql`, es. `017_marketplace_down.sql`) stanno in `CHAIN` come `!exclude`:
+  non fanno parte della catena in avanti.
 
 ```bash
-# Via Supabase CLI (se configurato con progetto remoto)
-supabase db push
+# Locale / CI — DB Supabase usa-e-getta in Docker, catena da zero + test SQL + smoke
+npm run db:local          # = bash scripts/db/local.sh all   (serve solo Docker)
+bash scripts/db/local.sh stop
 
-# In alternativa, copia il contenuto dei file .sql
-# nella Supabase Dashboard → SQL Editor → Run
+# Contro un DB esistente (DATABASE_URL), es. staging
+npm run db:chain          # check del manifest + applicazione della catena
+npm run test:sql          # esegue supabase/tests/SUITE (ogni test fa ROLLBACK)
+
+# Deploy (staging/prod): applica SOLO le migration nuove di CHAIN, in ordine,
+# dal SQL Editor o con psql. Leggi prima supabase/migrations_v2/PRODUCTION_ROLLOUT.md.
 ```
 
-L'ordine di esecuzione è determinato dal prefisso numerico dei file (001–011).
+Una nuova migration va aggiunta **sia** come file `NNN_*.sql` **sia** come riga in `CHAIN`:
+`scripts/db/chain.sh check` fallisce se un file numerato non è classificato.
 
 ---
 
