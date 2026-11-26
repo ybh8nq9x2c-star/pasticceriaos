@@ -7,11 +7,12 @@
 
 import { redirect } from 'next/navigation';
 
-export default function LegacyPosSettingsRedirect({
-  searchParams,
-}: {
-  searchParams: { highlight?: string };
-}) {
+export default async function LegacyPosSettingsRedirect(
+  props: {
+    searchParams: Promise<{ highlight?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const q = searchParams.highlight ? `?highlight=${encodeURIComponent(searchParams.highlight)}` : '';
   redirect(`/sales/pos${q}`);
 }

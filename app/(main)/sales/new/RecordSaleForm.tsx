@@ -9,8 +9,7 @@
 // ma non dedotta (la si collega poi da /sales).
 // =============================================================================
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useState, useActionState } from 'react';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { recordSaleAction } from '@/modules/sales/actions';
@@ -58,7 +57,7 @@ export function RecordSaleForm({
   initialLines?: InitialSaleLine[];
   contextBanner?: string;
 }) {
-  const [state, formAction] = useFormState(recordSaleAction, IDLE_STATE);
+  const [state, formAction] = useActionState(recordSaleAction, IDLE_STATE);
   const [lines, setLines] = useState<LineRow[]>(() =>
     initialLines && initialLines.length > 0
       ? initialLines.map((l) => ({ key: ++keyCounter, ...l }))

@@ -134,11 +134,12 @@ export async function getPortalOrder(token: string, orderId: string): Promise<{ 
     .eq('organization_id', ctx.organizationId)
     .order('created_at', { ascending: false });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   // client privilegiato: un prodotto di un'altra org (riferimento incoerente) non
   // viene mai mostrato — al suo posto un'etichetta neutra (063).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ownProduct = (l: any) =>
     l.ingredient_products && l.ingredient_products.organization_id === ctx.organizationId ? l.ingredient_products : null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lines = ((o.order_line_items as any[]) ?? []).map((l) => ({
     id: l.id,
     name: ownProduct(l)?.name ?? 'Prodotto',

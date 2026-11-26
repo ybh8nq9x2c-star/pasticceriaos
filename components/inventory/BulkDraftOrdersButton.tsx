@@ -6,8 +6,8 @@
 // Stessa meccanica del DraftOrdersButton del piano produzione.
 // =============================================================================
 
+import { useActionState } from 'react';
 import Link from 'next/link';
-import { useFormState } from 'react-dom';
 import { ShoppingCart } from 'lucide-react';
 import { IDLE_STATE, type ActionState } from '@/lib/utils';
 import { createDraftsFromLowStockAction } from '@/modules/ordering/actions';
@@ -19,7 +19,7 @@ export function BulkDraftOrdersButton({ alertCount }: { alertCount: number }) {
     prev: ActionState,
     formData: FormData,
   ) => Promise<ActionState>;
-  const [state, formAction] = useFormState(bound, IDLE_STATE);
+  const [state, formAction] = useActionState(bound, IDLE_STATE);
 
   if (state.status === 'success') {
     return (

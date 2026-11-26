@@ -7,7 +7,8 @@ import { NextResponse } from 'next/server';
 import { getErrorMessage } from '@/lib/errors';
 import { replayPosEvent } from '@/modules/pos/service';
 
-export async function POST(_req: Request, { params }: { params: { eventId: string } }) {
+export async function POST(_req: Request, props: { params: Promise<{ eventId: string }> }) {
+  const params = await props.params;
   try {
     const result = await replayPosEvent(params.eventId);
     return NextResponse.json({ ok: true, result });

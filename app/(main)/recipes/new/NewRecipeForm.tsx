@@ -6,8 +6,7 @@
 // props (P0-1): niente fetch client che degrada a tendina muta.
 // =============================================================================
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useState, useActionState } from 'react';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { createRecipeAction } from '@/modules/catalog/actions';
@@ -35,7 +34,7 @@ const fieldClass = 'w-full rounded-xl border border-border px-3 py-2.5 text-sm f
 const labelClass = 'block text-sm font-medium text-ink mb-1.5';
 
 export function NewRecipeForm({ ingredientOptions }: { ingredientOptions: IngredientOption[] }) {
-  const [state, formAction] = useFormState(createRecipeAction, IDLE_STATE);
+  const [state, formAction] = useActionState(createRecipeAction, IDLE_STATE);
   const [rows, setRows] = useState<IngredientRow[]>([
     { key: ++keyCounter, ingredientProductId: '', quantity: '', unit: 'g' },
   ]);

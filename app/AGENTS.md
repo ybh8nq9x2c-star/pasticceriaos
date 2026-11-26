@@ -1,6 +1,6 @@
 # app/ — Agent Guide
 
-App Router Next.js 14. **Server Components di default**; le scritture passano da
+App Router Next.js 15 (React 19; `params`/`searchParams` sono Promise da `await`-are). **Server Components di default**; le scritture passano da
 **Server Actions** (`modules/<x>/actions.ts`), non da route handler custom.
 
 ## Route groups = i due workspace + auth + portale

@@ -58,7 +58,8 @@ function StepCard({
   );
 }
 
-export default async function PosWizardPage({ searchParams }: { searchParams: { highlight?: string } }) {
+export default async function PosWizardPage(props: { searchParams: Promise<{ highlight?: string }> }) {
+  const searchParams = await props.searchParams;
   const [health, config, mappings, unmapped, recipes, webhookSecret] = await Promise.all([
     getPosHealth('mipos'),
     getPosConfig('mipos'),

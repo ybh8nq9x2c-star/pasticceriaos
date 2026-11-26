@@ -39,7 +39,8 @@ function readSignature(req: Request, provider: string): string | null {
 const unauthorized = () => NextResponse.json({ error: 'invalid signature' }, { status: 401 });
 const retryLater = (error: string) => NextResponse.json({ ok: false, error }, { status: 503 });
 
-export async function POST(req: Request, { params }: { params: { provider: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ provider: string }> }) {
+  const params = await props.params;
   const provider = params.provider.toLowerCase();
   const adapter = getPosAdapter(provider);
   if (!adapter) {

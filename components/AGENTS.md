@@ -20,7 +20,7 @@ marketplace/, receipts/, suppliers/   Componenti specifici di dominio (client wh
   breadcrumb, bottom-nav mobile, per entrambi i workspace). Aggiungi voci lì, non nelle pagine.
 - **Icone: solo `lucide-react`** (parte del design system). Niente SVG inline ad-hoc o altre librerie.
 - **Server vs client**: i componenti sono Server Component salvo necessità (`'use client'`
-  solo per stato/interattività — es. `useFormState` nelle form delle action).
+  solo per stato/interattività — es. `useActionState` (React 19) nelle form delle action).
 - **Mobile**: `MobileChrome` + `BottomSheet` + bottom-nav sono il pattern mobile. Verifica i
   layout su viewport stretto; vedi `MOBILE_QA_CHECKLIST.md` in root.
 - **Styling**: Tailwind con i token del tema (`tailwind.config.ts`). Usa classi semantiche

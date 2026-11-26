@@ -5,7 +5,7 @@
 // Matching manuale: associa il documento a un ordine ed esegue il confronto.
 // =============================================================================
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import { IDLE_STATE, type ActionState } from '@/lib/utils';
 import { runMatchingAction } from '@/modules/documents/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -23,7 +23,7 @@ export function MatchPanel({
     prev: ActionState,
     formData: FormData,
   ) => Promise<ActionState>;
-  const [state, formAction] = useFormState(bound, IDLE_STATE);
+  const [state, formAction] = useActionState(bound, IDLE_STATE);
 
   return (
     <div className="bg-surface-2 rounded-2xl border border-border p-5">

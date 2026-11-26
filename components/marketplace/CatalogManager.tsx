@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useActionState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IDLE_STATE } from '@/lib/utils';
 import { upsertCatalogItemAction, deactivateCatalogItemAction } from '@/modules/marketplace/actions';
@@ -12,8 +11,8 @@ const field = 'rounded-xl border border-border px-3 py-2.5 text-base sm:text-sm 
 
 export function CatalogManager({ items }: { items: CatalogItem[] }) {
   const router = useRouter();
-  const [addState, addAction] = useFormState(upsertCatalogItemAction, IDLE_STATE);
-  const [delState, delAction] = useFormState(deactivateCatalogItemAction, IDLE_STATE);
+  const [addState, addAction] = useActionState(upsertCatalogItemAction, IDLE_STATE);
+  const [delState, delAction] = useActionState(deactivateCatalogItemAction, IDLE_STATE);
   useEffect(() => { if (delState.status === 'success') router.refresh(); }, [delState, router]);
 
   return (

@@ -4,8 +4,7 @@
 // app/(main)/customers/new/NewCustomerOrderForm.tsx
 // =============================================================================
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useState, useActionState } from 'react';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { createCustomerOrderAction } from '@/modules/customers/actions';
@@ -29,7 +28,7 @@ const EMPTY_ITEM = (): ItemRow => ({
 });
 
 export function NewCustomerOrderForm({ recipes }: { recipes: { id: string; name: string }[] }) {
-  const [state, formAction] = useFormState(createCustomerOrderAction, IDLE_STATE);
+  const [state, formAction] = useActionState(createCustomerOrderAction, IDLE_STATE);
   const [items, setItems] = useState<ItemRow[]>([EMPTY_ITEM()]);
 
   function updateItem(key: number, field: keyof ItemRow, value: string) {

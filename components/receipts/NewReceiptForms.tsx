@@ -7,8 +7,8 @@
 // Stesse server actions per bakery e supplier (prop `mode`).
 // =============================================================================
 
-import { useMemo, useState } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useMemo, useState, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { FileUp, PackagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, Select, Textarea } from '@/components/ui/Input';
@@ -66,7 +66,7 @@ export function ImportDdtCard({
   mode: ReceiptMode;
   suppliers: SupplierOption[];
 }) {
-  const [state, formAction] = useFormState(importDdtAction, IDLE_STATE);
+  const [state, formAction] = useActionState(importDdtAction, IDLE_STATE);
   const [supplierId, setSupplierId] = useState('');
   const [fileName, setFileName] = useState<string | null>(null);
 
@@ -133,7 +133,7 @@ export function NewReceiptForm({
   orders: ReceivableOrder[];
   initialOrderId?: string;
 }) {
-  const [state, formAction] = useFormState(createReceiptAction, IDLE_STATE);
+  const [state, formAction] = useActionState(createReceiptAction, IDLE_STATE);
   // Precompilazione da deep-link ordine: ordine + fornitore già selezionati.
   const [supplierId, setSupplierId] = useState(
     () => orders.find((o) => o.id === initialOrderId)?.supplierId ?? '',

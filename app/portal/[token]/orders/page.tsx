@@ -24,7 +24,8 @@ function fmtDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-export default async function PortalOrdersPage({ params }: { params: { token: string } }) {
+export default async function PortalOrdersPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   let result;
   try {
     result = await listPortalOrders(params.token);

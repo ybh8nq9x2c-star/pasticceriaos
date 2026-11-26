@@ -8,8 +8,7 @@
 // Onboarding mai bloccante: i dati fiscali sono facoltativi.
 // =============================================================================
 
-import { useState, useTransition } from 'react';
-import { useFormState } from 'react-dom';
+import { useState, useTransition, useActionState } from 'react';
 import { IDLE_STATE } from '@/lib/utils';
 import { createOrganizationAction, verifyVatAction } from '@/modules/identity/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -39,7 +38,7 @@ const COPY = {
 } as const;
 
 export default function OnboardingPage() {
-  const [state, formAction] = useFormState(createOrganizationAction, IDLE_STATE);
+  const [state, formAction] = useActionState(createOrganizationAction, IDLE_STATE);
   const [accountType, setAccountType] = useState<'customer' | 'supplier'>('customer');
   const copy = COPY[accountType];
 

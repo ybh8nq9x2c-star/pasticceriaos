@@ -11,11 +11,12 @@ import { NewDocumentForm, type DocLinePrefill } from './NewDocumentForm';
 
 export const metadata: Metadata = { title: 'Registra documento' };
 
-export default async function NewDocumentPage({
-  searchParams,
-}: {
-  searchParams: { order?: string };
-}) {
+export default async function NewDocumentPage(
+  props: {
+    searchParams: Promise<{ order?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const [suppliers, orders] = await Promise.all([listSuppliers(), listOrders()]);
 
   // Ordini agganciabili: tutto lo storico recente non-draft (DDT/fatture

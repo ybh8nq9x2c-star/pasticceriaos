@@ -7,8 +7,7 @@
 // 7 giorni (i giorni già pianificati non vengono toccati).
 // =============================================================================
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useState, useActionState } from 'react';
 import Link from 'next/link';
 import { CalendarDays } from 'lucide-react';
 import { IDLE_STATE } from '@/lib/utils';
@@ -38,8 +37,8 @@ export function WeekTemplateEditor({ template, recipes }: { template: TemplateDa
       };
     }),
   );
-  const [saveState, saveAction] = useFormState(saveWeekTemplateAction, IDLE_STATE);
-  const [applyState, applyAction] = useFormState(applyWeekTemplateAction, IDLE_STATE);
+  const [saveState, saveAction] = useActionState(saveWeekTemplateAction, IDLE_STATE);
+  const [applyState, applyAction] = useActionState(applyWeekTemplateAction, IDLE_STATE);
 
   function addRow(wd: number) {
     setDays((p) => p.map((d) => (d.weekday === wd ? { ...d, rows: [...d.rows, { key: ++seq, recipeId: '', batchCount: '1' }] } : d)));

@@ -26,7 +26,8 @@ const dateFmt = new Intl.DateTimeFormat('it-IT', {
   day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
 });
 
-export default async function SaleDetailPage({ params }: { params: { id: string } }) {
+export default async function SaleDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const [sale, lines] = await Promise.all([getSale(params.id), getSaleLines(params.id)]);
   if (!sale) notFound();
 

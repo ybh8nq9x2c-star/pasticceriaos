@@ -5,8 +5,7 @@
 // Modifica fornitore: il dato arriva dal SERVER via props (P0-1).
 // =============================================================================
 
-import { useEffect, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useState, useActionState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
@@ -22,7 +21,7 @@ export function SupplierEditForm({ supplier }: { supplier: Supplier }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
 
-  const [state, formAction] = useFormState(
+  const [state, formAction] = useActionState(
     (prev: typeof IDLE_STATE, formData: FormData) =>
       updateSupplierAction(supplier.id, prev, formData),
     IDLE_STATE,

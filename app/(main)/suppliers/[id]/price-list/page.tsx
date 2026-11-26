@@ -12,7 +12,8 @@ import { PriceListEditor } from './PriceListEditor';
 
 export const metadata: Metadata = { title: 'Listino fornitore' };
 
-export default async function PriceListPage({ params }: { params: { id: string } }) {
+export default async function PriceListPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   let supplier;
   try {
     supplier = await getSupplier(params.id);

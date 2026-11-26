@@ -12,11 +12,12 @@ import { RecordSaleForm, type InitialSaleLine } from './RecordSaleForm';
 
 export const metadata: Metadata = { title: 'Registra vendita' };
 
-export default async function NewSalePage({
-  searchParams,
-}: {
-  searchParams: { ordine?: string };
-}) {
+export default async function NewSalePage(
+  props: {
+    searchParams: Promise<{ ordine?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const recipes = await listLinkableRecipes();
 
   // Prefill dal ritiro (P0-C): best-effort — se l'ordine non è leggibile il

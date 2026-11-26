@@ -26,11 +26,12 @@ function formatDateTime(iso: string | null) {
   return new Date(iso).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-export default async function SupplierOrdersPage({
-  searchParams,
-}: {
-  searchParams: { stato?: string };
-}) {
+export default async function SupplierOrdersPage(
+  props: {
+    searchParams: Promise<{ stato?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const facts = await getSupplierOrderFacts();
   // I draft del cliente non sono ancora "ordini ricevuti".
   const orders = facts.filter((o) => o.status !== 'draft');

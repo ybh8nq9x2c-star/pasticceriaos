@@ -7,8 +7,7 @@
 // nessun fetch client, nessun dato statico.
 // =============================================================================
 
-import { useEffect, useMemo, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useMemo, useState, useActionState } from 'react';
 import Link from 'next/link';
 import { ClipboardList, AlertTriangle, Link2, ArrowRight } from 'lucide-react';
 import { IDLE_STATE } from '@/lib/utils';
@@ -65,7 +64,7 @@ export function NewOrderForm({
   );
   const [supplierId, setSupplierId] = useState(initialSupplierId ?? '');
 
-  const [state, formAction] = useFormState(createOrderAction, IDLE_STATE);
+  const [state, formAction] = useActionState(createOrderAction, IDLE_STATE);
   // Caso standard (Task 2): solo i campi indispensabili. Data/consegna/note e
   // unità/prezzo per riga (auto-compilati dall'ingrediente) stanno dietro "dettagli".
   const [showDetails, setShowDetails] = useState(false);

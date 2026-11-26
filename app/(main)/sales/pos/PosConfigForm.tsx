@@ -6,7 +6,7 @@
 // organizzazione appartiene lo scontrino. Prima esisteva solo via SQL.
 // =============================================================================
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import { IDLE_STATE } from '@/lib/utils';
 import { savePosConfigAction } from '@/modules/pos/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -23,7 +23,7 @@ export function PosConfigForm({
   storeId: string | null;
   merchantCode: string | null;
 }) {
-  const [state, formAction] = useFormState(savePosConfigAction, IDLE_STATE);
+  const [state, formAction] = useActionState(savePosConfigAction, IDLE_STATE);
 
   return (
     <form action={formAction} className="space-y-3">

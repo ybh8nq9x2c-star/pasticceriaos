@@ -12,7 +12,8 @@ import type { Recipe } from '@/modules/catalog/types';
 
 export const metadata: Metadata = { title: 'Modifica ricetta' };
 
-export default async function EditRecipePage({ params }: { params: { id: string } }) {
+export default async function EditRecipePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   let recipe: Recipe;
   try {
     recipe = await getRecipe(params.id);

@@ -6,8 +6,8 @@
 // consegnato. Idempotente lato DB (nessun doppio movimento al retry).
 // =============================================================================
 
+import { useActionState } from 'react';
 import Link from 'next/link';
-import { useFormState } from 'react-dom';
 import { IDLE_STATE } from '@/lib/utils';
 import { receiveMarketplaceOrderAction } from '@/modules/marketplace/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -19,7 +19,7 @@ export function ReceiveIntoInventory({
   orderId: string;
   linkedPurchaseOrderId: string | null;
 }) {
-  const [state, formAction] = useFormState(receiveMarketplaceOrderAction, IDLE_STATE);
+  const [state, formAction] = useActionState(receiveMarketplaceOrderAction, IDLE_STATE);
 
   if (linkedPurchaseOrderId) {
     return (

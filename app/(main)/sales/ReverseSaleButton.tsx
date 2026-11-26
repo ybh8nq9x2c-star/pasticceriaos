@@ -6,13 +6,13 @@
 // magazzino. La storia NON viene modificata (regola #3). Conferma prima di agire.
 // =============================================================================
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import { IDLE_STATE } from '@/lib/utils';
 import { reverseSaleAction } from '@/modules/sales/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
 
 export function ReverseSaleButton({ saleId }: { saleId: string }) {
-  const [state, formAction] = useFormState(reverseSaleAction, IDLE_STATE);
+  const [state, formAction] = useActionState(reverseSaleAction, IDLE_STATE);
 
   return (
     <form

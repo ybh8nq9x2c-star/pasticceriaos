@@ -6,8 +6,7 @@
 // SERVER via props (P0-1): niente fetch client che degradano a liste mute.
 // =============================================================================
 
-import { useMemo, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useMemo, useState, useActionState } from 'react';
 import Link from 'next/link';
 import { IDLE_STATE, UNIT_LABELS, cn } from '@/lib/utils';
 import { createIngredientAction } from '@/modules/catalog/actions';
@@ -38,7 +37,7 @@ export function NewIngredientForm({
   suppliers: SupplierOption[];
   catalog: CatalogProductRef[];
 }) {
-  const [state, formAction] = useFormState(createIngredientAction, IDLE_STATE);
+  const [state, formAction] = useActionState(createIngredientAction, IDLE_STATE);
   const [supplierId, setSupplierId] = useState('');
   const [name, setName] = useState('');
 

@@ -141,11 +141,12 @@ function MobileStockCard({ lv }: { lv: InventoryStockFull }) {
 // Page
 // ---------------------------------------------------------------------------
 
-export default async function InventoryPage({
-  searchParams,
-}: {
-  searchParams: { vista?: string };
-}) {
+export default async function InventoryPage(
+  props: {
+    searchParams: Promise<{ vista?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   // Errore DB → error boundary del route group: meglio un errore esplicito
   // che un magazzino mostrato (falsamente) vuoto.
   const levels: InventoryStockFull[] = await getInventoryStockFull();

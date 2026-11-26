@@ -7,7 +7,7 @@
 // per il matching.
 // =============================================================================
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import { IDLE_STATE } from '@/lib/utils';
 import { supplierUploadDocumentAction } from '@/modules/documents/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -15,7 +15,7 @@ import { SubmitButton } from '@/components/ui/SubmitButton';
 const fieldClass = 'w-full rounded-xl border border-border px-3 py-2.5 text-sm bg-surface-2 focus:outline-none focus:ring-2 focus:ring-primary-ring focus:border-primary';
 
 export function SupplierDocumentUpload({ orderId }: { orderId: string }) {
-  const [state, formAction] = useFormState(supplierUploadDocumentAction, IDLE_STATE);
+  const [state, formAction] = useActionState(supplierUploadDocumentAction, IDLE_STATE);
 
   return (
     <div className="bg-surface-2 rounded-2xl border border-border p-4 sm:p-5">

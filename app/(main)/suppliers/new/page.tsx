@@ -5,7 +5,7 @@
 // Form creazione fornitore.
 // =============================================================================
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { createSupplierAction } from '@/modules/catalog/actions';
@@ -16,7 +16,7 @@ const labelClass = 'block text-sm font-medium text-ink mb-1.5';
 const optClass   = 'text-ink-muted font-normal text-xs';
 
 export default function NewSupplierPage() {
-  const [state, formAction] = useFormState(createSupplierAction, IDLE_STATE);
+  const [state, formAction] = useActionState(createSupplierAction, IDLE_STATE);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-xl mx-auto">

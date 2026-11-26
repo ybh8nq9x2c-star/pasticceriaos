@@ -60,13 +60,14 @@ function formatCurrency(n: number | null) {
   return new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(n);
 }
 
-export default async function OrderDetailPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams?: { flash?: string };
-}) {
+export default async function OrderDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams?: Promise<{ flash?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   // L'ordine è l'entità primaria: se manca → 404. Lo storico è ancillare: un suo
   // errore NON deve far sparire un ordine esistente (degrada a lista vuota).
   let order;

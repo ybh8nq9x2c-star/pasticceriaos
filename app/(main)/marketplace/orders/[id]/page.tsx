@@ -2,7 +2,8 @@ import { getOrder, getLinkedPurchaseOrderId } from '@/modules/marketplace/servic
 import { OrderDetail } from '@/components/marketplace/OrderDetail';
 import { ReceiveIntoInventory } from '@/components/marketplace/ReceiveIntoInventory';
 
-export default async function CustomerOrderPage({ params }: { params: { id: string } }) {
+export default async function CustomerOrderPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const order = await getOrder(params.id);
 
   // CTA ricezione: solo quando il fornitore ha consegnato. Se già registrato,

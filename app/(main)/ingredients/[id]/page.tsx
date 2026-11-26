@@ -16,7 +16,8 @@ import { IngredientEditForm } from './IngredientEditForm';
 
 export const metadata: Metadata = { title: 'Ingrediente' };
 
-export default async function IngredientDetailPage({ params }: { params: { id: string } }) {
+export default async function IngredientDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await requireSession();
 
   let ingredient;

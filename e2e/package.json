@@ -3,9 +3,10 @@
   "private": true,
   "description": "Suite E2E audit bakery↔supplier per PasticceriaOS (Playwright). Self-contained: non tocca i node_modules dell'app.",
   "scripts": {
-    "test": "playwright test",
-    "test:setup": "playwright test tests/00-auth.setup.ts",
-    "report": "playwright show-report"
+    "test": "NODE_PATH=./node_modules playwright test --config=../playwright.config.ts",
+    "test:list": "NODE_PATH=./node_modules playwright test --config=../playwright.config.ts --list",
+    "test:setup": "NODE_PATH=./node_modules playwright test --config=../playwright.config.ts --project=setup",
+    "report": "playwright show-report ./artifacts/html-report"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1"

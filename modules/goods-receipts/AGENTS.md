@@ -60,10 +60,11 @@ Annullamento consentito solo se nessuna riga ha `qty_posted > 0` (altrimenti ser
 
 ## ⚠️ Trappole runtime (già costate deploy)
 
-- **Node 20 obbligatorio.** `pdf-text.ts` riceve un `File` (global Web API): esiste solo
-  da Node 20. Su Node 18 → `File is not defined`. Pin in `package.json` `engines.node`.
+- **Node 22 obbligatorio** (minimo tecnico Node 20). `pdf-text.ts` riceve un `File` (global
+  Web API): esiste solo da Node 20. Su Node 18 → `File is not defined`. Pin in
+  `package.json` `engines.node` e `.nvmrc`.
 - **`pdf-parse` non bundlato**: dichiarato in `next.config.mjs`
-  `serverComponentsExternalPackages`. L'import usa il path interno
+  `serverExternalPackages`. L'import usa il path interno
   `pdf-parse/lib/pdf-parse.js` (il wrapper rompe webpack). Non "semplificare" l'import.
 - Aggiungendo dipendenze qui (es. parser), **sincronizza `package-lock.json`** (già causa di build rotte).
 

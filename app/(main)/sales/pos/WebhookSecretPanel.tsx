@@ -6,8 +6,7 @@
 // subito di valere). Il segreto globale storico non viene MAI mostrato.
 // =============================================================================
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useState, useActionState } from 'react';
 import { rotatePosWebhookSecretAction } from '@/modules/pos/actions';
 import { IDLE_STATE } from '@/lib/utils';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -21,7 +20,7 @@ interface Props {
 
 export function WebhookSecretPanel({ scheme, version, verifiedAt, secret }: Props) {
   const [shown, setShown] = useState(false);
-  const [state, formAction] = useFormState(rotatePosWebhookSecretAction, IDLE_STATE);
+  const [state, formAction] = useActionState(rotatePosWebhookSecretAction, IDLE_STATE);
 
   return (
     <div className="mt-4 rounded-xl border border-border bg-surface-2 p-3 space-y-2" data-testid="pos-webhook-secret">

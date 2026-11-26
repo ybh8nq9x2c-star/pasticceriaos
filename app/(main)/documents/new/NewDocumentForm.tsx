@@ -6,8 +6,7 @@
 // dall'ordine reale quando si parte da /documents/new?order=<id>.
 // =============================================================================
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useState, useActionState } from 'react';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { createDocumentAction } from '@/modules/documents/actions';
@@ -46,7 +45,7 @@ export function NewDocumentForm({
   prefillSupplierId?: string;
   prefillLines?: DocLinePrefill[];
 }) {
-  const [state, formAction] = useFormState(createDocumentAction, IDLE_STATE);
+  const [state, formAction] = useActionState(createDocumentAction, IDLE_STATE);
   const [rows, setRows] = useState<LineRow[]>(
     prefillLines && prefillLines.length > 0
       ? prefillLines.map((l) => ({ ...l, key: ++keyCounter }))

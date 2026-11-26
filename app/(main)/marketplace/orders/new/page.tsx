@@ -5,9 +5,10 @@ import { getOrder } from '@/modules/ordering/service';
 import { getSupplier } from '@/modules/catalog/service';
 import { OrderComposer } from '@/components/marketplace/OrderComposer';
 
-export default async function NewMarketplaceOrderPage({
-  searchParams,
-}: { searchParams: { connection?: string; fromDraft?: string } }) {
+export default async function NewMarketplaceOrderPage(
+  props: { searchParams: Promise<{ connection?: string; fromDraft?: string }> }
+) {
+  const searchParams = await props.searchParams;
   const { connection, fromDraft } = searchParams;
   const suppliers = await listConnectedSuppliers();
 

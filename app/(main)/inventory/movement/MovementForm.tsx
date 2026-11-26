@@ -7,8 +7,7 @@
 // dedicato sulla dashboard (dominio separato: mai mischiare i due ledger).
 // =============================================================================
 
-import { useEffect, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useState, useActionState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
@@ -31,7 +30,7 @@ const labelClass = 'block text-sm font-medium text-ink mb-1.5';
 export function MovementForm({ ingredients }: { ingredients: IngredientOption[] }) {
   const router = useRouter();
   const [movType, setMovType] = useState('purchase_receipt');
-  const [state, formAction] = useFormState(recordMovementAction, IDLE_STATE);
+  const [state, formAction] = useActionState(recordMovementAction, IDLE_STATE);
 
   useEffect(() => {
     if (state.status === 'success') router.push('/inventory');
@@ -62,7 +61,7 @@ export function MovementForm({ ingredients }: { ingredients: IngredientOption[] 
           </select>
           {movType === 'purchase_receipt' && (
             <HelpInlineHint tone="warning" className="mt-1.5">
-              Per una consegna vera del fornitore usa <a href="/receipts/new" className="underline font-semibold">Ricevimenti</a>:
+              Per una consegna vera del fornitore usa <Link href="/receipts/new" className="underline font-semibold">Ricevimenti</Link>:
               registra lotti, scadenza e collega l’ordine. Qui è solo per correzioni fuori ciclo.
             </HelpInlineHint>
           )}

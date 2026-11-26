@@ -46,7 +46,8 @@ function formatQty(n: number) {
   return n % 1 === 0 ? String(n) : n.toFixed(2);
 }
 
-export default async function ProductionDetailPage({ params }: { params: { id: string } }) {
+export default async function ProductionDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   let plan;
   try {
     plan = await getPlan(params.id);

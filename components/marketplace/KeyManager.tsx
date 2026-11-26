@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useActionState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IDLE_STATE } from '@/lib/utils';
 import { generateKeyAction, revokeKeyAction } from '@/modules/marketplace/actions';
@@ -9,8 +8,8 @@ import type { ConnectionKeyView } from '@/modules/marketplace/types';
 
 export function KeyManager({ keys }: { keys: ConnectionKeyView[] }) {
   const router = useRouter();
-  const [genState, genAction] = useFormState(generateKeyAction, IDLE_STATE);
-  const [revState, revAction] = useFormState(revokeKeyAction, IDLE_STATE);
+  const [genState, genAction] = useActionState(generateKeyAction, IDLE_STATE);
+  const [revState, revAction] = useActionState(revokeKeyAction, IDLE_STATE);
 
   useEffect(() => { if (revState.status === 'success') router.refresh(); }, [revState, router]);
   useEffect(() => { if (genState.status === 'success') router.refresh(); }, [genState, router]);

@@ -1,14 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useActionState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IDLE_STATE } from '@/lib/utils';
 import { connectSupplierAction } from '@/modules/marketplace/actions';
 
 export function ConnectSupplierForm() {
   const router = useRouter();
-  const [state, action] = useFormState(connectSupplierAction, IDLE_STATE);
+  const [state, action] = useActionState(connectSupplierAction, IDLE_STATE);
   useEffect(() => { if (state.status === 'success') router.refresh(); }, [state, router]);
 
   return (

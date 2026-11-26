@@ -5,7 +5,7 @@
 // Registra lotto + scadenza per una riga di un ordine ricevuto (HACCP-lite).
 // =============================================================================
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import { IDLE_STATE } from '@/lib/utils';
 import { recordBatchAction } from '@/modules/inventory/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -21,7 +21,7 @@ export function RegisterBatchForm({
   defaultQuantity: number;
   unit: string;
 }) {
-  const [state, formAction] = useFormState(recordBatchAction, IDLE_STATE);
+  const [state, formAction] = useActionState(recordBatchAction, IDLE_STATE);
 
   if (state.status === 'success') {
     return <p className="text-xs font-semibold text-success-strong">✓ Lotto registrato</p>;

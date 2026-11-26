@@ -8,7 +8,7 @@ Sistema operativo per la gestione di pasticcerie: ricette, produzione, magazzino
 
 | Layer | Tecnologia |
 |-------|-----------|
-| Framework | Next.js 14 (App Router, Server Components, Server Actions) |
+| Framework | Next.js 15.5 + React 19 (App Router, Server Components, Server Actions) |
 | Auth & DB | Supabase (PostgreSQL + RLS + SSR cookies) |
 | Language | TypeScript 5 |
 | Styling | Tailwind CSS 3 |

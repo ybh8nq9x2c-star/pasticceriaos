@@ -4,10 +4,11 @@ import { ReceiptNewView } from '@/components/receipts/ReceiptViews';
 export const metadata: Metadata = { title: 'Nuovo ricevimento' };
 export const dynamic = 'force-dynamic';
 
-export default function BakeryNewReceiptPage({
-  searchParams,
-}: {
-  searchParams: { order?: string };
-}) {
+export default async function BakeryNewReceiptPage(
+  props: {
+    searchParams: Promise<{ order?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   return <ReceiptNewView mode="bakery" preselectedOrderId={searchParams.order} />;
 }

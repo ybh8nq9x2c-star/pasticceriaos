@@ -24,11 +24,12 @@ function fmtDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-export default async function DocumentsPage({
-  searchParams,
-}: {
-  searchParams: { stato?: string };
-}) {
+export default async function DocumentsPage(
+  props: {
+    searchParams: Promise<{ stato?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const docs = await listDocuments();
   const filter = searchParams.stato as DocumentStatus | undefined;
   const filtered = filter ? docs.filter((d) => d.documentStatus === filter) : docs.filter((d) => d.documentStatus !== 'archived');

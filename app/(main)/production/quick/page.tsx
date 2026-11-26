@@ -13,11 +13,12 @@ import { QuickProduceForm, type SelectedRecipe } from '@/components/production/Q
 export const metadata: Metadata = { title: 'Scarico produzione' };
 export const dynamic = 'force-dynamic';
 
-export default async function QuickProducePage({
-  searchParams,
-}: {
-  searchParams: { recipe?: string };
-}) {
+export default async function QuickProducePage(
+  props: {
+    searchParams: Promise<{ recipe?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const recipes = await listRecipes(); // solo ricette attive
 
   let selected: SelectedRecipe | null = null;

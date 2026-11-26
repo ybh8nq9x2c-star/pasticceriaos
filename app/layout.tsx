@@ -1,13 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 // UI font: Inter con feature settings da design system (cv11, ss01 in globals).
-// Variable font → pesi 400-700 senza richieste extra.
-const inter = Inter({
-  subsets: ["latin"],
+// Self-hosted (W7): niente download da Google Fonts in build, che così funziona
+// offline. File = subset latin variabile (asse wght 100–900) da
+// @fontsource-variable/inter 5.3.0, licenza OFL in app/fonts/Inter-OFL.txt.
+const inter = localFont({
+  src: "./fonts/InterVariable-latin.woff2",
+  weight: "100 900",
+  style: "normal",
   variable: "--font-sans",
   display: "swap",
+  fallback: ["system-ui", "-apple-system", "Segoe UI", "sans-serif"],
 });
 
 export const metadata: Metadata = {

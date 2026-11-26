@@ -1,12 +1,13 @@
 import Link from 'next/link';
 
 interface PageProps {
-  searchParams: Record<string, string | string[] | undefined>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 // Shown only when a user's account type can't be resolved to a workspace.
 // The normal wrong-workspace case redirects straight to the user's own home.
-export default function UnauthorizedPage({ searchParams }: PageProps) {
+export default async function UnauthorizedPage(props: PageProps) {
+  const searchParams = await props.searchParams;
   const from = typeof searchParams.from === 'string' ? searchParams.from : undefined;
 
   return (

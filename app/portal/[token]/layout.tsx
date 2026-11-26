@@ -11,13 +11,18 @@ import { Badge } from '@/components/ui/Badge';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PortalLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: { token: string };
-}) {
+export default async function PortalLayout(
+  props: {
+    children: React.ReactNode;
+    params: Promise<{ token: string }>;
+  }
+) {
+  const params = await props.params;
+
+  const {
+    children
+  } = props;
+
   let ctx;
   try {
     ctx = await getPortalContext(params.token);

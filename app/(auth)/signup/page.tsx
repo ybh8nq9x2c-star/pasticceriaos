@@ -6,7 +6,7 @@
 // l'org viene creata nell'onboarding.
 // =============================================================================
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { signUpAction } from '@/modules/identity/actions';
@@ -14,7 +14,7 @@ import { Logo } from '@/components/shared/Logo';
 import { SubmitButton } from '@/components/ui/SubmitButton';
 
 export default function SignupPage() {
-  const [state, formAction] = useFormState(signUpAction, IDLE_STATE);
+  const [state, formAction] = useActionState(signUpAction, IDLE_STATE);
 
   return (
     <div className="space-y-8">

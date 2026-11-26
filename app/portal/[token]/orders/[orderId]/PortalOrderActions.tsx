@@ -6,8 +6,7 @@
 // (input file con accept pdf+immagini: da mobile apre camera roll).
 // =============================================================================
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useState, useActionState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IDLE_STATE, type ActionState } from '@/lib/utils';
 import {
@@ -37,12 +36,12 @@ export function PortalOrderActions({
   const issueBound = portalReportIssueAction.bind(null, token, orderId) as (
     prev: ActionState, formData: FormData,
   ) => Promise<ActionState>;
-  const [issueState, issueAction, issuePending] = useFormState(issueBound, IDLE_STATE);
+  const [issueState, issueAction, issuePending] = useActionState(issueBound, IDLE_STATE);
 
   const uploadBound = portalUploadDocumentAction.bind(null, token, orderId) as (
     prev: ActionState, formData: FormData,
   ) => Promise<ActionState>;
-  const [uploadState, uploadAction, uploadPending] = useFormState(uploadBound, IDLE_STATE);
+  const [uploadState, uploadAction, uploadPending] = useActionState(uploadBound, IDLE_STATE);
 
   async function handleConfirm() {
     setConfirming(true);

@@ -3,7 +3,7 @@
 // Renders only the status transitions the current side is allowed to perform.
 // The DB trigger + service re-enforce this; this is just UX.
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import { IDLE_STATE } from '@/lib/utils';
 import { changeOrderStatusAction } from '@/modules/marketplace/actions';
 import {
@@ -18,7 +18,7 @@ const ALL: MarketplaceOrderStatus[] = [
 export function StatusActions({
   orderId, status, side,
 }: { orderId: string; status: MarketplaceOrderStatus; side: AccountType }) {
-  const [state, formAction] = useFormState(changeOrderStatusAction, IDLE_STATE);
+  const [state, formAction] = useActionState(changeOrderStatusAction, IDLE_STATE);
   const nexts = ALL.filter((to) => canTransition(status, to, side));
   if (nexts.length === 0) {
     return <p className="text-sm text-ink-muted">Nessuna azione disponibile in questo stato.</p>;

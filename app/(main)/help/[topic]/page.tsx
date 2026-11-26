@@ -14,12 +14,14 @@ export function generateStaticParams() {
   return Object.values(HELP_SLUGS).map((topic) => ({ topic }));
 }
 
-export function generateMetadata({ params }: { params: { topic: string } }): Metadata {
+export async function generateMetadata(props: { params: Promise<{ topic: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const a = articleBySlug(params.topic);
   return { title: a ? `Guida · ${a.title}` : 'Guida' };
 }
 
-export default function HelpArticlePage({ params }: { params: { topic: string } }) {
+export default async function HelpArticlePage(props: { params: Promise<{ topic: string }> }) {
+  const params = await props.params;
   const article = articleBySlug(params.topic);
   if (!article) notFound();
 

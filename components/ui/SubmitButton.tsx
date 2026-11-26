@@ -2,8 +2,8 @@
 
 // =============================================================================
 // <SubmitButton> — bottone submit con stato LOADING reale.
-// In React 18 `useFormState` NON espone `pending` (ritorna [state, action]):
-// lo stato di invio va letto con useFormStatus dentro un figlio del <form>.
+// Lo stato di invio va letto con useFormStatus dentro un figlio del <form>
+// (`isPending` di useActionState vive nel componente padre, non nel bottone).
 // Questo componente incapsula quel pattern e preserva lo stile passato via
 // className, così sostituisce 1:1 i vecchi bottoni `disabled={pending}` rotti.
 // =============================================================================

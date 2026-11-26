@@ -7,7 +7,8 @@
 // caricamento reale via useFormStatus.
 // =============================================================================
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
 import { IDLE_STATE } from '@/lib/utils';
 import { signInAction } from '@/modules/identity/actions';
@@ -28,7 +29,7 @@ function SubmitButton() {
 }
 
 export function LoginForm({ next }: { next: string }) {
-  const [state, formAction] = useFormState(signInAction, IDLE_STATE);
+  const [state, formAction] = useActionState(signInAction, IDLE_STATE);
 
   return (
     <div className="space-y-8">

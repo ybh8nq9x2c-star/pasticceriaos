@@ -100,7 +100,13 @@ test.describe('supplier — ingresso merce da produttore esterno', () => {
     await page.getByRole('button', { name: 'Crea e associa' }).click();
     await expect(page.getByText('Riconosciuto').first()).toBeVisible({ timeout: 30_000 });
 
-    await page.getByRole('button', { name: /Completa ricevimento/ }).click();
+    // W7: il bottone si chiama "Conferma e aggiorna magazzino" (W4); su un esito
+    // parziale/con discrepanze compare un ConfirmDialog da confermare.
+    await page.getByRole('button', { name: /Conferma e aggiorna magazzino/ }).click();
+    const dialogConfirm = page.getByRole('button', { name: /Completa con discrepanze|Registra carico parziale/ });
+    if (await dialogConfirm.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await dialogConfirm.click();
+    }
     await expect(
       page.getByText(/magazzino aggiornato|Carico parziale|discrepanze/),
     ).toBeVisible({ timeout: 45_000 });

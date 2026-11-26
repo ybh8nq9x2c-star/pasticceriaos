@@ -10,7 +10,8 @@ import { Logo } from '@/components/shared/Logo';
 
 export const metadata: Metadata = { title: 'Accesso non riuscito' };
 
-export default function AuthErrorPage({ searchParams }: { searchParams: { reason?: string } }) {
+export default async function AuthErrorPage(props: { searchParams: Promise<{ reason?: string }> }) {
+  const searchParams = await props.searchParams;
   const reason = searchParams.reason?.trim();
 
   return (

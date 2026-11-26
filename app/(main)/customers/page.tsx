@@ -65,11 +65,12 @@ function AdvanceButton({ orderId, status }: { orderId: string; status: CustomerO
   );
 }
 
-export default async function CustomerOrdersPage({
-  searchParams,
-}: {
-  searchParams: { storico?: string };
-}) {
+export default async function CustomerOrdersPage(
+  props: {
+    searchParams: Promise<{ storico?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const showClosed = searchParams.storico === '1';
   const orders = await listCustomerOrders(showClosed);
   const visible = showClosed

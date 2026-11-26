@@ -17,11 +17,12 @@ function formatQty(n: number): string {
   return String(Math.round(n * 1000) / 1000);
 }
 
-export default async function NewOrderPage({
-  searchParams,
-}: {
-  searchParams: { plan?: string; ingredient?: string; qty?: string; ingredients?: string };
-}) {
+export default async function NewOrderPage(
+  props: {
+    searchParams: Promise<{ plan?: string; ingredient?: string; qty?: string; ingredients?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const [suppliers, ingredients] = await Promise.all([
     listSuppliersWithChannel(),
     listIngredients(),

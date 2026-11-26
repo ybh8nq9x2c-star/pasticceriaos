@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 
-export default function PortalIndexPage({ params }: { params: { token: string } }) {
+export default async function PortalIndexPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   redirect(`/portal/${params.token}/orders`);
 }

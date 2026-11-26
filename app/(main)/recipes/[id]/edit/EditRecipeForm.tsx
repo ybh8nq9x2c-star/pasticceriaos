@@ -5,8 +5,7 @@
 // Form modifica ricetta (client). Dati iniziali reali dal server component.
 // =============================================================================
 
-import { useEffect, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useState, useActionState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { IDLE_STATE, type ActionState } from '@/lib/utils';
@@ -53,7 +52,7 @@ export function EditRecipeForm({
     prev: ActionState,
     formData: FormData,
   ) => Promise<ActionState>;
-  const [state, formAction] = useFormState(boundAction, IDLE_STATE);
+  const [state, formAction] = useActionState(boundAction, IDLE_STATE);
 
   const [rows, setRows] = useState<IngredientRow[]>(
     recipe.ingredients.length > 0

@@ -58,7 +58,7 @@ Questi punti vanno nelle **nuove** migration di W2 (≥ 059). Il contenuto della
 | W4 ricevimenti parziali | ✅ | `72d9e78` | 061 | 2 sessioni Postgres reali: +4/+5 → 9; +6/+6 su 10 → una rifiutata |
 | W5 POS | ✅ codice · ⏳ H5–H6 | `aa4f51e` | 062 | firma di un'altra config → 401; retry dopo transitorio → una vendita |
 | W6 uso quotidiano | ✅ | `434b1f8` | 063 | 2ª rapida nello stesso giorno OK; doppio submit → una spedizione; tutti i prodotti con avanzo |
-| W7 piattaforma | ⏭ non avviato | — | — | per prompt: **dopo staging, separato** (Node 22 + Next supportato, font self-hosted, ESLint, e2e) |
+| W7 piattaforma | ✅ codice · ⏳ staging | commit `fix(W7)` | — | Node 22 + Next 15.5.29 + React 19; build offline OK; lint 0 errori; e2e 80/90 reincluse. **Da verificare in staging prima del merge** |
 
 Esecuzione finale (catena 001…063 da zero su `supabase/postgres:15.20.0.005`):
 `✓ CHAIN coerente: 62 migration, 1 escluse` · `✓ test SQL verdi: 13 suite` (12 SQL + 1 concorrenza) ·
@@ -299,11 +299,53 @@ Il ledger resta coerente con `qty_received`. Fix suggerito: incremento atomico i
 
 ---
 
+### W7 — Piattaforma e tooling · ✅ fatto (codice, eseguito in locale) · ⏳ verifica in staging
+
+Separato da W0–W6 per scelta: **va provato in staging prima del merge su `main`** (il merge fa
+partire l'autodeploy Railway, che da qui in poi usa Node 22).
+
+| Punto | Esito | Evidenza |
+|---|---|---|
+| Runtime | ✅ | Node 22: `engines.node: "22.x"`, `.nvmrc` = `22`, CI con `node-version-file: .nvmrc` |
+| Next.js | ✅ | `next@15.5.29` (linea 15.5 con backport di sicurezza, ≥ 15.5.28), `eslint-config-next@15.5.29` |
+| React | ✅ | `react`/`react-dom` 19, `@types/react*` 19, `@types/node` 22 |
+| `params`/`searchParams` asincroni | ✅ | codemod ufficiale `@next/codemod@15.5.29 next-async-request-api`: 39 file (pagine, layout del portale, `generateMetadata`, route handler `webhooks/[provider]` e `pos/replay-event`). Diff rivisto: solo `props` + `await`, nessun `UnsafeUnwrapped` |
+| `cookies()`/`headers()` | ✅ già ok | `lib/supabase/server.ts` faceva già `await cookies()`; `middleware.ts` e `lib/supabase/middleware.ts` usano `request.cookies` (sincrono anche in 15). Nessun'altra chiamata non `await` (grep) |
+| `useFormState` → `useActionState` | ✅ | 36 componenti: `useFormState` di `react-dom` è deprecato in React 19; stessa firma, import da `react` |
+| `serverExternalPackages` | ✅ | `['pdf-parse']`. Verificato nel bundle: `require("pdf-parse/lib/pdf-parse.js")` resta esterno |
+| `outputFileTracingRoot` | ✅ | fissato alla cartella dell'app: senza, Next 15 sceglieva come root un `package-lock.json` nella home |
+| `images.unoptimized` | ✅ tenuto | L'app non usa `next/image`: `/_next/image` sarebbe solo superficie. Commento aggiornato (non è più una mitigazione temporanea) |
+| Matcher middleware ↔ `lib/server-routes.ts` | ✅ | matcher invariato; `lib/__tests__/server-routes.test.ts` verde |
+| Font Inter self-hosted | ✅ | `next/font/local` con `app/fonts/InterVariable-latin.woff2` (subset latin, asse `wght` 100–900, da `@fontsource-variable/inter` 5.3.0) + licenza OFL in `app/fonts/Inter-OFL.txt`. Nessuna dipendenza npm aggiunta |
+| `npm run lint` | ✅ | ESLint 9 flat config `eslint.config.mjs` (`next/core-web-vitals` + `next/typescript` via `FlatCompat`), script `eslint .` (`next lint` è deprecato in 15.5). Risultato: **0 errori, 34 warning**. Corretti: 3 `prefer-const`, 1 `<a>` interno → `<Link>`, 2 `any` con disable mal posizionato. Spenta `react/no-unescaped-entities` (apostrofi italiani nel JSX, voluti) |
+| Playwright | ✅ | `80-goods-receipts` e `90-sales-area` di nuovo nel progetto `audit-desktop`. GR4 aggiornato: il bottone "Completa ricevimento" non esiste più (W4) → "Conferma e aggiorna magazzino" + eventuale dialog. Script `e2e/package.json` con `--config=../playwright.config.ts` e `NODE_PATH` (prima il comando documentato falliva: `Cannot find module '@playwright/test'`). Runbook: `e2e/README.md` |
+| F-10 residuo | ✅ | `app/(auth)/login/page.tsx` usa `safeNextPath` (lasciato al W7 dalla sessione F-08/F-10) |
+
+**Esecuzione (Node 22.22.0):**
+- `npm run typecheck` pulito (anche senza `.next/`, come in CI) · `npm test` **389/389** · `npm run lint` 0 errori.
+- `npm run build` **senza rete**: `sandbox-exec` con `deny network-outbound` (controllo: `curl
+  fonts.googleapis.com` nello stesso sandbox → `Couldn't connect`). Build OK, 0 warning `⚠`.
+- `npm ci --dry-run` OK (lockfile sincronizzato).
+- `bash scripts/db/local.sh all` su HEAD (catena 001…064): `✓ catena applicata: 63 migration` ·
+  `✓ test SQL verdi: 14 suite` · riconciliazione OK. Lanciato su una copia di HEAD con container
+  `bakeryos-sqltest-w7` e porta 54339: il nome e la porta fissi di `local.sh` fanno scontrare due
+  sessioni sullo stesso host (vedi sotto).
+- `playwright test --list` con env fittizie: **52 test in 10 file**, 80 e 90 inclusi. Senza env → fail-fast.
+
+**Non verificato / da fare:**
+- **Staging**: navigazione reale su Next 15/React 19 (form con `useActionState`, portale, POS
+  webhook, upload DDT con `pdf-parse`) e suite e2e completa. Prerequisiti: H3/H4.
+- **Railway** legge `engines`/`.nvmrc` per scegliere Node 22: da confermare nel primo deploy di staging.
+- `npm audit`: restano i punti F-17 sopra; `zod` 4 è un lavoro separato (tocca tutti gli `schemas.ts`).
+- 34 warning ESLint (soprattutto variabili inutilizzate) lasciati com'erano: non bloccanti.
+- `scripts/db/local.sh` usa nome container e porta fissi: due esecuzioni in parallelo sullo stesso
+  host si cancellano il DB a vicenda. Proposta: porta e nome derivati da una variabile (non fatto qui).
+
 ## 4. Stato dei rilievi di `SECURITY_REPORT.md`
 
 | Finding | Esito | Dove / motivazione |
 |---|---|---|
-| F-01 Next 14 (RCE optimizer) | **parziale** | mitigato (optimizer spento, baseline); l'upgrade è W7, dopo staging |
+| F-01 Next 14 (RCE optimizer) | **fatto (codice)** | W7: Next 15.5.29 (≥ 15.5.28, `npm audit` non segnala più `next`); optimizer resta spento. Chiuso davvero al deploy dopo lo staging |
 | F-02 riattivazione/ripuntamento connessioni | **fatto** | 058 (trigger, test `security_column_guards`) |
 | F-03 manomissione ordini marketplace | **fatto** | 058 |
 | F-04 secret POS globale | **fatto (codice)** | 062; chiusura effettiva con H5/H6 |
@@ -319,7 +361,7 @@ Il ledger resta coerente con `qty_received`. Fix suggerito: incremento atomico i
 | F-14 token portale 1 anno | **fatto** | W6: 30 giorni configurabili, rotazione via RPC |
 | F-15 entropia chiavi PSOS | **aperto** (basso) | correggere il commento e aggiungere un rate limit |
 | F-16 rollback nella catena | **fatto** | W1 (`CHAIN` con `!exclude`) |
-| F-17 dipendenze | **aperto** | W7 |
+| F-17 dipendenze | **parziale** | W7: restano `postcss`/`nanoid` (copia interna di Next, solo build), `source-map-js`, `brace-expansion` e `zod <4.6.6` (major 3→4: lavoro a parte) |
 
 ## 5. ADR prodotti
 
@@ -333,8 +375,8 @@ Il ledger resta coerente con `qty_received`. Fix suggerito: incremento atomico i
   (in ordine di `CHAIN`) e configurato `POS_WEBHOOK_MASTER_SECRET`.
 - **Job `sql` su GitHub Actions**: non osservato (`gh` non autenticato). Esegue lo stesso
   `scripts/db/local.sh all` verificato qui.
-- **E2E Playwright**: non eseguiti (servono ambiente e credenziali nuove, H3/H4). Le suite `80`/`90`
-  restano escluse dal config: è W7.
+- **E2E Playwright**: non eseguiti (servono ambiente e credenziali nuove, H3/H4). Dal W7 le suite
+  `80`/`90` sono nel config e il runbook è `e2e/README.md`.
 - **`lib/database.types.ts`** non rigenerato: le nuove RPC sono chiamate con il cast `as never`;
   `DispatchOutcome` è esteso localmente con `'pending'`.
 - **Rischio residuo noto** (ADR 002): incremento non atomico di `qty_received` da scanner.
@@ -355,5 +397,5 @@ Il ledger resta coerente con `qty_received`. Fix suggerito: incremento atomico i
 **Esecuzione:** catena 001…064 da zero, `✓ test SQL verdi: 14 suite`; typecheck pulito e **389/389** unit
 sull'albero condiviso con la sessione W7 (Next 15 in corso). `next build` non eseguito qui, per non
 interferire con la build della sessione W7.
-**Nota:** `app/(auth)/login/page.tsx` ha ancora il vecchio controllo per precompilare il campo nascosto.
-Non l'ho toccato perché è in migrazione nella sessione W7. È innocuo: la redirect vera la valida la server action.
+**Nota:** `app/(auth)/login/page.tsx` aveva ancora il vecchio controllo per precompilare il campo nascosto;
+allineato a `safeNextPath` nel commit W7.

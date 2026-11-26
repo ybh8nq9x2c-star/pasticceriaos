@@ -22,11 +22,12 @@ const DOC_LABEL: Record<string, string> = {
   credit_note: 'Nota credito',
 };
 
-export default async function PortalOrderDetailPage({
-  params,
-}: {
-  params: { token: string; orderId: string };
-}) {
+export default async function PortalOrderDetailPage(
+  props: {
+    params: Promise<{ token: string; orderId: string }>;
+  }
+) {
+  const params = await props.params;
   let result;
   try {
     result = await getPortalOrder(params.token, params.orderId);

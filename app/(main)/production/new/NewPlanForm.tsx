@@ -9,8 +9,7 @@
 // ambigue.
 // =============================================================================
 
-import { useEffect, useRef, useState, useTransition } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useRef, useState, useTransition, useActionState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Cake } from 'lucide-react';
@@ -74,7 +73,7 @@ export function NewPlanForm({
   const [reqLoading, setReqLoading] = useState(false);
   const [reqError, setReqError] = useState<string | null>(null);
 
-  const [state, formAction] = useFormState(createPlanAction, IDLE_STATE);
+  const [state, formAction] = useActionState(createPlanAction, IDLE_STATE);
 
   // Ordini clienti REALI per la data scelta: server action, errore visibile.
   function loadOrdersFor(date: string) {

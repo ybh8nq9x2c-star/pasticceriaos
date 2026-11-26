@@ -5,8 +5,8 @@
 // A1: genera bozze d'ordine reali (una per fornitore) dalle shortage del piano.
 // =============================================================================
 
+import { useActionState } from 'react';
 import Link from 'next/link';
-import { useFormState } from 'react-dom';
 import { ShoppingCart } from 'lucide-react';
 import { IDLE_STATE, type ActionState } from '@/lib/utils';
 import { createDraftsFromShortageAction } from '@/modules/ordering/actions';
@@ -18,7 +18,7 @@ export function DraftOrdersButton({ planId }: { planId: string }) {
     prev: ActionState,
     formData: FormData,
   ) => Promise<ActionState>;
-  const [state, formAction] = useFormState(bound, IDLE_STATE);
+  const [state, formAction] = useActionState(bound, IDLE_STATE);
 
   if (state.status === 'success') {
     return (

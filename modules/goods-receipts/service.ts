@@ -96,9 +96,9 @@ export async function createReceipt(raw: unknown): Promise<string> {
   const userId = await requireUserId();
   const input = createReceiptSchema.parse(raw);
 
-  let status: ReceiptStatus = 'draft';
-  let lines: Database['public']['Tables']['purchase_receipt_lines']['Insert'][] = [];
-  let supplierId = input.supplierId || null;
+  const status: ReceiptStatus = 'draft';
+  const lines: Database['public']['Tables']['purchase_receipt_lines']['Insert'][] = [];
+  const supplierId = input.supplierId || null;
 
   // W4 (061): ricevimento da ORDINE = find-or-create ATOMICO in una RPC
   // (advisory lock per ordine + indice "un ricevimento aperto per ordine").

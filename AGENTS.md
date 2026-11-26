@@ -17,7 +17,7 @@
    Riusa service/repository esistenti; non creare write-path paralleli.
 4. **Non rompere la business logic esistente** (transizioni stato, RLS, idempotenza).
 5. Ogni modifica si chiude con: **`npm run typecheck` + `npm run test` + `npm run build`** (§5).
-6. **Runtime Node 20** obbligatorio (§4). **Sincronizza `package-lock.json`** a ogni
+6. **Runtime Node 22** obbligatorio (§4). **Sincronizza `package-lock.json`** a ogni
    cambio dipendenze (§4) — è già stato causa di build rotte su Railway.
 7. Se trovi un problema strutturale: **spiegalo, poi proponi un fix conservativo**. Niente refactor impliciti.
 
@@ -25,7 +25,7 @@
 
 | Layer | Tecnologia |
 |------|-----------|
-| Framework | Next.js 14 (App Router, Server Components, **Server Actions**) |
+| Framework | Next.js 15.5 + React 19 (App Router, Server Components, **Server Actions**) |
 | Auth & DB | Supabase (Postgres + **RLS** + SSR cookies) |
 | Linguaggio | TypeScript 5 (`strict`) |
 | Validazione | Zod (negli `schemas.ts` di ogni modulo) |
@@ -92,13 +92,13 @@ Moduli presenti: `catalog`, `customers`, `documents`, `goods-receipts`,
 
 ## 4. Vincoli di runtime e deploy (Railway)
 
-- **Node 20.x obbligatorio.** Pinnato in `package.json` → `engines.node: "20.x"`.
-  Motivo: il Goods Receipt Engine usa `File` (global Web API disponibile **solo da
-  Node 20**) e `pdf-parse`. Su Node 18 → `File is not defined` a runtime.
-  ⚠️ **Non esiste `.nvmrc`/`nixpacks.toml`/`Dockerfile`**: l'unico pin è `engines`.
-  Se tocchi il runtime, considera di rendere il pin più robusto e segnalalo.
+- **Node 22.x obbligatorio** (W7). Pinnato in `package.json` → `engines.node: "22.x"`
+  e in `.nvmrc` (letto anche dalla CI via `node-version-file`). Minimo storico: il
+  Goods Receipt Engine usa `File` (global Web API, da Node 20) e `pdf-parse`; su
+  Node 18 → `File is not defined` a runtime. Cambiando versione, aggiorna i due pin insieme.
 - **`pdf-parse` non va bundlato**: è in `next.config.mjs` →
-  `serverComponentsExternalPackages`. Non rimuoverlo. L'import usa il path interno
+  `serverExternalPackages` (Next 15; in Next 14 era `experimental.serverComponentsExternalPackages`).
+  Non rimuoverlo. L'import usa il path interno
   `pdf-parse/lib/pdf-parse.js` (il wrapper ha side-effect che rompono webpack).
 - **`package-lock.json` SEMPRE sincronizzato** col `package.json`. Railway fa `npm ci`:
   un lockfile fuori sync rompe il deploy (già successo). Dopo ogni `npm install <pkg>`
@@ -114,7 +114,8 @@ cd pasticceriaos-web
 npm run typecheck     # tsc --noEmit (strict). Deve passare pulito.
 npm run test          # vitest run — unit su modules/**/__tests__
 npm run build         # next build (ESLint è ignorato in build → gira `npm run lint` a parte)
-# e2e (opzionale, richiede .env.local + DB): npx playwright test  (vedi e2e/)
+npm run lint          # eslint . (flat config eslint.config.mjs): 0 errori richiesti
+# e2e (opzionale, MAI contro prod): runbook in e2e/README.md
 ```
 
 Se la modifica tocca SQL/RPC: l'unico modo di applicarla è una nuova migration in
@@ -129,7 +130,7 @@ Se la modifica tocca SQL/RPC: l'unico modo di applicarla è una nuova migration 
 | `lib/database.types.ts` | Tipi generati dal DB: rigenera, non editare a mano |
 | `lib/supabase/{server,middleware,admin}.ts` | Client SSR/admin. `admin` = service role, solo server |
 | `next.config.mjs` | externals pdf-parse, header no-store sul portale |
-| `package.json` `engines` + `package-lock.json` | Pin Node 20 + integrità deploy |
+| `package.json` `engines` + `.nvmrc` + `package-lock.json` | Pin Node 22 + integrità deploy |
 | `supabase/migrations_v2/*` | Schema + RPC + RLS. Append-only, mai riscrivere |
 
 ## 7. Rischi noti (vedi AGENTS.md dei moduli per il dettaglio)
@@ -139,10 +140,9 @@ Se la modifica tocca SQL/RPC: l'unico modo di applicarla è una nuova migration 
   (`receive_purchase_order`, 019: DEPRECATA, execute revocato). Sono il punto più
   delicato per il doppio conteggio: vedi [`modules/inventory/AGENTS.md`](modules/inventory/AGENTS.md)
   e [`modules/goods-receipts/AGENTS.md`](modules/goods-receipts/AGENTS.md).
-- Pin Node fragile (solo `engines`, vedi §4).
 - **Sicurezza:** finding aperti in [`SECURITY_REPORT.md`](SECURITY_REPORT.md) e stato in
-  [`REMEDIATION_REPORT.md`](REMEDIATION_REPORT.md): Next 14 da aggiornare (optimizer immagini
-  spento come mitigazione). Segreto POS ora per-config (062): la cassa pre-062 va migrata
+  [`REMEDIATION_REPORT.md`](REMEDIATION_REPORT.md). Next 15.5 dal W7 (optimizer immagini
+  comunque spento: l'app non usa `next/image`). Segreto POS ora per-config (062): la cassa pre-062 va migrata
   generando la firma dedicata dal wizard. Ledger e proiezioni non sono più scrivibili dal
   client (059): gesti manuali via `record_inventory_movement` / `record_finished_goods_waste`.
 - Documenti di analisi nella cartella padre potenzialmente disallineati dal codice.

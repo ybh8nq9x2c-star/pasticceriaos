@@ -1,7 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useRef, useState, useActionState } from 'react';
 import { IDLE_STATE } from '@/lib/utils';
 import { placeOrderAction } from '@/modules/marketplace/actions';
 import type { CatalogItem } from '@/modules/marketplace/types';
@@ -19,7 +18,7 @@ export function OrderComposer({
   /** Bozza PO d'origine: annullata dopo l'invio riuscito (vedi placeOrderAction). */
   fromDraftId?: string;
 }) {
-  const [state, formAction] = useFormState(placeOrderAction, IDLE_STATE);
+  const [state, formAction] = useActionState(placeOrderAction, IDLE_STATE);
   const [qty, setQty] = useState<Record<string, string>>(initialQty ?? {});
   const idem = useRef<string>(typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString(36));
 

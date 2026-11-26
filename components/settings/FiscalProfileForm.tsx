@@ -8,8 +8,7 @@
 // introdotti dalla 038. Nessun provider esterno, nessuna fatturazione attivata.
 // =============================================================================
 
-import { useState, useTransition } from 'react';
-import { useFormState } from 'react-dom';
+import { useActionState, useState, useTransition } from 'react';
 import { IDLE_STATE } from '@/lib/utils';
 import { updateFiscalProfileAction, verifyVatAction, type FiscalProfileState } from '@/modules/identity/actions';
 import { LEGAL_FORMS, LEGAL_FORM_LABELS, normalizeLegalForm } from '@/modules/identity/vat';
@@ -24,7 +23,7 @@ function formatDate(iso: string) {
 }
 
 export function FiscalProfileForm({ initial, canEdit }: { initial: FiscalProfile; canEdit: boolean }) {
-  const [state, formAction] = useFormState<FiscalProfileState, FormData>(updateFiscalProfileAction, IDLE_STATE);
+  const [state, formAction] = useActionState<FiscalProfileState, FormData>(updateFiscalProfileAction, IDLE_STATE);
   const current: FiscalProfile = state.status === 'success' && state.profile ? state.profile : initial;
 
   const [vatNumber, setVatNumber] = useState(initial.vatNumber ?? '');

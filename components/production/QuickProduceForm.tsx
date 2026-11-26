@@ -7,8 +7,8 @@
 // sistema di scarico, riusa il path canonico piano→completamento. Mobile-first.
 // =============================================================================
 
-import { useState } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useState, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ChefHat, ArrowDownToLine } from 'lucide-react';
@@ -48,7 +48,7 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
 
 export function QuickProduceForm({ recipes, selected }: { recipes: RecipeOpt[]; selected: SelectedRecipe | null }) {
   const router = useRouter();
-  const [state, formAction] = useFormState(quickProduceAction, IDLE_STATE);
+  const [state, formAction] = useActionState(quickProduceAction, IDLE_STATE);
   const [batches, setBatches] = useState('1');
   const n = Math.max(1, Math.floor(Number(batches)) || 1);
 

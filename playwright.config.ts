@@ -7,9 +7,8 @@
 //   E2E_BAKERY_EMAIL / E2E_BAKERY_PASSWORD     account pasticceria
 //   E2E_SUPPLIER_EMAIL / E2E_SUPPLIER_PASSWORD account fornitore
 //
-// Esecuzione: cd e2e && npm i && npx playwright install chromium
-//             npx playwright test --config=../playwright.config.ts
-// (oppure dalla root: npx playwright test, se @playwright/test è risolvibile)
+// Runbook completo (env, ambiente target, esecuzione): e2e/README.md.
+// Ambiente target MAI produzione.
 //
 // NOTA: workers=1 + retries=0 sono INTENZIONALI. La suite è uno scenario
 // stateful (una giornata operativa): un retry duplicherebbe dati reali.
@@ -55,8 +54,10 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
     },
     {
+      // 10–50, 70 = giornata operativa; 80 = goods receipts, 90 = area vendite
+      // (reincluse in W7). 60 gira nel progetto mobile.
       name: 'audit-desktop',
-      testMatch: /(?:1|2|3|4|5|7)\d-.*\.spec\.ts/,
+      testMatch: /(?:1|2|3|4|5|7|8|9)\d-.*\.spec\.ts/,
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
     },

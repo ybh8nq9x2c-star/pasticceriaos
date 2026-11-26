@@ -37,7 +37,8 @@ function fmtDateTime(iso: string) {
   return new Date(iso).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-export default async function PosInboxPage({ searchParams }: { searchParams: { tab?: string } }) {
+export default async function PosInboxPage(props: { searchParams: Promise<{ tab?: string }> }) {
+  const searchParams = await props.searchParams;
   const tab = (TABS.some((t) => t.key === searchParams.tab) ? searchParams.tab : 'all') as PosInboxFilter;
   const [events, reconciliation] = await Promise.all([
     listPosEvents(tab),

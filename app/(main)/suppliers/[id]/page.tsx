@@ -17,7 +17,8 @@ import { SupplierEditForm } from './SupplierEditForm';
 
 export const metadata: Metadata = { title: 'Fornitore' };
 
-export default async function SupplierDetailPage({ params }: { params: { id: string } }) {
+export default async function SupplierDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   let supplier;
   try {
     supplier = await getSupplierWithChannel(params.id);

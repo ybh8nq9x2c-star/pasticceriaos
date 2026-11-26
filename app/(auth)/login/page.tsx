@@ -5,11 +5,12 @@
 // prerender; la pagina è dinamica perché legge searchParams.
 // =============================================================================
 
+import { safeNextPath } from '@/lib/safe-next';
 import { LoginForm } from './LoginForm';
 
-export default function LoginPage({ searchParams }: { searchParams: { next?: string } }) {
-  const next = searchParams.next && searchParams.next.startsWith('/') && !searchParams.next.startsWith('//')
-    ? searchParams.next
-    : '';
+export default async function LoginPage(props: { searchParams: Promise<{ next?: string }> }) {
+  const searchParams = await props.searchParams;
+  // F-10: stesso controllo della server action (lib/safe-next.ts).
+  const next = safeNextPath(searchParams.next, '');
   return <LoginForm next={next} />;
 }

@@ -26,7 +26,8 @@ function fmtDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
-export default async function DocumentDetailPage({ params }: { params: { id: string } }) {
+export default async function DocumentDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   let doc: CommercialDocument;
   try {
     doc = await getDocument(params.id);

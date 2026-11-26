@@ -8,7 +8,7 @@
 //  • aggiunta manuale (posItemId editabile)
 // =============================================================================
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import { IDLE_STATE } from '@/lib/utils';
 import { upsertPosMappingAction } from '@/modules/pos/actions';
 import { SubmitButton } from '@/components/ui/SubmitButton';
@@ -35,7 +35,7 @@ export function PosMappingForm({
   editablePosId?: boolean;
   submitLabel?: string;
 }) {
-  const [state, formAction] = useFormState(upsertPosMappingAction, IDLE_STATE);
+  const [state, formAction] = useActionState(upsertPosMappingAction, IDLE_STATE);
 
   return (
     // Mobile: campi impilati a tutta larghezza (tap comodo); da sm: riga compatta.
