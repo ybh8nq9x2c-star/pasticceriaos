@@ -81,29 +81,34 @@ export async function listMovements(
   return (data ?? []).map(toMovement);
 }
 
+/**
+ * Movimento manuale materie prime. Unico write-path client verso il ledger:
+ * RPC record_inventory_movement (059, SECURITY DEFINER) — l'app non ha più
+ * privilegi INSERT su inventory_movements. Poi rilegge la riga (SELECT, RLS).
+ */
 export async function insertMovement(
   orgId: string,
-  userId: string,
   input: CreateMovementInput,
 ): Promise<InventoryMovement> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('inventory_movements')
-    .insert({
-      organization_id:       orgId,
-      ingredient_product_id: input.ingredientProductId,
-      movement_type:         input.movementType,
-      quantity_delta:        input.quantityDelta,
-      unit:                  input.unit,
-      notes:                 input.notes || null,
-      reference_type:        input.referenceType || null,
-      reference_id:          input.referenceId || null,
-      performed_by:          userId,
-    })
-    .select('*, ingredient_products(name)')
-    .single();
-
+  const { data: id, error } = await supabase.rpc('record_inventory_movement' as never, {
+    p_ingredient_product_id: input.ingredientProductId,
+    p_movement_type:         input.movementType,
+    p_quantity_delta:        input.quantityDelta,
+    p_unit:                  input.unit,
+    p_notes:                 input.notes || null,
+    p_reference_type:        input.referenceType || null,
+    p_reference_id:          input.referenceId || null,
+  } as never);
   if (error) throw mapSupabaseError(error);
+
+  const { data, error: readErr } = await supabase
+    .from('inventory_movements')
+    .select('*, ingredient_products(name)')
+    .eq('organization_id', orgId)
+    .eq('id', id as unknown as string)
+    .single();
+  if (readErr) throw mapSupabaseError(readErr);
   return toMovement(data);
 }
 
@@ -245,27 +250,20 @@ function toLevel(row: any): InventoryLevel {
 }
 
 /**
- * Movimento sul ledger PRODOTTI FINITI (append-only; RLS fgm_insert per-org;
- * la proiezione finished_goods_levels si aggiorna via trigger, mai da qui).
+ * Invenduto PRODOTTI FINITI (waste, delta negativo). Unico write-path client:
+ * RPC record_finished_goods_waste (059). La proiezione finished_goods_levels si
+ * aggiorna via trigger, mai da qui.
  */
-export async function insertFinishedGoodsMovement(row: {
-  organizationId: string;
+export async function insertFinishedGoodsWaste(row: {
   recipeId: string;
-  movementType: string;
-  quantityDelta: number;
-  referenceType: string | null;
-  performedBy: string | null;
+  quantity: number;
   notes: string | null;
 }): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase.from('finished_goods_movements').insert({
-    organization_id: row.organizationId,
-    recipe_id: row.recipeId,
-    movement_type: row.movementType,
-    quantity_delta: row.quantityDelta,
-    reference_type: row.referenceType,
-    performed_by: row.performedBy,
-    notes: row.notes,
+  const { error } = await supabase.rpc('record_finished_goods_waste' as never, {
+    p_recipe_id: row.recipeId,
+    p_quantity:  row.quantity,
+    p_notes:     row.notes,
   } as never);
   if (error) throw mapSupabaseError(error);
 }

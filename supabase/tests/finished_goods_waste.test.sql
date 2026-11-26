@@ -38,8 +38,8 @@ select pg_temp.act_as('77777777-7777-7777-7777-777777777777');
 do $$
 declare v_lvl numeric; v_rem numeric; v_wasted numeric; n int; failed boolean := false;
 begin
-  insert into finished_goods_movements (organization_id, recipe_id, movement_type, quantity_delta, reference_type, performed_by, notes)
-  values ('a9a9a9a9-a9a9-a9a9-a9a9-a9a9a9a9a9a9', 'b9b9b9b9-b9b9-b9b9-b9b9-b9b9b9b9b9b9', 'waste', -6, 'manual', '77777777-7777-7777-7777-777777777777', 'Invenduto');
+  -- 059: l'invenduto passa SOLO dalla RPC (niente INSERT diretto dal client).
+  perform public.record_finished_goods_waste('b9b9b9b9-b9b9-b9b9-b9b9-b9b9b9b9b9b9', 6, 'Invenduto');
 
   -- 2) proiezione via trigger: 20 - 6 = 14
   select current_quantity into v_lvl from finished_goods_levels
@@ -53,13 +53,20 @@ begin
   assert v_wasted = 6, 'view wasted must be 6, got ' || v_wasted;
   assert v_rem = 14, 'view remaining must be produced-sold-wasted = 14, got ' || v_rem;
 
-  -- 4) waste positivo → CHECK violato
+  -- 4) quantità non positiva → rifiutata dalla RPC (P0042); e un INSERT diretto
+  --    dal client non è più nemmeno permesso (059: privilegi revocati → 42501).
+  begin
+    perform public.record_finished_goods_waste('b9b9b9b9-b9b9-b9b9-b9b9-b9b9b9b9b9b9', -3, null);
+  exception when sqlstate 'P0042' then failed := true;
+  end;
+  assert failed, 'non-positive waste must be rejected by the RPC (P0042)';
+  failed := false;
   begin
     insert into finished_goods_movements (organization_id, recipe_id, movement_type, quantity_delta)
-    values ('a9a9a9a9-a9a9-a9a9-a9a9-a9a9a9a9a9a9', 'b9b9b9b9-b9b9-b9b9-b9b9-b9b9b9b9b9b9', 'waste', 3);
-  exception when check_violation then failed := true;
+    values ('a9a9a9a9-a9a9-a9a9-a9a9-a9a9a9a9a9a9', 'b9b9b9b9-b9b9-b9b9-b9b9-b9b9b9b9b9b9', 'waste', -3);
+  exception when insufficient_privilege then failed := true;
   end;
-  assert failed, 'positive waste must violate fgm_delta_sign';
+  assert failed, 'direct client INSERT into finished_goods_movements must be denied (059)';
 
   -- dominio separato: NESSUN movimento materie prime creato da tutto questo
   select count(*) into n from inventory_movements

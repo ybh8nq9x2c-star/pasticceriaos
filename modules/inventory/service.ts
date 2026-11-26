@@ -65,14 +65,10 @@ const MUST_BE_POSITIVE: CreateMovementInput['movementType'][] = [
   'initial_stock',
 ];
 
-// Movimenti operativi in uscita soggetti alla guardia "no stock sotto zero".
-// manual_adjustment è ESCLUSO di proposito: la rettifica è l'eccezione esplicita
-// (atterra sempre a un conteggio reale >= 0, con motivo).
-const GUARDED_OUTBOUND: CreateMovementInput['movementType'][] = [
-  'production_usage',
-  'waste',
-  'return_to_supplier',
-];
+// La guardia "no stock sotto zero" per i movimenti operativi in uscita (waste,
+// return_to_supplier) vive nella RPC record_inventory_movement (059): lì è
+// valutata SOTTO LOCK della giacenza, quindi regge anche con richieste
+// concorrenti (qui era una lettura separata dall'insert → race). P0052.
 
 function normalizeSign(input: CreateMovementInput): CreateMovementInput {
   let delta = input.quantityDelta;
@@ -97,24 +93,8 @@ export async function recordMovement(raw: unknown): Promise<InventoryMovement> {
   const input: CreateMovementInput = createMovementSchema.parse(raw);
   const normalized = normalizeSign(input);
 
-  // Guardia verità del magazzino: un movimento operativo in uscita non può
-  // portare la giacenza sotto zero. La rettifica (manual_adjustment) è esente.
-  if (GUARDED_OUTBOUND.includes(normalized.movementType) && normalized.quantityDelta < 0) {
-    const level = await repo.getLevelByIngredient(orgId, normalized.ingredientProductId);
-    const current = level?.currentQuantity ?? 0;
-    if (current + normalized.quantityDelta < 0) {
-      throw new BusinessRuleError(
-        `Stock insufficiente${level ? ` per ${level.ingredientName}` : ''}: disponibili ${current} ${normalized.unit}, ` +
-          `l'operazione ne toglie ${Math.abs(normalized.quantityDelta)}. Registra prima un carico o usa la rettifica del magazzino.`,
-      );
-    }
-  }
-
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new AuthError();
-
-  return repo.insertMovement(orgId, user.id, normalized);
+  // 059: unico write-path = RPC (org-check, ruolo, unità, guardia stock).
+  return repo.insertMovement(orgId, normalized);
 }
 
 /**
@@ -131,13 +111,10 @@ export async function recordFinishedGoodsWaste(raw: unknown): Promise<void> {
   }
   const input: RecordFinishedGoodsWasteInput = recordFinishedGoodsWasteSchema.parse(raw);
 
-  await repo.insertFinishedGoodsMovement({
-    organizationId: session.organizationId,
+  // 059: RPC record_finished_goods_waste (org-check su ricetta, viewer escluso).
+  await repo.insertFinishedGoodsWaste({
     recipeId: input.recipeId,
-    movementType: 'waste',
-    quantityDelta: -input.quantity,
-    referenceType: 'manual',
-    performedBy: session.userId,
+    quantity: input.quantity,
     notes: `${input.reason}${input.note?.trim() ? ` — ${input.note.trim()}` : ''}`,
   });
 }
@@ -205,7 +182,7 @@ export async function recordInitialStock(raw: unknown): Promise<InventoryMovemen
     notes:               input.notes || undefined,
   };
 
-  return repo.insertMovement(orgId, user.id, movement);
+  return repo.insertMovement(orgId, movement);
 }
 
 // ---------------------------------------------------------------------------

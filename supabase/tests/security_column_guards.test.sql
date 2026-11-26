@@ -148,11 +148,13 @@ do $$ declare v numeric; begin
   assert v = 5, 'F-07: min_threshold deve restare modificabile, vale ' || v;
 end $$;
 
--- la giacenza NO: si cambia solo con un movimento
+-- la giacenza NO: si cambia solo con un movimento. Dalla 059 il client non ha
+-- nemmeno il privilegio UPDATE sulla colonna (42501) — il trigger 058 (P0213)
+-- resta come seconda linea per chi avesse privilegi di tabella.
 select pg_temp.expect_error(
   $q$update inventory_levels set current_quantity = 999999
      where ingredient_product_id = '5fffffff-ffff-ffff-ffff-ffffffffffff'$q$,
-  'P0213', 'F-07a scrittura diretta della giacenza');
+  '42501', 'F-07a scrittura diretta della giacenza');
 
 -- le vendite non si cancellano dal client (nessuna policy DELETE ⇒ 0 righe)
 delete from sales where id = '50000000-0000-0000-0000-00000000aaaa';

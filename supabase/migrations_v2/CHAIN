@@ -63,3 +63,4 @@
 056_finished_goods_waste.sql
 057_connect_bridges_anagrafica.sql
 058_security_column_guards.sql
+059_tenant_guards_receipts_ledger.sql

@@ -31,6 +31,19 @@ Vincoli DB da rispettare quando inserisci un movimento (`service.ts` → `normal
 - `reference_type` ∈ {`purchase_order`,`production_plan`,`manual`} e va **in coppia** con `reference_id` (o entrambi null).
 - `manual_adjustment` richiede `notes` non vuote.
 
+## Privilegi del client (059)
+
+`anon`/`authenticated` **non hanno** INSERT/UPDATE/DELETE su `inventory_movements`,
+`finished_goods_movements`, `inventory_levels`, `finished_goods_levels` (unica eccezione:
+`UPDATE(min_threshold)` su `inventory_levels`). I gesti manuali dell'app passano da:
+
+| RPC (SECURITY DEFINER) | Usata da | Garanzie |
+|---|---|---|
+| `record_inventory_movement` | `repository.insertMovement` (rettifiche, carichi iniziali, scarti) | org-check ingrediente (P0045), viewer escluso (P0050), solo tipi manuali (P0051), conversione unità (P0212), guardia stock **sotto lock** (P0052) |
+| `record_finished_goods_waste` | `repository.insertFinishedGoodsWaste` (invenduto) | org-check ricetta (P0045), viewer escluso (P0050), quantità > 0 |
+
+Un nuovo write-path verso questi ledger = **nuova RPC definer**, mai un insert da PostgREST.
+
 ## I TRE write-path verso il ledger (⚠️ rischio doppio conteggio)
 
 Tutti finiscono in `inventory_movements` e si appoggiano allo stesso trigger:

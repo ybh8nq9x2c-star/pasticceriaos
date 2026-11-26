@@ -140,5 +140,6 @@ Se la modifica tocca SQL/RPC: l'unico modo di applicarla è una nuova migration 
 - Pin Node fragile (solo `engines`, vedi §4).
 - **Sicurezza:** finding aperti in [`SECURITY_REPORT.md`](SECURITY_REPORT.md): Next 14 da
   aggiornare (optimizer immagini spento come mitigazione), secret POS globale
-  (va reso per-org prima del 2° cliente POS), insert diretti sui ledger, ruolo `viewer` non in RLS.
+  (va reso per-org prima del 2° cliente POS). Ledger e proiezioni non sono più scrivibili dal
+  client (059): gesti manuali via `record_inventory_movement` / `record_finished_goods_waste`.
 - Documenti di analisi nella cartella padre potenzialmente disallineati dal codice.

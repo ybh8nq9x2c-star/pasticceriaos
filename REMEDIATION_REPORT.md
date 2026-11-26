@@ -120,3 +120,42 @@ security_column_guards: OK                (058: F-02, F-03, F-07 parziale — pr
 ```
 **Non verificato:** il job `sql` su GitHub Actions (`gh` non autenticato). Il job ora chiama lo
 stesso `scripts/db/local.sh all` eseguito qui; Docker è disponibile su `ubuntu-latest`.
+
+### W2 — Isolamento cross-org nei ricevimenti e ledger · ✅ fatto (eseguito)
+
+**Bug confermato a runtime (controllo negativo, prima del fix).** Sul DB di test, con il corpo della 054
+e la sola FK sull'id, l'utente dell'org B ha completato un ricevimento che puntava al PO dell'org A:
+```
+ esito_con_054 → completed
+ stato_ordine_di_A → partial      (era confirmed: scrittura cross-tenant + order_status_history in A)
+```
+Con la 059 lo stesso scenario dà `P0045` e l'ordine di A resta `confirmed` con le righe a 0.
+
+**Migration `059_tenant_guards_receipts_ledger.sql`** (la 058 non è stata duplicata: copre altre tabelle)
+| Punto | Implementazione |
+|---|---|
+| Coerenza ricevimento → ordine/fornitore | `unique (organization_id, id)` su `purchase_orders`/`suppliers` + FK composite `purchase_receipts_{order,supplier}_same_org`. `NOT VALID` + validazione tentata: se ci sono dati storici incoerenti dà un WARNING invece di bloccare il deploy (query in `supabase/diagnostics/tenant_coherence.sql`) |
+| Coerenza riga → prodotto | trigger `trg_receipt_line_tenant_guard` (P0045). Le righe non hanno `organization_id`, quindi niente FK composita |
+| RPC `complete_purchase_receipt` | ridefinita (corpo 054 + punti `059:`): l'ordine viene bloccato `for update` e la sua org verificata **prima** di ogni scrittura; anche il prodotto della riga deve essere dell'org (P0045) |
+| Ledger e proiezioni | `revoke insert, update, delete, truncate` da `anon`/`authenticated` su `inventory_movements`, `finished_goods_movements`, `inventory_levels`, `finished_goods_levels`; `grant update (min_threshold)` su `inventory_levels`; tolte le policy di insert ormai inerti |
+| Write-path manuali | nuove RPC definer `record_inventory_movement` e `record_finished_goods_waste` (+ helper `current_org_role()`), che **sostituiscono** gli insert diretti di `modules/inventory/repository.ts`. La guardia "stock sotto zero" è stata spostata dal service (lettura separata dall'insert, quindi race) alla RPC, sotto lock |
+
+**Regressioni** — `supabase/tests/tenant_ledger_guards.test.sql` (nuova, in `SUITE`), tutte eseguite:
+| ID | Scenario | Esito |
+|---|---|---|
+| A1 | B crea un ricevimento che punta al PO di A | `23503` (FK composita) |
+| A2 | Riga storica incoerente (vincolo tolto nella transazione), B la completa | `P0045`; ordine A invariato (`confirmed`, 0 ricevuti) |
+| A3 | Riga di ricevimento con prodotto di altra org | `P0045` |
+| A4 | Caso legittimo: 4 kg su prodotto in g | 4000 g a magazzino, PO `partial` |
+| B1–B6 | `authenticated`: INSERT/UPDATE/DELETE su ledger, UPDATE giacenza, UPDATE `finished_goods_levels` | tutti `42501` |
+| B7 | UPDATE `min_threshold` | consentito |
+| C1–C7 | RPC: conversione kg→g; scarto oltre giacenza `P0052`; `production_usage` a mano `P0051`; ingrediente o ricetta di altra org `P0045`; unità incompatibile `P0212`; viewer `P0050` su entrambe | tutti come atteso |
+
+Test esistenti allineati alla 059 (cambiava il write-path, non la regola):
+- `finished_goods_waste`: l'invenduto passa dalla RPC; l'INSERT diretto ora è `42501`.
+- `security_column_guards`: la scrittura della giacenza è bloccata già dal privilegio (`42501`); il trigger della 058 (P0213) resta come seconda linea.
+
+**Esecuzione:** catena 001…059 da zero (58 migration); `✓ test SQL verdi: 8 suite`. App: typecheck
+pulito, 356/356 unit, build OK.
+**Non fatto:** `lib/database.types.ts` non è stato rigenerato (CLI Supabase assente). Le due nuove RPC
+sono chiamate con il cast `as never`, come altri punti del codice.
