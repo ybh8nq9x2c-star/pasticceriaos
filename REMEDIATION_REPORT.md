@@ -49,3 +49,23 @@ Questi punti vanno nelle **nuove** migration di W2 (≥ 059). Il contenuto della
 ## 3. Stato per lavoro
 
 _(aggiornato a ogni commit: vedi sezioni seguenti)_
+
+### W0 — Bonifica credenziali · ✅ fatto (lato repo) · azioni umane H1–H3 pendenti
+
+| Punto | Esito | Evidenza |
+|---|---|---|
+| Token nel remote | ✅ | `git remote set-url origin https://github.com/ybh8nq9x2c-star/pasticceriaos.git`; `grep -cF <vecchi valori> .git/config` → **0** |
+| `../.github_config` | ⏳ umano | Fuori dal repo, **non** copiato dentro; aggiunto a `.gitignore` per sicurezza. Dopo la revoca: cancellarlo o spostarlo fuori da ogni cartella sincronizzata |
+| `e2e/helpers/accounts.ts` | ✅ | Niente fallback per email e password; `requireEnv()` con fail-fast |
+| `playwright.config.ts` | ✅ | `baseURL` solo da `BAKERYOS_E2E_BASE_URL`, niente default Railway, fail-fast |
+| `.gitignore` | ✅ | `.env.*` (eccetto `.env.example`), `.github_config`, `*.secrets`, `e2e/.auth/` |
+| Valori vecchi nel working tree | ✅ | `grep -rlF -f <4 valori> .` (esclusi `node_modules`, `.git`, `.next`) → **0 file**. Fuori dal repo l'unico hit è `../.github_config` (H2) |
+| Fail-fast E2E | ✅ eseguito | Senza env → `Error: [e2e] BAKERYOS_E2E_BASE_URL mancante…`; con solo l'URL → `Error: [e2e] variabile d'ambiente E2E_BAKERY_EMAIL mancante…` |
+
+**Storia git (nessuna riscrittura, i valori vanno revocati):**
+- Le 2 password E2E compaiono nel commit `0f20a6b` (2026-06-11, "fix: chiusura blocchi audit E2E") e
+  restano in tutta la storia successiva fino a `ad54f02`.
+- I token GitHub **non** compaiono in nessun commit (erano solo in `.git/config` e `../.github_config`).
+- Altri hit della scansione (`ghp_`, `github_pat_`, `sk-ant-`, `AIza`, JWT, `sb_secret_`, URL Postgres con
+  password, letterali `password/secret`): solo valori non sensibili, cioè la password di default del
+  Postgres **locale** della CI (`127.0.0.1:54322`) e due `const SECRET` fittizi nei test unitari POS.

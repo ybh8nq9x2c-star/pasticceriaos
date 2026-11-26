@@ -16,10 +16,12 @@ build/
 # ── Environment files ─────────────────────────────────────────────────────────
 # .env.example IS committed (template with placeholders, no secrets)
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+# config locali con credenziali (W0): mai nel repo
+.github_config
+*.secrets
+e2e/.auth/
 
 # ── TypeScript build artifacts ────────────────────────────────────────────────
 *.tsbuildinfo

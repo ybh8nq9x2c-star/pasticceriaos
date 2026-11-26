@@ -1,23 +1,40 @@
 // =============================================================================
 // e2e/helpers/accounts.ts
-// Account dei due agenti. ATTENZIONE: nel DB di produzione i ruoli risultano
-// INVERTITI rispetto alla richiesta originale dell'audit:
-//   eeskere33@gmail.com    → org "luca toni"    account_type=customer (PASTICCERIA)
-//   emirimatteo2@gmail.com → org "matteo emiri" account_type=supplier (FORNITORE)
-// La suite usa i ruoli EFFETTIVI del DB. Override via env se necessario.
+// Account dei due agenti E2E (pasticceria + fornitore). Email e password NON
+// stanno nel repo: si leggono dalle env sotto.
 // =============================================================================
 
 import * as path from 'node:path';
 
+// =============================================================================
+// Credenziali SOLO da variabili d'ambiente (W0, REMEDIATION_REPORT.md).
+// Nessun fallback: le vecchie password erano committate e vanno considerate
+// compromesse (ruotate). Se una variabile manca la suite si ferma subito con un
+// messaggio esplicito, invece di girare con account sbagliati.
+//   E2E_BAKERY_EMAIL   / E2E_BAKERY_PASSWORD    account pasticceria (customer)
+//   E2E_SUPPLIER_EMAIL / E2E_SUPPLIER_PASSWORD  account fornitore   (supplier)
+// =============================================================================
+
+function requireEnv(name: string): string {
+  const v = process.env[name]?.trim();
+  if (!v) {
+    throw new Error(
+      `[e2e] variabile d'ambiente ${name} mancante. ` +
+        'Le credenziali E2E si forniscono solo via env / secret store (vedi e2e/README o REMEDIATION_REPORT.md W0).',
+    );
+  }
+  return v;
+}
+
 export const BAKERY = {
-  email: process.env.E2E_BAKERY_EMAIL ?? 'eeskere33@gmail.com',
-  password: process.env.E2E_BAKERY_PASSWORD ?? '010670Pe',
+  email: requireEnv('E2E_BAKERY_EMAIL'),
+  password: requireEnv('E2E_BAKERY_PASSWORD'),
   home: '/dashboard',
 };
 
 export const SUPPLIER = {
-  email: process.env.E2E_SUPPLIER_EMAIL ?? 'emirimatteo2@gmail.com',
-  password: process.env.E2E_SUPPLIER_PASSWORD ?? '010670Pe',
+  email: requireEnv('E2E_SUPPLIER_EMAIL'),
+  password: requireEnv('E2E_SUPPLIER_PASSWORD'),
   home: '/supplier',
 };
 

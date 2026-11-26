@@ -2,7 +2,8 @@
 // playwright.config.ts
 // Config per l'audit E2E bakery↔supplier contro l'ambiente deployato.
 //
-//   E2E_BASE_URL  override dell'ambiente (default: produzione Railway)
+//   BAKERYOS_E2E_BASE_URL  ambiente target (OBBLIGATORIA, nessun default:
+//                          la suite è stateful e crea dati reali)
 //   E2E_BAKERY_EMAIL / E2E_BAKERY_PASSWORD     account pasticceria
 //   E2E_SUPPLIER_EMAIL / E2E_SUPPLIER_PASSWORD account fornitore
 //
@@ -16,7 +17,14 @@
 
 import { defineConfig, devices } from '@playwright/test';
 
-const BASE_URL = process.env.E2E_BASE_URL ?? 'https://pasticceriaos-production-d14d.up.railway.app';
+// W0: nessun URL predefinito (prima puntava alla produzione Railway). Fail-fast.
+const BASE_URL = process.env.BAKERYOS_E2E_BASE_URL?.trim();
+if (!BASE_URL) {
+  throw new Error(
+    '[e2e] BAKERYOS_E2E_BASE_URL mancante: indica esplicitamente l\'ambiente di test ' +
+      '(es. http://localhost:3000 o lo staging). La suite crea dati reali: niente default di produzione.',
+  );
+}
 
 export default defineConfig({
   testDir: './e2e/tests',
