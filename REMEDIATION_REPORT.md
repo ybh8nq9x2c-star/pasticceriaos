@@ -312,7 +312,7 @@ Il ledger resta coerente con `qty_received`. Fix suggerito: incremento atomico i
 | F-07 ledger scrivibili / viewer | **fatto** per ledger e proiezioni (059) e per le nuove RPC (viewer escluso) · **parziale** per il ruolo viewer sulle altre tabelle, dove la RLS non distingue i ruoli |
 | F-08 prezzi forgiati nelle righe marketplace | **fatto** | 064: trigger che ricalcola lo snapshot dal catalogo (vedi §7) |
 | F-09 costi import AI | **aperto** | non incluso; serve una quota per org |
-| F-10 open redirect `/\` | **aperto** | non incluso; fix da una riga in `safeNext` |
+| F-10 open redirect `/\` | **fatto** | `lib/safe-next.ts` usato da login, conferma e callback (vedi §7) |
 | F-11 header di sicurezza | **aperto** | non incluso (CSP da progettare con gli script inline esistenti) |
 | F-12 FK cross-tenant | **parziale** | ricevimenti (059), righe di ricevimento (059/061), produzione (righe di altra org dichiarate, 060/063), prenotazioni e piani (063); restano `recipe_ingredients` e `order_line_items` |
 | F-13 upload dal portale | **aperto** (basso) | mitigato dalla whitelist MIME del bucket |
