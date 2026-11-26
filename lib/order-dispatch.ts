@@ -15,6 +15,12 @@
 
 export interface OrderDispatchPayload {
   orderId: string;
+  /**
+   * Identificativo STABILE di questo invio (063, purchase_orders.dispatch_id):
+   * inviato anche come header Idempotency-Key, così il servizio email può
+   * scartare un eventuale retry dello stesso invio.
+   */
+  dispatchId: string;
   supplierName: string;
   supplierEmail: string;
   orderDate: string;
@@ -50,7 +56,7 @@ export async function dispatchOrderToSupplier(
   try {
     const res = await fetch(webhookUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': payload.dispatchId },
       body: JSON.stringify({ type: 'purchase_order.sent', order: payload }),
       // L'invio non deve bloccare la transizione di stato oltre il ragionevole.
       signal: AbortSignal.timeout(8000),

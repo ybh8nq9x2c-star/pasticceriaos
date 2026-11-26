@@ -96,12 +96,13 @@ export async function getFinishedGoodsTheoretical(
   return repo.listFinishedGoodsTheoretical(orgId, businessDate ?? todayISODate());
 }
 
-/** Riepilogo per la dashboard: i primi N prodotti (rimasto crescente) di oggi. */
-export async function getTodayFinishedGoodsTheoreticalSummary(
-  limit = 5,
-): Promise<FinishedGoodTheoretical[]> {
-  const rows = await getFinishedGoodsTheoretical();
-  return rows.slice(0, limit);
+/**
+ * Riepilogo per la dashboard: TUTTI i prodotti di oggi (063). Prima erano i primi
+ * 5 per rimanenza crescente → l'azione "Registra invenduto" non vedeva i prodotti
+ * con più avanzo, proprio quelli da buttare/registrare.
+ */
+export async function getTodayFinishedGoodsTheoreticalSummary(): Promise<FinishedGoodTheoretical[]> {
+  return getFinishedGoodsTheoretical();
 }
 
 // ---------------------------------------------------------------------------

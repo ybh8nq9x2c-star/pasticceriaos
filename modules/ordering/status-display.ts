@@ -31,9 +31,11 @@ export function orderStatusBadge(
     case 'draft':
       return { label: 'Bozza', variant: 'gray' };
     case 'sent':
-      return dispatchOutcome === 'delivered'
-        ? { label: 'Inviato', variant: 'blue' }
-        : { label: 'Da inviare a mano', variant: 'amber' };
+      if (dispatchOutcome === 'delivered') return { label: 'Inviato', variant: 'blue' };
+      // 063: registrato come inviato, esito email non ancora noto (in corso o
+      // interrotto). Mai "Inviato" senza attestazione.
+      if (dispatchOutcome === 'pending') return { label: 'Invio da verificare', variant: 'amber' };
+      return { label: 'Da inviare a mano', variant: 'amber' };
     case 'confirmed':
       return { label: 'Confermato', variant: 'indigo' };
     case 'partial':

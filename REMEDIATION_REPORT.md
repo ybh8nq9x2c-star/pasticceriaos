@@ -256,3 +256,28 @@ Il ledger resta coerente con `qty_received`. Fix suggerito: incremento atomico i
 |---|---|---|
 | H5 | Impostare `POS_WEBHOOK_MASTER_SECRET` (≥ 32 caratteri) su Railway **prima** di attivare nuove casse | ⏳ |
 | H6 | Guidare la cassa già collegata (config pre-062, `legacy_global`) a "Genera firma dedicata" e incollarla in MiPOS; poi rimuovere `MIPOS_WEBHOOK_SECRET` | ⏳ |
+
+### W6 — Difetti d'uso quotidiano · ✅ fatto (eseguito)
+
+**Migration `063_daily_use_fixes.sql`**
+| Punto | Prima | Dopo |
+|---|---|---|
+| **Produzione rapida** | ogni rapida creava un nuovo piano per oggi, quindi dalla seconda c'era collisione con `UNIQUE(org, plan_date)` e la correzione dalla dashboard falliva | RPC `quick_produce`: **find-or-create del piano di oggi** (advisory lock org+giorno), +N infornate sulla riga della ricetta **postate subito** (`posted_batch_count`, stesso pattern di `qty_posted`). Funziona più volte al giorno, con piano in bozza **o completato**. `complete_production_plan` v6 posta solo `batch_count − posted_batch_count`, quindi niente doppio scarico; il piano resta non ricompletabile. Logica di contabilizzazione della v5 estratta in `post_production_items` (corpo unico, interno). Il client non può scrivere `posted_batch_count` (privilegi di colonna) |
+| **Piani atomici** | insert testata + insert righe separati (piani senza righe); modifica = delete + insert righe | RPC `save_production_plan` (creazione, modifica, settimana tipo): una transazione; infornate postate non rimovibili (`P0047`) |
+| **Prenotazioni atomiche** | due insert separati | RPC `create_customer_order`: una transazione, org-check sulle ricette, viewer escluso |
+| **Email d'ordine** | l'email partiva **prima** di `mark_order_sent`: con un doppio submit due email, con un errore DB dopo l'invio un'email senza stato | `begin_order_dispatch` (sent + history + `dispatch_id` stabile, esito `pending`) **prima**; poi l'email con `dispatchId` nel payload e header `Idempotency-Key`; infine `record_order_dispatch` (esito solo se l'id coincide). Il doppio submit restituisce `should_dispatch=false`. Badge "Invio da verificare" per `pending`, mai "Inviato" senza attestazione |
+| **Invenduto** | vista dai piani completati × resa **corrente**, per giorno; dashboard limitata ai **primi 5** per rimanenza crescente, quindi i prodotti con più avanzo restavano fuori | vista `v_finished_goods_daily_theoretical` rifatta sui **movimenti postati** (riporto + prodotto − venduto netto degli storni − buttato ± rettifiche, giorno Europe/Rome). Compare anche un prodotto con solo riporto. La dashboard mostra **tutti** i prodotti, con il riporto in riga (vale anche per "Chiudi la giornata") |
+| **Portale** | token 1 anno; qualunque membro poteva scrivere `portal_token_version` e `supplier_org_id`; letture service-role senza filtro org su documenti e prodotti collegati; `partial` invisibile | TTL configurabile `SUPPLIER_PORTAL_TOKEN_TTL_DAYS` (default **30**, max 365); rotazione solo via RPC `rotate_supplier_portal_token` (owner); privilegi di colonna su `suppliers`; filtro `organization_id` sui documenti e prodotto mostrato solo se della stessa org; `partial` visibile con il suo messaggio |
+
+**Regressioni eseguite**
+- `supabase/tests/daily_use.test.sql` (nuova):
+  - **A**: 2 rapide nello stesso giorno → 1 piano, riga 3/3, 30 pezzi, −300 g; scendere sotto il postato → `P0047`; completamento → solo il Pane (cornetti fermi a 30, farina −700); rapida a piano **completato** → 40, riga 4/4; client su `posted_batch_count` → `42501`.
+  - **B**: riga non valida → `P0045` e **0** testate orfane; prenotazione valida → 2 righe, totale 29.
+  - **C**: doppio `begin_order_dispatch` → primo `true`, secondo `false`, stesso id, una sola transizione draft→sent; esito con id sbagliato ignorato; esito corretto → `delivered`.
+  - **D**: oggi compaiono entrambi i prodotti; pane con solo riporto 6; cornetti 40 − 3 = 37.
+  - **E**: `portal_token_version`/`supplier_org_id` → `42501`; anagrafica modificabile; rotazione → v2; non-owner → `P0050`.
+- Unit: badge `pending`, TTL del token (default, env, valori non validi, tetto), mapping del riporto.
+- Test esistenti invariati e verdi: `finished_goods_waste` sulla nuova vista, `production_fefo_lots` sul v6.
+
+**Esecuzione:** 62 migration da zero, `✓ test SQL verdi: 13 suite`; typecheck pulito; **385/385** unit; build OK.
+**Non coperto da test automatici:** il flusso `changeOrderStatus → email` del service non ha un unit test con mock. Il contratto anti-doppio-invio è verificato a livello RPC (W6-C) e dal typecheck.

@@ -79,4 +79,9 @@ describe('pipeline a 3 nodi (Bozza → Inviato → Ricevuto)', () => {
     expect(pipelineIndex('cancelled')).toBe(-1);
     expect(pipelineIndex('bogus' as unknown as Parameters<typeof pipelineIndex>[0])).toBe(-1);
   });
+
+  it('sent + pending (063, esito email non ancora noto) → MAI "Inviato"', () => {
+    expect(orderStatusBadge('sent', 'pending')).toEqual({ label: 'Invio da verificare', variant: 'amber' });
+    expect(needsManualSend('sent', 'pending')).toBe(true);
+  });
 });

@@ -74,7 +74,8 @@ export async function getPortalContext(token: string): Promise<PortalContext> {
   };
 }
 
-const PORTAL_VISIBLE_STATUSES: OrderStatus[] = ['sent', 'confirmed', 'received'];
+// 063: 'partial' visibile — il fornitore deve vedere che una parte è arrivata e il resto manca.
+const PORTAL_VISIBLE_STATUSES: OrderStatus[] = ['sent', 'confirmed', 'partial', 'received'];
 
 export async function listPortalOrders(token: string): Promise<{ ctx: PortalContext; orders: PortalOrderListItem[] }> {
   const ctx = await getPortalContext(token);
@@ -116,7 +117,7 @@ export async function getPortalOrder(token: string, orderId: string): Promise<{ 
     .from('purchase_orders')
     .select(`
       id, status, order_date, expected_date, notes, total_amount,
-      order_line_items(id, quantity_ordered, unit, unit_price_snapshot, ingredient_products(name, sku))
+      order_line_items(id, quantity_ordered, unit, unit_price_snapshot, ingredient_products(name, sku, organization_id))
     `)
     .eq('id', orderId)
     .eq('organization_id', ctx.organizationId)
@@ -125,17 +126,23 @@ export async function getPortalOrder(token: string, orderId: string): Promise<{ 
   if (error) throw new Error(error.message);
   if (!o || !PORTAL_VISIBLE_STATUSES.includes(o.status)) throw new NotFoundError('Ordine');
 
+  // client privilegiato (service role): filtro org esplicito anche qui (063)
   const { data: docs } = await db
     .from('commercial_documents')
     .select('id, document_type, document_number, created_at')
     .eq('purchase_order_id', orderId)
+    .eq('organization_id', ctx.organizationId)
     .order('created_at', { ascending: false });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // client privilegiato: un prodotto di un'altra org (riferimento incoerente) non
+  // viene mai mostrato — al suo posto un'etichetta neutra (063).
+  const ownProduct = (l: any) =>
+    l.ingredient_products && l.ingredient_products.organization_id === ctx.organizationId ? l.ingredient_products : null;
   const lines = ((o.order_line_items as any[]) ?? []).map((l) => ({
     id: l.id,
-    name: l.ingredient_products?.name ?? 'Prodotto',
-    sku: l.ingredient_products?.sku ?? null,
+    name: ownProduct(l)?.name ?? 'Prodotto',
+    sku: ownProduct(l)?.sku ?? null,
     quantity: Number(l.quantity_ordered),
     unit: l.unit as UnitOfMeasure,
     unitPrice: l.unit_price_snapshot !== null ? Number(l.unit_price_snapshot) : null,
@@ -261,7 +268,7 @@ export async function portalUploadDocument(
 
   const { data: o, error } = await db
     .from('purchase_orders')
-    .select('id, status, order_line_items(id, quantity_ordered, unit, unit_price_snapshot, ingredient_products(name))')
+    .select('id, status, order_line_items(id, quantity_ordered, unit, unit_price_snapshot, ingredient_products(name, organization_id))')
     .eq('id', orderId)
     .eq('organization_id', ctx.organizationId)
     .eq('supplier_id', ctx.supplierId)
@@ -306,7 +313,8 @@ export async function portalUploadDocument(
     document_id: doc.id,
     order_line_item_id: l.id,
     ingredient_product_id: null,
-    description: l.ingredient_products?.name ?? 'Riga ordine',
+    description:
+      l.ingredient_products?.organization_id === ctx.organizationId ? l.ingredient_products.name : 'Riga ordine',
     quantity: Number(l.quantity_ordered),
     unit: l.unit,
     unit_price: l.unit_price_snapshot,

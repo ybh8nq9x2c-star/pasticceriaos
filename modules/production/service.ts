@@ -90,7 +90,7 @@ export async function applyWeekTemplate(): Promise<ApplyTemplateResult> {
     }
     const items = c.items.map((it, idx) => ({ recipeId: it.recipeId, batchCount: it.batchCount, sortOrder: idx }));
     try {
-      await repo.insertPlan(orgId, { planDate: c.date, notes: 'Da settimana tipo', items } as CreatePlanInput);
+      await repo.savePlan({ planId: null, planDate: c.date, notes: 'Da settimana tipo', items });
       created.push(c.date);
     } catch {
       skipped.push(c.date); // race su UNIQUE(org, plan_date): qualcuno l'ha appena creato
@@ -235,9 +235,13 @@ export async function computePlanRequirements(
 // ---------------------------------------------------------------------------
 
 export async function createPlan(raw: unknown): Promise<ProductionPlan> {
-  const orgId = await requireOrgId();
+  await requireOrgId();
   const input: CreatePlanInput = createPlanSchema.parse(raw);
-  return repo.insertPlan(orgId, input);
+  // 063: testata + righe atomiche (prima: due insert separati → piani senza righe)
+  const id = await repo.savePlan({
+    planId: null, planDate: input.planDate, notes: input.notes || null, items: input.items,
+  });
+  return repo.getPlanById(id);
 }
 
 export async function updatePlan(id: string, raw: unknown): Promise<ProductionPlan> {
@@ -262,22 +266,20 @@ export async function updatePlan(id: string, raw: unknown): Promise<ProductionPl
     );
   }
 
-  await repo.patchPlan(id, {
-    planDate:    input.planDate,
-    notes:       input.notes,
-    status:      input.status,
-    completedAt: null,
+  if (input.items && input.items.length > 0 && existing.status !== 'draft') {
+    throw new BusinessRuleError('Gli ingredienti possono essere modificati solo su piani in bozza.');
+  }
+  // 063: data, note e righe in UNA transazione (RPC). Le infornate già postate da
+  // produzione rapida sono protette (P0047).
+  await repo.savePlan({
+    planId: id,
+    planDate: input.planDate ?? null,
+    notes: input.notes ?? existing.notes,
+    items: input.items && input.items.length > 0 ? input.items : null,
   });
-
-  if (input.items && input.items.length > 0) {
-    // Items allowed only on draft plans
-    if (existing.status !== 'draft') {
-      throw new BusinessRuleError(
-        'Gli ingredienti possono essere modificati solo su piani in bozza.',
-      );
-    }
-    await repo.deletePlanItems(id);
-    await repo.insertPlanItems(id, input.items);
+  // Cambio di stato non contabile (es. draft → in_progress): separato e invariato.
+  if (input.status && input.status !== existing.status) {
+    await repo.patchPlan(id, { status: input.status, completedAt: null });
   }
 
   return repo.getPlanById(id);
@@ -310,23 +312,11 @@ export async function completePlan(id: string): Promise<void> {
  */
 export async function quickProduce(raw: unknown): Promise<void> {
   const input: QuickProduceInput = quickProduceSchema.parse(raw);
-
-  const plan = await createPlan({
-    planDate: todayISODate(),
-    notes: 'Scarico produzione rapido',
-    items: [{ recipeId: input.recipeId, batchCount: input.batchCount, sortOrder: 0 }],
-  });
-
-  try {
-    await completePlan(plan.id);
-  } catch (err) {
-    try {
-      await cancelPlan(plan.id);
-    } catch {
-      // best-effort: il piano resta in bozza, nessuno scarico è avvenuto.
-    }
-    throw err;
-  }
+  // 063: UNA RPC — find-or-create del piano di OGGI, +N infornate postate subito
+  // (posted_batch_count). Ripetibile più volte al giorno, anche a piano completato;
+  // il completamento successivo non riscarica queste infornate. Prima: un nuovo
+  // piano per ogni rapida → collisione con UNIQUE(org, plan_date) dalla seconda.
+  await repo.quickProduceRpc(input.recipeId, input.batchCount);
 }
 
 export async function cancelPlan(id: string): Promise<void> {

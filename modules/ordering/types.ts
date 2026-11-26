@@ -3,10 +3,15 @@
 // Tipi dominio: ordini d'acquisto.
 // =============================================================================
 
-import type { UnitOfMeasure, DispatchOutcome } from '@/lib/database.types';
+import type { UnitOfMeasure, DispatchOutcome as DbDispatchOutcome } from '@/lib/database.types';
 
 export type OrderStatus = 'draft' | 'sent' | 'confirmed' | 'partial' | 'received' | 'cancelled';
-export type { DispatchOutcome };
+/**
+ * Esito dell'invio al fornitore. 'pending' (063): ordine registrato come inviato,
+ * email in corso o interrotta prima dell'esito — mai mostrato come consegnato.
+ * (lib/database.types.ts non è rigenerato: il valore DB è un superset.)
+ */
+export type DispatchOutcome = DbDispatchOutcome | 'pending';
 
 export interface OrderLineItem {
   id: string;

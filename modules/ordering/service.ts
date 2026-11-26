@@ -184,14 +184,25 @@ export async function changeOrderStatus(
 
   const supabase = await createClient();
 
-  // Invio al fornitore: dispatch ESTERNO (fallibile, mai bloccante) seguito dalla
-  // transizione ATOMICA via RPC `mark_order_sent` — status + sent_at +
-  // dispatch_outcome + history in UNA transazione (niente buco di audit se una
-  // delle scritture fallisce). dispatch_outcome rende lo stato ONESTO: "Inviato"
-  // solo se il recapito è attestato, altrimenti "Da inviare a mano".
+  // Invio al fornitore (063): PRIMA il commit, POI l'email.
+  //  1) begin_order_dispatch: draft → sent + history + dispatch_id stabile, esito
+  //     'pending', in UNA transazione. Se l'ordine è già sent (doppio submit,
+  //     retry) → should_dispatch=false: NESSUNA seconda email.
+  //  2) email con il dispatch_id nel payload/Idempotency-Key.
+  //  3) record_order_dispatch: esito onesto (delivered/manual/failed) solo se
+  //     l'invio è ancora quello pendente.
   if (input.status === 'sent') {
+    const { data: begun, error: beginErr } = await supabase.rpc('begin_order_dispatch' as never, {
+      p_order_id: id,
+      p_note: input.notes || null,
+    } as never);
+    if (beginErr) throw mapSupabaseError(beginErr);
+    const row = (Array.isArray(begun) ? begun[0] : begun) as { dispatch_id: string; should_dispatch: boolean } | null;
+    if (!row?.should_dispatch) return repo.getOrderById(id);
+
     const dispatch = await dispatchOrderToSupplier({
       orderId:       existing.id,
+      dispatchId:    row.dispatch_id,
       supplierName:  existing.supplierName,
       supplierEmail: existing.supplierEmail,
       orderDate:     existing.orderDate,
@@ -209,13 +220,13 @@ export async function changeOrderStatus(
       : dispatch.channel === 'manual'
       ? 'manual'
       : 'failed';
-    const note = [input.notes, dispatch.detail].filter(Boolean).join(' — ') || null;
 
-    const { error } = await supabase.rpc('mark_order_sent', {
-      p_order_id: id,
-      p_outcome:  outcome,
-      p_note:     note,
-    });
+    const { error } = await supabase.rpc('record_order_dispatch' as never, {
+      p_order_id:    id,
+      p_dispatch_id: row.dispatch_id,
+      p_outcome:     outcome,
+      p_note:        dispatch.detail,
+    } as never);
     if (error) throw mapSupabaseError(error);
     return repo.getOrderById(id);
   }

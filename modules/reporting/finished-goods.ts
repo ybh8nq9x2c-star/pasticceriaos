@@ -3,9 +3,9 @@
 // FASE 1 — Rimanenza teorica prodotti finiti. Logica PURA di mapping della riga
 // della vista v_finished_goods_daily_theoretical → DTO.
 //
-// L'ARITMETICA (produced − sold) e le ESCLUSIONI (vendite con recipe_id NULL,
-// vendite reversed/void, solo piani completati) sono di competenza della VISTA SQL
-// (migration 046) e sono verificate end-to-end dallo smoke transazionale su staging.
+// L'ARITMETICA è della VISTA SQL (063): dai MOVIMENTI postati sul ledger finiti
+// (produzione − vendite nette degli storni − scarti ± rettifiche) con RIPORTO dai
+// giorni precedenti, giorno Europe/Rome. Verificata da supabase/tests/daily_use.test.sql.
 // Qui isoliamo solo la trasformazione TS, con UNA garanzia esplicita: la rimanenza
 // negativa NON viene mai azzerata/corretta (vincolo: "mostra as-is"). File senza
 // import server → unit-testabile nel runtime node di vitest.
@@ -21,6 +21,7 @@ export interface FinishedGoodViewRow {
   sold_qty: number | string | null;
   wasted_qty: number | string | null;
   remaining_theoretical: number | string | null;
+  opening_qty?: number | string | null;
 }
 
 const toNum = (v: number | string | null | undefined): number =>
@@ -37,6 +38,7 @@ export function toFinishedGoodTheoretical(row: FinishedGoodViewRow): FinishedGoo
     producedQty:          toNum(row.produced_qty),
     soldQty:              toNum(row.sold_qty),
     wastedQty:            toNum(row.wasted_qty),
+    openingQty:           toNum(row.opening_qty),
     remainingTheoretical: toNum(row.remaining_theoretical),
   };
 }

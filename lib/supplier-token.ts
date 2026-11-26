@@ -21,7 +21,17 @@ export interface SupplierTokenPayload {
   exp: number;
 }
 
-const ONE_YEAR_S = 60 * 60 * 24 * 365;
+/**
+ * Durata del link portale (W6): corta e configurabile. Default 30 giorni
+ * (prima: 1 anno). SUPPLIER_PORTAL_TOKEN_TTL_DAYS, limitata a 1..365.
+ * Ri-emettere è un tap dalla scheda fornitore (e revoca i link precedenti).
+ */
+export const DEFAULT_PORTAL_TTL_DAYS = 30;
+export function portalTokenTtlSeconds(): number {
+  const raw = Number(process.env.SUPPLIER_PORTAL_TOKEN_TTL_DAYS);
+  const days = Number.isFinite(raw) && raw >= 1 ? Math.min(Math.floor(raw), 365) : DEFAULT_PORTAL_TTL_DAYS;
+  return days * 24 * 60 * 60;
+}
 
 /** True se il portale fornitore è configurato su questo ambiente. */
 export function isPortalConfigured(): boolean {
@@ -76,7 +86,7 @@ export async function generateSupplierToken(
     tokenVersion,
     scope: 'supplier_portal',
     iat: now,
-    exp: now + ONE_YEAR_S,
+    exp: now + portalTokenTtlSeconds(),
   };
   const header = b64urlJson({ alg: 'HS256', typ: 'JWT' });
   const body = b64urlJson(payload);

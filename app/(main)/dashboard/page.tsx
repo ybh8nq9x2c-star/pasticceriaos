@@ -99,7 +99,7 @@ export default async function TodayPage() {
     getIngredientPurchaseStats(3),
     listReceipts({ status: ['draft', 'expected', 'partial'] }),
     listPlans(),
-    getTodayFinishedGoodsTheoreticalSummary(5),
+    getTodayFinishedGoodsTheoreticalSummary(),
     getPosHealth('mipos'),
     getActivationSnapshot(),
     getPosConfig('mipos'),
@@ -758,7 +758,7 @@ export default async function TodayPage() {
           <div className="min-w-0">
             <h2 className="font-semibold text-[15px] text-ink">Rimanenze teoriche di oggi</h2>
             <p className="text-xs text-ink-muted mt-0.5">
-              Calcolata da produzione confermata e vendite registrate oggi.
+              Dai movimenti registrati: riporto di ieri + prodotto − venduto − buttato.
             </p>
           </div>
           <Link
@@ -770,7 +770,7 @@ export default async function TodayPage() {
         </div>
         {finishedGoods.length === 0 ? (
           <p className="px-5 py-8 text-sm text-ink-muted text-center">
-            Nessun prodotto da mostrare: serve un piano di produzione confermato per oggi.
+            Nessun prodotto da mostrare: registra la produzione di oggi (piano o produzione rapida).
           </p>
         ) : (
           <div className="divide-y divide-divider">
@@ -778,6 +778,7 @@ export default async function TodayPage() {
               <div key={g.sellableProductId} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3">
                 <span className="flex-1 min-w-0 text-sm text-ink truncate">{g.productName}</span>
                 <span className="text-xs font-mono text-ink-muted whitespace-nowrap">
+                  {g.openingQty !== 0 && <>{g.openingQty} riporto · </>}
                   {g.producedQty} prod · {g.soldQty} vend
                   {g.wastedQty > 0 && <span className="text-danger"> · {g.wastedQty} buttati</span>}
                 </span>

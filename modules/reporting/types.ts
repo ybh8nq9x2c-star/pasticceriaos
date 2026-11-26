@@ -36,7 +36,10 @@ export interface FinishedGoodTheoretical {
   producedQty: number;
   soldQty: number;
   wastedQty: number; // invenduto/scarto registrato (056)
-  remainingTheoretical: number; // produced - sold - wasted (può essere negativo: mostrato così)
+  /** 063: riporto dai giorni precedenti (saldo dei movimenti fino a ieri). */
+  openingQty: number;
+  /** 063: riporto + prodotto − venduto − scartato ± rettifiche, dai MOVIMENTI postati (può essere negativo). */
+  remainingTheoretical: number;
 }
 
 // ---------------------------------------------------------------------------

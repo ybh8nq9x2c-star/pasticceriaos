@@ -13,6 +13,7 @@ import type { ActionState } from '@/lib/utils';
 import * as service from './service';
 import { requireSession } from '@/modules/identity/service';
 import { generateSupplierToken } from '@/lib/supplier-token';
+import { mapSupabaseError } from '@/lib/errors';
 import { createClient } from '@/lib/supabase/server';
 
 // ---------------------------------------------------------------------------
@@ -73,26 +74,15 @@ export async function generateSupplierLinkAction(
       throw new ForbiddenError('Solo il titolare può generare i link del portale fornitore.');
     }
 
+    // 063: la rotazione passa SOLO dalla RPC (solo owner, org-check): il client
+    // non ha più il privilegio di scrivere portal_token_version.
     const supabase = await createClient();
-    // RLS limita già alla propria org; il filtro esplicito è difesa in profondità.
-    const { data: supplier, error } = await supabase
-      .from('suppliers')
-      .select('id, portal_token_version')
-      .eq('id', supplierId)
-      .eq('organization_id', session.organizationId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!supplier) throw new NotFoundError('Fornitore');
+    const { data: newVersion, error } = await supabase.rpc('rotate_supplier_portal_token' as never, {
+      p_supplier_id: supplierId,
+    } as never);
+    if (error) throw mapSupabaseError(error);
 
-    // Rigenera = revoca: incrementa la versione e firma il token con la nuova.
-    const newVersion = (supplier.portal_token_version ?? 1) + 1;
-    const { error: upErr } = await supabase
-      .from('suppliers')
-      .update({ portal_token_version: newVersion })
-      .eq('id', supplierId);
-    if (upErr) throw new Error(upErr.message);
-
-    const token = await generateSupplierToken(supplierId, session.organizationId, newVersion);
+    const token = await generateSupplierToken(supplierId, session.organizationId, Number(newVersion));
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
     return { url: `${baseUrl}/portal/${token}` };
   } catch (err) {

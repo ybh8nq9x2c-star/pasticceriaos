@@ -79,6 +79,12 @@ export function PortalOrderActions({
           ✓ Hai confermato questo ordine. Quando consegni, allega il DDT qui sotto.
         </div>
       )}
+      {status === 'partial' && (
+        <div className="bg-warning-light rounded-2xl border border-warning-soft p-4 text-sm text-warning-strong">
+          Consegna parziale: la pasticceria ha registrato solo una parte della merce. Il resto risulta
+          ancora da consegnare. Allega il DDT della prossima consegna o segnala un problema.
+        </div>
+      )}
       {status === 'received' && (
         <div className="bg-success-light rounded-2xl border border-success-soft p-4 text-sm text-success-strong">
           ✓ La pasticceria ha registrato la consegna. Puoi allegare la fattura qui sotto.

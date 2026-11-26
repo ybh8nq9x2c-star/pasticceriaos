@@ -67,3 +67,4 @@
 060_production_fefo_lots.sql
 061_partial_receipts_coherence.sql
 062_pos_binding_recovery.sql
+063_daily_use_fixes.sql

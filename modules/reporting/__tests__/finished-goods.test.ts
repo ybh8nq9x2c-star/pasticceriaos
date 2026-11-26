@@ -97,4 +97,10 @@ describe('toFinishedGoodTheoretical (FASE 1)', () => {
     expect(out.soldQty).toBe(5.5);
     expect(out.remainingTheoretical).toBe(14.5);
   });
+
+  // 063: la vista ha il RIPORTO dai giorni precedenti; assente (vista vecchia) → 0
+  it('e) riporto (opening_qty) mappato; assente → 0', () => {
+    expect(toFinishedGoodTheoretical(row({ opening_qty: '6', remaining_theoretical: 6 })).openingQty).toBe(6);
+    expect(toFinishedGoodTheoretical(row({})).openingQty).toBe(0);
+  });
 });

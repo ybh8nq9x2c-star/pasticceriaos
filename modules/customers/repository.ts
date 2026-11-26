@@ -10,50 +10,36 @@ import type { CreateCustomerOrderInput } from './schemas';
 
 const numOrNull = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v));
 
+/**
+ * Prenotazione: testata + righe in UNA transazione (RPC create_customer_order,
+ * 063). Prima erano due insert separati: un errore sulle righe lasciava una
+ * prenotazione senza prodotti. Il totale lo calcola la RPC (solo se tutte le
+ * righe hanno prezzo, come prima).
+ */
 export async function insertOrder(
-  orgId: string,
-  userId: string,
+  _orgId: string,
+  _userId: string,
   input: CreateCustomerOrderInput,
 ): Promise<string> {
   const supabase = await createClient();
-
-  const total = input.items.every((i) => i.unitPrice !== null)
-    ? input.items.reduce((s, i) => s + i.quantity * (i.unitPrice ?? 0), 0)
-    : null;
-
-  const { data, error } = await supabase
-    .from('customer_orders')
-    .insert({
-      organization_id: orgId,
-      customer_name:   input.customerName,
-      customer_phone:  input.customerPhone || null,
-      customer_email:  input.customerEmail || null,
-      pickup_date:     input.pickupDate,
-      pickup_time:     input.pickupTime || null,
-      notes:           input.notes || null,
-      total_amount:    total,
-      deposit_paid:    input.depositPaid,
-      created_by:      userId,
-    })
-    .select('id')
-    .single();
-  if (error) throw mapSupabaseError(error);
-  const orderId = data.id as string;
-
-  const { error: itemsErr } = await supabase.from('customer_order_items').insert(
-    input.items.map((i, idx) => ({
-      customer_order_id: orderId,
-      recipe_id:         i.recipeId || null,
-      description:       i.description,
-      quantity:          i.quantity,
-      unit_price:        i.unitPrice,
-      notes:             i.notes || null,
-      sort_order:        idx,
+  const { data, error } = await supabase.rpc('create_customer_order' as never, {
+    p_customer_name:  input.customerName,
+    p_customer_phone: input.customerPhone || null,
+    p_customer_email: input.customerEmail || null,
+    p_pickup_date:    input.pickupDate,
+    p_pickup_time:    input.pickupTime || null,
+    p_notes:          input.notes || null,
+    p_deposit_paid:   input.depositPaid,
+    p_items: input.items.map((i) => ({
+      recipe_id:   i.recipeId || null,
+      description: i.description,
+      quantity:    i.quantity,
+      unit_price:  i.unitPrice,
+      notes:       i.notes || null,
     })),
-  );
-  if (itemsErr) throw mapSupabaseError(itemsErr);
-
-  return orderId;
+  } as never);
+  if (error) throw mapSupabaseError(error);
+  return data as unknown as string;
 }
 
 export async function listOrders(orgId: string, includeClosed = false): Promise<CustomerOrderListItem[]> {

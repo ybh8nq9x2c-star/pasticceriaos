@@ -7,7 +7,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { mapSupabaseError } from '@/lib/errors';
-import { toFinishedGoodTheoretical } from './finished-goods';
+import { toFinishedGoodTheoretical, type FinishedGoodViewRow } from './finished-goods';
 import type {
   IngredientRequirement,
   InventoryStockFull,
@@ -114,12 +114,12 @@ export async function listFinishedGoodsTheoretical(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('v_finished_goods_daily_theoretical')
-    .select('sellable_product_id, product_name, produced_qty, sold_qty, wasted_qty, remaining_theoretical')
+    .select('sellable_product_id, product_name, produced_qty, sold_qty, wasted_qty, remaining_theoretical, opening_qty' as never)
     .eq('organization_id', orgId)
     .eq('business_date', businessDate)
     .order('remaining_theoretical', { ascending: true }); // i più "scoperti"/in esaurimento prima
   if (error) throw mapSupabaseError(error);
-  return (data ?? []).map(toFinishedGoodTheoretical);
+  return ((data ?? []) as unknown as FinishedGoodViewRow[]).map(toFinishedGoodTheoretical);
 }
 
 // ---------------------------------------------------------------------------

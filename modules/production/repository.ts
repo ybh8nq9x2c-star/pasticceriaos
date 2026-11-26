@@ -57,42 +57,43 @@ export async function getPlanById(id: string): Promise<ProductionPlan> {
   return toPlan(data);
 }
 
-export async function insertPlan(
-  orgId: string,
-  input: CreatePlanInput,
-): Promise<ProductionPlan> {
+/**
+ * Piano + righe in UNA transazione (RPC save_production_plan, 063). Nuovo piano
+ * se planId è null; altrimenti aggiorna testata e (se items != null) sostituisce
+ * le righe in bozza preservando le infornate già postate da produzione rapida.
+ */
+export async function savePlan(args: {
+  planId: string | null;
+  planDate: string | null;
+  notes: string | null;
+  items: CreatePlanInput['items'] | null;
+}): Promise<string> {
   const supabase = await createClient();
-
-  const { data: plan, error: planError } = await supabase
-    .from('production_plans')
-    .insert({
-      organization_id: orgId,
-      plan_date:       input.planDate,
-      notes:           input.notes || null,
-      status:          'draft',
-    })
-    .select()
-    .single();
-
-  if (planError) throw mapSupabaseError(planError);
-
-  if (input.items.length > 0) {
-    const { error: itemsError } = await supabase
-      .from('production_plan_items')
-      .insert(
-        input.items.map((item, idx) => ({
-          production_plan_id:    plan.id,
-          recipe_id:  item.recipeId,
+  const { data, error } = await supabase.rpc('save_production_plan' as never, {
+    p_plan_id: args.planId,
+    p_plan_date: args.planDate,
+    p_notes: args.notes,
+    p_items: args.items
+      ? args.items.map((item, idx) => ({
+          recipe_id: item.recipeId,
           batch_count: item.batchCount,
-          notes:      item.notes || null,
+          notes: item.notes || null,
           sort_order: item.sortOrder ?? idx,
-        })),
-      );
+        }))
+      : null,
+  } as never);
+  if (error) throw mapSupabaseError(error);
+  return data as unknown as string;
+}
 
-    if (itemsError) throw mapSupabaseError(itemsError);
-  }
-
-  return getPlanById(plan.id);
+/** Produzione rapida sul piano del giorno (RPC quick_produce, 063). */
+export async function quickProduceRpc(recipeId: string, batchCount: number): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc('quick_produce' as never, {
+    p_recipe_id: recipeId,
+    p_batch_count: batchCount,
+  } as never);
+  if (error) throw mapSupabaseError(error);
 }
 
 export async function patchPlan(
@@ -115,34 +116,6 @@ export async function patchPlan(
     })
     .eq('id', id);
 
-  if (error) throw mapSupabaseError(error);
-}
-
-export async function deletePlanItems(planId: string): Promise<void> {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('production_plan_items')
-    .delete()
-    .eq('production_plan_id', planId);
-  if (error) throw mapSupabaseError(error);
-}
-
-export async function insertPlanItems(
-  planId: string,
-  items: PlanItemInput[],
-): Promise<void> {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('production_plan_items')
-    .insert(
-      items.map((item, idx) => ({
-        production_plan_id:    planId,
-        recipe_id:  item.recipeId,
-        batch_count: item.batchCount,
-        notes:      item.notes || null,
-        sort_order: item.sortOrder ?? idx,
-      })),
-    );
   if (error) throw mapSupabaseError(error);
 }
 
