@@ -120,22 +120,27 @@ export async function getReceiptRow(id: string): Promise<ReceiptRow> {
 }
 
 /** Ricevimento APERTO già collegato a un ordine (per riusarlo, niente doppioni). */
-export async function findOpenReceiptIdForOrder(
-  orgId: string,
-  orderId: string,
-): Promise<string | null> {
+/**
+ * Find-or-create atomico della sessione di ricevimento di un ordine (RPC 061).
+ * Due chiamate concorrenti sullo stesso ordine ottengono lo STESSO id.
+ */
+export async function openReceiptForOrder(input: {
+  orderId: string;
+  mode: 'bakery' | 'supplier';
+  ddtNumber: string | null;
+  ddtDate: string | null;
+  notes: string | null;
+}): Promise<string> {
   const supabase = await createClient<Database>();
-  const { data, error } = await supabase
-    .from('purchase_receipts')
-    .select('id')
-    .eq('organization_id', orgId)
-    .eq('purchase_order_id', orderId)
-    .in('status', ['draft', 'expected', 'partial'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('open_receipt_for_order' as never, {
+    p_order_id: input.orderId,
+    p_mode: input.mode,
+    p_ddt_number: input.ddtNumber,
+    p_ddt_date: input.ddtDate,
+    p_notes: input.notes,
+  } as never);
   if (error) throw mapSupabaseError(error);
-  return data?.id ?? null;
+  return data as unknown as string;
 }
 
 export interface ListReceiptsFilter {

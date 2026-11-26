@@ -14,14 +14,19 @@ compra anche da chi non usa BakeryOs).
 ## INVARIANTE: come muove lo stock
 
 > Lo stock cambia **solo** via la RPC transazionale **`complete_purchase_receipt`**
-> (`supabase/migrations_v2/035_goods_receipts.sql`). Mai update diretti delle giacenze.
+> (definizione attuale: **061**, v3; storia 035 → 049 → 054 → 059 → 061). Mai update diretti delle giacenze.
 
-La RPC, in **una transazione** (row-lock sul receipt → serializza i doppi submit):
-1. per ogni riga calcola `delta = qty_received − qty_posted` (salta delta = 0);
-2. inserisce un `inventory_movements` `purchase_receipt` (con `qty_before`/`qty_after` di audit);
-3. crea il lotto in `ingredient_batches` se c'è `expiry_date`;
-4. avanza l'eventuale ordine collegato (`order_line_items.quantity_received`, cap alla qty ordinata);
-5. ricalcola lo stato del receipt e porta il PO a `received` se tutte le righe sono coperte.
+**Apertura da ordine** = RPC **`open_receipt_for_order`** (061): find-or-create **atomico**
+(advisory lock per ordine + indice "un ricevimento aperto per ordine"). Le righe nascono dal
+residuo di ogni riga d'ordine e portano `order_line_item_id`. Mai "cerca + crea" lato app.
+
+La RPC di completamento, in **una transazione** (lock: receipt → ordine → righe d'ordine → righe → giacenze):
+1. verifica che ordine e prodotti siano dell'org del ricevimento (059, P0045);
+2. per ogni riga calcola `delta = qty_received − qty_posted` (salta delta = 0);
+3. **prima** avanza la riga d'ordine target (`order_line_item_id`) ricalcolando il residuo sotto lock;
+   **eccedenza → P0046**, tutto annullato ([ADR 002](../../docs/adr/002-over-receipt-policy.md));
+4. **poi** inserisce il movimento `purchase_receipt` (unità del prodotto, `qty_before`/`qty_after`) e il lotto;
+5. ricalcola lo stato del receipt e porta il PO a `received`/`partial`.
 
 ✅ **Verificato**: usa correttamente il ledger esistente (`inventory_movements` +
 trigger su `inventory_levels`). **Non crea una fonte di verità duplicata.**

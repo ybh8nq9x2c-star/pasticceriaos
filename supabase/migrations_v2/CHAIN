@@ -65,3 +65,4 @@
 058_security_column_guards.sql
 059_tenant_guards_receipts_ledger.sql
 060_production_fefo_lots.sql
+061_partial_receipts_coherence.sql

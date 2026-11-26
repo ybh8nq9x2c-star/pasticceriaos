@@ -84,6 +84,17 @@ cmd_test() {
     "${PSQL[@]}" -f "$TEST_DIR/$t" || { echo "✗ test fallito: $t" >&2; failed+=("$t"); continue; }
     n=$((n + 1))
   done < <(entries "$SUITE")
+  # Test multi-sessione (fixture committate): SOLO su DB effimero.
+  if [[ "${CHAIN_TEST_BOOTSTRAP:-0}" == "1" ]]; then
+    for t in "$TEST_DIR"/concurrency/*.sh; do
+      [[ -e "$t" ]] || continue
+      echo "── running concurrency/$(basename "$t")"
+      bash "$t" || { echo "✗ test fallito: $(basename "$t")" >&2; failed+=("$(basename "$t")"); continue; }
+      n=$((n + 1))
+    done
+  else
+    echo "── (test di concorrenza saltati: richiedono DB effimero, CHAIN_TEST_BOOTSTRAP=1)"
+  fi
   if ((${#failed[@]})); then
     echo "✗ test SQL ROSSI: ${#failed[@]}/$((n + ${#failed[@]})) → ${failed[*]}" >&2
     exit 1

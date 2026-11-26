@@ -191,3 +191,38 @@ toccare la 050. Il ritorno passa da `void` a `jsonb`, quindi DROP + CREATE con i
 **Nota di comportamento:** i movimenti `production_usage` diventano **uno per ingrediente**: prima
 erano uno per riga ricetta, con più righe per lo stesso ingrediente se più ricette lo usavano. Il totale
 scaricato è identico.
+
+### W4 — Ricevimenti parziali · ✅ fatto (eseguito, anche con concorrenza reale)
+
+**Bug confermati a runtime (controllo negativo con il corpo della 059, stesso scenario):**
+```
+ riga e01 (burro 5 kg) quantity_received = 3     ← consegnati 3 kg sulla riga e01…
+ riga e02 (burro 5 kg) quantity_received = 3     ← …ma è avanzata ANCHE la riga e02
+ riga e03 (uova 30)    quantity_received = 30    ← ordine "cappato" in silenzio
+ Uova a magazzino      current_quantity  = 31    ← l'eccedenza è entrata in stock
+```
+
+**Migration `061_partial_receipts_coherence.sql`** + [ADR 002](docs/adr/002-over-receipt-policy.md)
+| Punto | Implementazione |
+|---|---|
+| Apertura sessione | RPC `open_receipt_for_order`: find-or-create **atomico** (advisory lock per ordine) + indice unico parziale "un ricevimento aperto per ordine". Se esistono già doppioni storici dà un WARNING invece di bloccare il deploy (`diagnostics/receipts_open_duplicates.sql`). `createReceipt`/`receiveOrderInFull` la usano; rimosso il vecchio "cerca, poi crea" lato app |
+| Riga target | `purchase_receipt_lines.order_line_item_id` + trigger di coerenza (la riga d'ordine deve essere dell'ordine del ricevimento, P0045) + backfill degli abbinamenti univoci |
+| Completamento v3 | lock delle righe d'ordine; residuo ricalcolato sotto lock; avanzamento **solo** della riga target e **prima** del movimento a magazzino |
+| Eccedenze (ADR 002) | default **rifiuto** `P0046`, transazione annullata. La merce extra voluta va in un ricevimento senza ordine. Le righe non collegate seguono una regola deterministica documentata |
+
+**Regressioni eseguite**
+- `supabase/tests/partial_receipts.test.sql` (sessione singola): stessa sessione alla seconda apertura con 3/3 righe collegate; 3 kg sulla riga e01 → e01=3 ed **e02=0**; eccedenza uova 31/30 → `P0046`, 0 movimenti, riga invariata; completamento → burro 10 (somma dei movimenti = 10), uova 30, ordine `received`; riga non collegata oltre il residuo → `P0046`; merce non ordinata (panna) → a magazzino, l'ordine avanza solo col burro.
+- `supabase/tests/concurrency/receipts_concurrency.sh` (**due sessioni Postgres reali**, solo su DB effimero):
+  ```
+  C1 OK: aperture concorrenti → stessa sessione
+  C2 OK: consegne concorrenti +4/+5 → stock 9, riga ordine 9/10
+  C3 OK: +6/+6 su residuo 10 → una consegna posta 6, l'altra rifiutata (P0046)
+  ```
+- `chain.sh test` esegue `tests/concurrency/*.sh` solo con `CHAIN_TEST_BOOTSTRAP=1` (le fixture vanno committate).
+- `tenant_ledger_guards`: fixture adattata (il ricevimento incoerente di A2 viene chiuso prima di aprirne uno legittimo sullo stesso ordine, ora vietato dall'indice).
+
+**Esecuzione:** 60 migration da zero; `✓ test SQL verdi: 11 suite` (10 SQL + 1 concorrenza);
+riconciliazione OK; typecheck pulito; 359/359 unit; build OK.
+**Rischio residuo (in ADR 002):** `registerScan` incrementa `qty_received` con lettura+scrittura lato app,
+quindi due scansioni simultanee della stessa riga possono perdere un incremento prima del completamento.
+Il ledger resta coerente con `qty_received`. Fix suggerito: incremento atomico in RPC.

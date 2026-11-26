@@ -92,6 +92,10 @@ do $$ declare v_status text; v_recv numeric; begin
   assert v_recv = 0, 'W2-A2: le righe di A non dovevano avanzare, quantity_received=' || v_recv;
 end $$;
 
+-- il ricevimento incoerente di A2 si chiude: dalla 061 un ordine ha al più UN
+-- ricevimento aperto (indice unico), e A3/A4 ne aprono uno legittimo.
+update purchase_receipts set status = 'cancelled' where id = '6b000000-0000-0000-0000-0000000008b2';
+
 -- A3: riga di ricevimento con prodotto di un'altra org → rifiutata (trigger 059)
 select pg_temp.act_as('6a000000-0000-0000-0000-0000000000a1');
 insert into purchase_receipts (id, organization_id, mode, purchase_order_id, supplier_id, status, created_by)

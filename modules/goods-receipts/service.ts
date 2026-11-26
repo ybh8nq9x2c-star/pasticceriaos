@@ -100,62 +100,19 @@ export async function createReceipt(raw: unknown): Promise<string> {
   let lines: Database['public']['Tables']['purchase_receipt_lines']['Insert'][] = [];
   let supplierId = input.supplierId || null;
 
-  // P1-B: se per QUESTO ordine c'è già un ricevimento aperto, riusalo — mai
-  // doppioni da "Nuovo" premuto al posto di "riprendi" (stessa semantica di
-  // receiveOrderInFull).
+  // W4 (061): ricevimento da ORDINE = find-or-create ATOMICO in una RPC
+  // (advisory lock per ordine + indice "un ricevimento aperto per ordine").
+  // Prima erano due richieste (cerca, poi crea): due operatori potevano aprire
+  // due sessioni sullo stesso residuo. Le righe nascono dal residuo di ogni riga
+  // d'ordine e sono collegate a order_line_item_id (avanzamento per riga).
   if (input.purchaseOrderId) {
-    const existing = await repo.findOpenReceiptIdForOrder(orgId, input.purchaseOrderId);
-    if (existing) return existing;
-  }
-
-  // Ricevimento ATTESO da ordine esistente: precompila le righe dall'ordine.
-  if (input.purchaseOrderId) {
-    const supabase = await createClient<Database>();
-    const { data: order, error } = await supabase
-      .from('purchase_orders')
-      .select('id, organization_id, status, supplier_id')
-      .eq('id', input.purchaseOrderId)
-      .maybeSingle();
-    if (error) throw mapSupabaseError(error);
-    if (!order || order.organization_id !== orgId) throw new NotFoundError('Ordine');
-    if (order.status === 'received') {
-      throw new BusinessRuleError('Questo ordine risulta già ricevuto a magazzino.');
-    }
-    if (order.status === 'cancelled' || order.status === 'draft') {
-      throw new BusinessRuleError(
-        'Puoi creare un ricevimento solo da ordini inviati o confermati.',
-      );
-    }
-
-    // Backfill fornitore dall'ordine: chi collega un ordine non deve (ri)dire
-    // chi è il fornitore, e nessun caller futuro può dimenticarselo.
-    if (!supplierId) supplierId = order.supplier_id;
-
-    const { data: orderLines, error: linesErr } = await supabase
-      .from('order_line_items')
-      .select('ingredient_product_id, quantity_ordered, quantity_received, unit, ingredient_products(name, sku, barcode)')
-      .eq('purchase_order_id', input.purchaseOrderId)
-      .returns<{
-        ingredient_product_id: string;
-        quantity_ordered: number;
-        quantity_received: number | null;
-        unit: UnitOfMeasure;
-        ingredient_products: { name: string; sku: string | null; barcode: string | null } | null;
-      }[]>();
-    if (linesErr) throw mapSupabaseError(linesErr);
-
-    lines = (orderLines ?? []).map((l, i) => ({
-      receipt_id: '', // valorizzato sotto
-      product_id: l.ingredient_product_id,
-      raw_product_name: l.ingredient_products?.name ?? 'Riga ordine',
-      sku: l.ingredient_products?.sku ?? null,
-      barcode: l.ingredient_products?.barcode ?? null,
-      qty_expected: Math.max(0.0001, Number(l.quantity_ordered) - Number(l.quantity_received ?? 0)),
-      unit: l.unit,
-      line_status: 'matched' as const,
-      sort_order: i,
-    }));
-    status = 'expected';
+    return repo.openReceiptForOrder({
+      orderId: input.purchaseOrderId,
+      mode: input.mode,
+      ddtNumber: input.ddtNumber || null,
+      ddtDate: input.ddtDate || null,
+      notes: input.notes || null,
+    });
   }
 
   const receiptId = await repo.insertReceipt({
@@ -651,26 +608,9 @@ export async function receiveAllAndComplete(id: string): Promise<ReceiptStatus> 
  * già un ricevimento aperto collegato all'ordine viene riusato (niente doppioni).
  */
 export async function receiveOrderInFull(orderId: string): Promise<ReceiptStatus> {
-  const orgId = await requireOrgId();
-
-  const existing = await repo.findOpenReceiptIdForOrder(orgId, orderId);
-  if (existing) return receiveAllAndComplete(existing);
-
-  // Fornitore dall'ordine (createReceipt valida stato/org ma non backfilla il supplier).
-  const supabase = await createClient<Database>();
-  const { data: order, error } = await supabase
-    .from('purchase_orders')
-    .select('id, organization_id, supplier_id')
-    .eq('id', orderId)
-    .maybeSingle();
-  if (error) throw mapSupabaseError(error);
-  if (!order || order.organization_id !== orgId) throw new NotFoundError('Ordine');
-
-  const receiptId = await createReceipt({
-    mode: 'bakery',
-    supplierId: order.supplier_id ?? '',
-    purchaseOrderId: orderId,
-  });
+  await requireOrgId();
+  // 061: la RPC restituisce la sessione aperta esistente o ne crea una (atomico).
+  const receiptId = await createReceipt({ mode: 'bakery', supplierId: '', purchaseOrderId: orderId });
   return receiveAllAndComplete(receiptId);
 }
 
