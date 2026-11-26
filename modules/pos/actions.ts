@@ -95,3 +95,17 @@ export async function replayPosEventAction(eventId: string): Promise<ActionState
     return { status: 'error', error: getErrorMessage(err) };
   }
 }
+
+/** 062: ruota il segreto HMAC della cassa (il vecchio smette subito di valere). */
+export async function rotatePosWebhookSecretAction(_prev: ActionState, _formData: FormData): Promise<ActionState> {
+  try {
+    const version = await service.rotatePosWebhookSecret('mipos');
+    revalidatePath('/sales/pos');
+    return {
+      status: 'success',
+      message: `Nuovo segreto (versione ${version}) generato: incollalo nel pannello della cassa. Il precedente non è più valido.`,
+    };
+  } catch (err) {
+    return { status: 'error', error: getErrorMessage(err) };
+  }
+}

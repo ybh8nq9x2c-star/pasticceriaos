@@ -1,7 +1,8 @@
 // =============================================================================
 // modules/pos/adapters/mipos.ts
 // Adapter MiPOS (mipos.gitbook.io/public-api). Verifica HMAC-SHA256 del corpo
-// grezzo con MIPOS_WEBHOOK_SECRET; normalizza il webhook ricevuta in IncomingSale.
+// grezzo con la chiave della CONFIG risolta (062, modules/pos/secret.ts);
+// normalizza il webhook ricevuta in IncomingSale.
 //
 // NB SUI CAMPI: la forma del payload qui sotto rispecchia un webhook ricevuta
 // MiPOS (evento + oggetto receipt con items). I NOMI DEI CAMPI sono il punto di
@@ -72,12 +73,25 @@ function constantTimeEquals(a: string, b: string): boolean {
 export const miposAdapter: PosAdapter = {
   provider: 'mipos',
 
-  verifySignature(rawBody: string, signatureHeader: string | null): boolean {
-    const secret = (process.env.MIPOS_WEBHOOK_SECRET ?? '').trim();
+  verifySignature(rawBody: string, signatureHeader: string | null, secret: string): boolean {
     if (!secret || !signatureHeader) return false;
     const provided = signatureHeader.trim().replace(SIGNATURE_PREFIX, '');
     const expected = crypto.createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex');
     return constantTimeEquals(provided, expected);
+  },
+
+  peekRouting(body: unknown): { storeId: string | null; merchantCode: string | null } {
+    const pick = (o: unknown, k: string): string | null => {
+      if (!o || typeof o !== 'object') return null;
+      const v = (o as Record<string, unknown>)[k];
+      return typeof v === 'string' || typeof v === 'number' ? String(v).trim() || null : null;
+    };
+    const root = body as Record<string, unknown> | null;
+    const receipt = root && typeof root === 'object' ? root.receipt : null;
+    return {
+      storeId: pick(receipt, 'store_id') ?? pick(root, 'store_id'),
+      merchantCode: pick(receipt, 'merchant_code') ?? pick(root, 'merchant_code'),
+    };
   },
 
   parsePayload(body: unknown): IncomingSale {

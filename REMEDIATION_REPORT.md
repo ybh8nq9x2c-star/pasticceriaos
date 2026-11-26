@@ -226,3 +226,33 @@ riconciliazione OK; typecheck pulito; 359/359 unit; build OK.
 **Rischio residuo (in ADR 002):** `registerScan` incrementa `qty_received` con lettura+scrittura lato app,
 quindi due scansioni simultanee della stessa riga possono perdere un incremento prima del completamento.
 Il ledger resta coerente con `qty_received`. Fix suggerito: incremento atomico in RPC.
+
+### W5 — POS MiPOS: binding e recupero eventi · ✅ fatto (eseguito) · rollout con azione umana
+
+**Migration `062_pos_binding_recovery.sql`** + [ADR 003](docs/adr/003-pos-webhook-binding.md)
+| Punto | Implementazione |
+|---|---|
+| Segreto per org/cassa | Derivato: `HMAC(POS_WEBHOOK_MASTER_SECRET, provider:config_id:version)` (`modules/pos/secret.ts`). Nel DB solo `secret_scheme`/`secret_version`/`verified_at`. Rotazione con la RPC `rotate_pos_webhook_secret` (owner/baker) |
+| Il tenant non sceglie lo schema | Privilegi di colonna su `pos_configs`: `authenticated` scrive solo store/merchant/attivazione. `legacy_global` vale solo per le config pre-062 (backfill) |
+| Prova di possesso | `verified_at` alla prima ricevuta firmata con il segreto **di quella config**. Lo squatting di uno `store_id` non porta più a ricevere scontrini altrui. Messaggio di conflitto store reso generico (niente enumerazione) |
+| Verifica nel webhook | instradamento (senza effetti) → config → chiave della config → HMAC; store sconosciuto e firma errata danno lo stesso `401` |
+| Semantica | `200` = evento scritto in modo durevole (elaborato, duplicato terminale o errore permanente registrato); `4xx` = non ritentare; `503` = transitorio o non configurato |
+| Eventi recuperabili | stati `received → processed/reversed/failed` (`pending` migrato e vietato). Il reinvio di un evento non terminale viene **riprocessato**; gli esiti si scrivono solo su eventi non terminali; il replay dall'inbox copre anche `received` |
+| Bypass del gate di login | formalizzato: `lib/server-routes.ts` (unico elenco, usato dal middleware), header del route handler, ADR 003; un test verifica che il `matcher` statico sia allineato all'elenco |
+| UI | wizard `/sales/pos`: il passo 3 mostra la firma della propria cassa (mascherata, "Mostra"), lo stato di verifica e "Genera nuova firma". Le config legacy vedono "Genera firma dedicata" e il segreto globale non viene mai mostrato |
+
+**Regressioni eseguite**
+- Unit (`modules/pos/__tests__`, `lib/__tests__/server-routes.test.ts`), 57 test nell'area:
+  - firma con la chiave della propria config → 200; chiave di **un'altra** config → 401; segreto globale su config derived → 401; legacy → 200; store sconosciuto → 401 identico; master assente → 503;
+  - duplicato terminale → 200; transitorio → 503; non persistito → 503; permanente → 200 `failed`; JSON non valido → 400 senza query;
+  - **retry dopo errore transitorio**: 1° invio `retry`; reinvio (evento `failed`) → riprocessato, `created`, `markProcessed` **una** volta; 3° invio → `duplicate`; `ingestSaleAsSystem` chiamata 2 volte (1 fallita, 1 riuscita);
+  - evento rimasto `received` → ripreso; errore di dominio → `failed` (non retry); derivazione deterministica, diversa per config, versione e master.
+- SQL `supabase/tests/pos_binding.test.sql`: schema, versione e verifica non scrivibili dal tenant (`42501`, anche in insert); store modificabile; rotazione → v2 con verifica azzerata; viewer `P0050`, altra org `P0044`; `pending` → `23514`; default `received`; idempotenza `23505`; lo stesso scontrino ingerito due volte → **una** vendita, stesso id.
+
+**Esecuzione:** 61 migration da zero, `✓ test SQL verdi: 12 suite`; typecheck pulito; **380/380** unit; build OK.
+
+**Azioni umane per chiudere davvero F-04** (aggiunte alla §2):
+| # | Azione | Stato |
+|---|---|---|
+| H5 | Impostare `POS_WEBHOOK_MASTER_SECRET` (≥ 32 caratteri) su Railway **prima** di attivare nuove casse | ⏳ |
+| H6 | Guidare la cassa già collegata (config pre-062, `legacy_global`) a "Genera firma dedicata" e incollarla in MiPOS; poi rimuovere `MIPOS_WEBHOOK_SECRET` | ⏳ |

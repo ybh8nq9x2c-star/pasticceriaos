@@ -63,9 +63,11 @@ Non hardcodare voci di menu altrove.
 dall'istanza (usa `this.rest`): una chiamata "unbound" crasha in prod con
 `Cannot read properties of undefined (reading 'rest')` → 500. Vedi i commenti nel file.
 
-⚠️ **`/api/webhooks/*` è FUORI dal middleware** (matcher + early-return): i webhook
-non hanno sessione, l'autenticazione è l'HMAC nel route handler. Se il middleware li
-intercetta, la cassa riceve un 307 verso `/login` e gli scontrini si perdono.
+⚠️ **`/api/webhooks/*` è FUORI dal middleware** per eccezione DICHIARATA in
+[`lib/server-routes.ts`](lib/server-routes.ts) (unico elenco; il `matcher` è testato contro di esso).
+L'autenticazione è l'HMAC **per config POS** nel route handler (062,
+[ADR 003](docs/adr/003-pos-webhook-binding.md)). Se il middleware li intercetta, la cassa riceve un
+307 verso `/login` e gli scontrini si perdono.
 
 ⚠️ **Guard di colonna (migration 058)**: sulle scritture dirette del client
 (`current_user` = `authenticated`) le parti di `supplier_customer_connections` e
@@ -138,8 +140,9 @@ Se la modifica tocca SQL/RPC: l'unico modo di applicarla è una nuova migration 
   delicato per il doppio conteggio: vedi [`modules/inventory/AGENTS.md`](modules/inventory/AGENTS.md)
   e [`modules/goods-receipts/AGENTS.md`](modules/goods-receipts/AGENTS.md).
 - Pin Node fragile (solo `engines`, vedi §4).
-- **Sicurezza:** finding aperti in [`SECURITY_REPORT.md`](SECURITY_REPORT.md): Next 14 da
-  aggiornare (optimizer immagini spento come mitigazione), secret POS globale
-  (va reso per-org prima del 2° cliente POS). Ledger e proiezioni non sono più scrivibili dal
+- **Sicurezza:** finding aperti in [`SECURITY_REPORT.md`](SECURITY_REPORT.md) e stato in
+  [`REMEDIATION_REPORT.md`](REMEDIATION_REPORT.md): Next 14 da aggiornare (optimizer immagini
+  spento come mitigazione). Segreto POS ora per-config (062): la cassa pre-062 va migrata
+  generando la firma dedicata dal wizard. Ledger e proiezioni non sono più scrivibili dal
   client (059): gesti manuali via `record_inventory_movement` / `record_finished_goods_waste`.
 - Documenti di analisi nella cartella padre potenzialmente disallineati dal codice.

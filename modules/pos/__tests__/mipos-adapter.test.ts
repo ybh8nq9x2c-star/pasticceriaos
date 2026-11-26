@@ -1,11 +1,9 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import crypto from 'node:crypto';
 import { miposAdapter } from '../adapters/mipos';
 
+// 062: la chiave arriva dalla CONFIG risolta (segreto per config), non dall'env.
 const SECRET = 'test-secret-123';
-beforeAll(() => {
-  process.env.MIPOS_WEBHOOK_SECRET = SECRET;
-});
 
 const sign = (body: string) => crypto.createHmac('sha256', SECRET).update(body, 'utf8').digest('hex');
 
@@ -26,18 +24,40 @@ const salePayload = {
 describe('miposAdapter.verifySignature (HMAC-SHA256)', () => {
   it('firma valida → true', () => {
     const body = JSON.stringify(salePayload);
-    expect(miposAdapter.verifySignature(body, sign(body))).toBe(true);
+    expect(miposAdapter.verifySignature(body, sign(body), SECRET)).toBe(true);
   });
   it('accetta il prefisso sha256=', () => {
     const body = JSON.stringify(salePayload);
-    expect(miposAdapter.verifySignature(body, `sha256=${sign(body)}`)).toBe(true);
+    expect(miposAdapter.verifySignature(body, `sha256=${sign(body)}`, SECRET)).toBe(true);
   });
   it('corpo manomesso → false', () => {
     const body = JSON.stringify(salePayload);
-    expect(miposAdapter.verifySignature(`${body} `, sign(body))).toBe(false);
+    expect(miposAdapter.verifySignature(`${body} `, sign(body), SECRET)).toBe(false);
   });
   it('header firma assente → false', () => {
-    expect(miposAdapter.verifySignature('{}', null)).toBe(false);
+    expect(miposAdapter.verifySignature('{}', null, SECRET)).toBe(false);
+  });
+});
+
+describe('miposAdapter.verifySignature — chiave per config (062)', () => {
+  it('firma con la chiave di UN\'ALTRA config → false', () => {
+    const body = JSON.stringify(salePayload);
+    expect(miposAdapter.verifySignature(body, sign(body), 'altra-chiave')).toBe(false);
+  });
+  it('chiave vuota → false (mai accettare senza chiave)', () => {
+    const body = JSON.stringify(salePayload);
+    expect(miposAdapter.verifySignature(body, sign(body), '')).toBe(false);
+  });
+});
+
+describe('miposAdapter.peekRouting', () => {
+  it('legge store/merchant dal receipt annidato o dalla radice', () => {
+    expect(miposAdapter.peekRouting(salePayload)).toEqual({ storeId: 'STORE-1', merchantCode: null });
+    expect(miposAdapter.peekRouting({ store_id: 7, merchant_code: 'M1' })).toEqual({ storeId: '7', merchantCode: 'M1' });
+  });
+  it('payload strano → null, nessuna eccezione', () => {
+    expect(miposAdapter.peekRouting(null)).toEqual({ storeId: null, merchantCode: null });
+    expect(miposAdapter.peekRouting({ receipt: 'x' })).toEqual({ storeId: null, merchantCode: null });
   });
 });
 

@@ -27,8 +27,18 @@ export interface IncomingSale {
 
 export interface PosAdapter {
   readonly provider: string;
-  /** HMAC sul corpo grezzo + header firma. Niente firma valida → niente scrittura. */
-  verifySignature(rawBody: string, signatureHeader: string | null): boolean;
+  /**
+   * HMAC sul corpo grezzo + header firma, con la chiave della CONFIG risolta
+   * (062: segreto per config, vedi modules/pos/secret.ts). Niente firma valida →
+   * niente scrittura.
+   */
+  verifySignature(rawBody: string, signatureHeader: string | null, secret: string): boolean;
+  /**
+   * Legge SOLO i campi di instradamento (store/merchant) da un payload non ancora
+   * verificato, per scegliere la chiave. Nessun effetto: i dati veri si leggono
+   * con parsePayload DOPO la verifica della firma.
+   */
+  peekRouting(body: unknown): { storeId: string | null; merchantCode: string | null };
   /** Mappa il payload (JSON già parsato) in IncomingSale. Lancia su payload non valido. */
   parsePayload(body: unknown): IncomingSale;
 }

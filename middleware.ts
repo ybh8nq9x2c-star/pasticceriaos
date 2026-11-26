@@ -16,6 +16,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 import { gateWorkspace } from '@/lib/workspace-gate';
+import { isServerToServerRoute } from '@/lib/server-routes';
 
 const PUBLIC_ROUTES = ['/login', '/signup', '/auth/callback', '/auth/confirm', '/auth/error'];
 const SEMI_AUTH_ROUTES = ['/onboarding'];
@@ -31,11 +32,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Webhook server-to-server (POS): nessuna sessione Supabase per costruzione.
-  // L'autenticazione è la firma HMAC verificata nel route handler. Senza questo
-  // early-return il gate sotto reindirizzava la cassa a /login (F-05,
-  // SECURITY_REPORT.md). Doppia difesa insieme all'esclusione nel matcher.
-  if (pathname.startsWith('/api/webhooks/')) {
+  // Eccezioni DICHIARATE (lib/server-routes.ts): route server-to-server che si
+  // autenticano nel proprio handler (webhook POS = firma HMAC per config, ADR 003).
+  // Doppia difesa insieme all'esclusione nel matcher qui sotto.
+  if (isServerToServerRoute(pathname)) {
     return NextResponse.next();
   }
 
@@ -135,6 +135,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Esclusi: asset statici, manifest e il portale fornitore token-based.
+    // `api/webhooks/` = SERVER_TO_SERVER_PREFIXES (lib/server-routes.ts), allineamento testato.
     '/((?!_next/static|_next/image|favicon.ico|manifest.json|portal/|api/webhooks/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

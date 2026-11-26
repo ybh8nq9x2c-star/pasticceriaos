@@ -12,3 +12,4 @@ security_column_guards.test.sql
 tenant_ledger_guards.test.sql
 production_fefo_lots.test.sql
 partial_receipts.test.sql
+pos_binding.test.sql

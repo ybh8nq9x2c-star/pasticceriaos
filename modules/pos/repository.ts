@@ -12,6 +12,7 @@ import type { SalesDb } from '@/modules/sales/repository';
 import { mapSupabaseError } from '@/lib/errors';
 import { orgScoped } from '@/lib/supabase/org-scope';
 import { normalizePosRef } from './normalize';
+import type { PosConfigBinding } from './secret';
 import type { Json } from '@/lib/database.types';
 
 export interface PosMapping {
@@ -20,37 +21,49 @@ export interface PosMapping {
   posItemName: string | null;
 }
 
-/** Risolve l'org dal config provider (store_id → merchant_code). null se assente.
- *  CROSS-ORG per natura: è il punto in cui il webhook scopre a chi appartiene. */
-export async function resolveOrgId(
+/** Risolve la CONFIG (e quindi org + schema/versione del segreto) dal provider
+ *  e da store_id → merchant_code. null se assente o non attiva.
+ *  CROSS-ORG per natura: è il punto in cui il webhook scopre a chi appartiene.
+ *  Il chiamante verifica la firma con la chiave di QUESTA config (062). */
+export async function resolvePosConfig(
   client: SalesDb,
   provider: string,
   storeId: string | null | undefined,
   merchantCode: string | null | undefined,
-): Promise<string | null> {
-  if (storeId) {
+): Promise<PosConfigBinding | null> {
+  const cols = 'id, organization_id, provider, secret_scheme, secret_version, verified_at';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const toBinding = (d: any): PosConfigBinding => ({
+    configId: d.id as string,
+    organizationId: d.organization_id as string,
+    provider: d.provider as string,
+    secretScheme: d.secret_scheme === 'legacy_global' ? 'legacy_global' : 'derived',
+    secretVersion: Number(d.secret_version ?? 1),
+    verifiedAt: (d.verified_at as string | null) ?? null,
+  });
+  for (const [col, val] of [['store_id', storeId], ['merchant_code', merchantCode]] as const) {
+    if (!val) continue;
     const { data, error } = await client
       .from('pos_configs')
-      .select('organization_id')
+      .select(cols as never)
       .eq('provider', provider)
       .eq('is_active', true)
-      .eq('store_id', storeId)
+      .eq(col, val)
       .maybeSingle();
     if (error) throw mapSupabaseError(error);
-    if (data) return data.organization_id as string;
-  }
-  if (merchantCode) {
-    const { data, error } = await client
-      .from('pos_configs')
-      .select('organization_id')
-      .eq('provider', provider)
-      .eq('is_active', true)
-      .eq('merchant_code', merchantCode)
-      .maybeSingle();
-    if (error) throw mapSupabaseError(error);
-    if (data) return data.organization_id as string;
+    if (data) return toBinding(data);
   }
   return null;
+}
+
+/** Prova di possesso: prima ricevuta firmata col segreto di questa config. */
+export async function markConfigVerified(client: SalesDb, configId: string): Promise<void> {
+  const { error } = await client
+    .from('pos_configs')
+    .update({ verified_at: new Date().toISOString() } as never)
+    .eq('id', configId)
+    .is('verified_at', null);
+  if (error) throw mapSupabaseError(error);
 }
 
 /**
@@ -58,6 +71,13 @@ export async function resolveOrgId(
  * Chiave di idempotenza (050): org + provider + store + receipt + EVENT_TYPE —
  * così il VOID con lo stesso receipt_id del SALE non viene più inghiottito.
  */
+/** Stati di pos_events (062). Terminali: processed, reversed (e duplicate storico). */
+export type PosEventStatus = 'received' | 'processed' | 'reversed' | 'failed' | 'duplicate';
+export const NON_TERMINAL: PosEventStatus[] = ['received', 'failed'];
+export function isTerminal(status: PosEventStatus): boolean {
+  return !NON_TERMINAL.includes(status);
+}
+
 export async function insertPosEvent(
   client: SalesDb,
   e: {
@@ -68,7 +88,7 @@ export async function insertPosEvent(
     externalStoreId: string;
     rawPayload: Json;
   },
-): Promise<{ id: string; duplicate: boolean }> {
+): Promise<{ id: string; duplicate: boolean; status: PosEventStatus }> {
   const org = orgScoped(client, e.orgId);
   const { data, error } = await org
     .upsert(
@@ -79,7 +99,7 @@ export async function insertPosEvent(
         event_type: e.eventType,
         external_store_id: e.externalStoreId,
         raw_payload: e.rawPayload,
-        status: 'pending',
+        status: 'received',
       },
       {
         onConflict: 'organization_id,provider,external_store_id,external_receipt_id,event_type',
@@ -88,18 +108,19 @@ export async function insertPosEvent(
     )
     .select('id');
   if (error) throw mapSupabaseError(error);
-  if (data && data.length > 0) return { id: data[0].id as string, duplicate: false };
+  if (data && data.length > 0) return { id: data[0].id as string, duplicate: false, status: 'received' };
 
   // Conflitto: l'evento esiste già → recupera l'id (idempotenza primaria).
   const existing = await org
-    .select('pos_events', 'id')
+    .select('pos_events', 'id, status')
     .eq('provider', e.provider)
     .eq('external_store_id', e.externalStoreId)
     .eq('external_receipt_id', e.externalReceiptId)
     .eq('event_type', e.eventType)
     .maybeSingle();
   if (existing.error) throw mapSupabaseError(existing.error);
-  return { id: (existing.data as { id: string }).id, duplicate: true };
+  const row = existing.data as { id: string; status: PosEventStatus };
+  return { id: row.id, duplicate: true, status: row.status };
 }
 
 export async function markProcessed(
@@ -111,22 +132,26 @@ export async function markProcessed(
       sale_id: saleId,
       unlinked: unlinked.length ? (unlinked as unknown as Json) : null,
       processed_at: new Date().toISOString(),
+      error_text: null,
     })
-    .eq('id', eventId);
+    .eq('id', eventId)
+    .in('status', NON_TERMINAL); // 062: mai sovrascrivere un esito terminale
   if (error) throw mapSupabaseError(error);
 }
 
 export async function markReversed(client: SalesDb, orgId: string, eventId: string, saleId: string): Promise<void> {
   const { error } = await orgScoped(client, orgId)
-    .update('pos_events', { status: 'reversed', sale_id: saleId, processed_at: new Date().toISOString() })
-    .eq('id', eventId);
+    .update('pos_events', { status: 'reversed', sale_id: saleId, error_text: null, processed_at: new Date().toISOString() })
+    .eq('id', eventId)
+    .in('status', NON_TERMINAL);
   if (error) throw mapSupabaseError(error);
 }
 
 export async function markFailed(client: SalesDb, orgId: string, eventId: string, errorText: string): Promise<void> {
   const { error } = await orgScoped(client, orgId)
     .update('pos_events', { status: 'failed', error_text: errorText, processed_at: new Date().toISOString() })
-    .eq('id', eventId);
+    .eq('id', eventId)
+    .in('status', NON_TERMINAL); // un tentativo concorrente già riuscito resta terminale
   if (error) throw mapSupabaseError(error);
 }
 

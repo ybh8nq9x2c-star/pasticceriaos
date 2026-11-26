@@ -12,6 +12,7 @@ import { AlertTriangle, Check, Receipt } from 'lucide-react';
 import {
   getPosConfig,
   getPosHealth,
+  getPosWebhookSecret,
   listPosMappings,
   listRecipeOptions,
   listUnmappedPosProducts,
@@ -26,6 +27,7 @@ import { PosConfigForm } from './PosConfigForm';
 import { DryRunTester } from './DryRunTester';
 import { HighlightScroll } from './HighlightScroll';
 import { RefreshStatusButton } from './RefreshStatusButton';
+import { WebhookSecretPanel } from './WebhookSecretPanel';
 
 export const metadata: Metadata = { title: 'Connetti il POS' };
 
@@ -57,12 +59,14 @@ function StepCard({
 }
 
 export default async function PosWizardPage({ searchParams }: { searchParams: { highlight?: string } }) {
-  const [health, config, mappings, unmapped, recipes] = await Promise.all([
+  const [health, config, mappings, unmapped, recipes, webhookSecret] = await Promise.all([
     getPosHealth('mipos'),
     getPosConfig('mipos'),
     listPosMappings(),
     listUnmappedPosProducts(),
     listRecipeOptions(),
+    // 062: segreto per-config, solo owner/baker (il viewer non lo vede)
+    getPosWebhookSecret('mipos').catch(() => null),
   ]);
 
   const highlight = searchParams.highlight?.trim().toLowerCase() ?? null;
@@ -125,12 +129,14 @@ export default async function PosWizardPage({ searchParams }: { searchParams: { 
           />
           {health.webhookSecretConfigured ? (
             <p className="text-xs text-success-strong mt-2">
-              La firma di sicurezza (secret) è configurata: gli scontrini non firmati vengono rifiutati.
+              Il server firma le casse una per una: gli scontrini non firmati con la firma della TUA cassa
+              vengono rifiutati. La firma da incollare nel pannello MiPOS è al passo 3.
             </p>
           ) : (
             <p className="text-xs text-warning-strong mt-2">
-              Manca la firma di sicurezza sul server (MIPOS_WEBHOOK_SECRET): senza, nessuno scontrino
-              viene accettato. Chiedi a chi gestisce l&apos;installazione di configurarla.
+              Il server non è ancora pronto a verificare le firme delle casse (chiave madre
+              POS_WEBHOOK_MASTER_SECRET mancante): senza, nessuno scontrino viene accettato. Chiedi a chi
+              gestisce l&apos;installazione di configurarla.
             </p>
           )}
         </StepCard>
@@ -138,6 +144,14 @@ export default async function PosWizardPage({ searchParams }: { searchParams: { 
         {/* 3 · Store/merchant → org */}
         <StepCard n={3} title="Il tuo negozio" done={health.configActive && health.storeConfigured}>
           <PosConfigForm provider="mipos" storeId={config?.storeId ?? null} merchantCode={config?.merchantCode ?? null} />
+          {webhookSecret && (
+            <WebhookSecretPanel
+              scheme={webhookSecret.scheme}
+              version={webhookSecret.version}
+              verifiedAt={webhookSecret.verifiedAt}
+              secret={webhookSecret.secret}
+            />
+          )}
         </StepCard>
 
         {/* 4 · Prova */}

@@ -14,6 +14,7 @@ import type { UnlinkedProduct } from '@/modules/sales/types';
 import { savePosConfigSchema, upsertPosMappingSchema } from './schemas';
 import { derivePosCta, type PosCta, type PosHealthSnapshot } from './status';
 import { normalizePosRef as norm } from './normalize';
+import { masterSecret, webhookKeyFor, type PosConfigBinding } from './secret';
 import { getPosAdapter, posSource, type IncomingSale } from './adapter';
 import { buildCanonicalSale } from './ingest';
 import { loadMappings } from './repository';
@@ -215,7 +216,7 @@ export async function getPosIntegrationStatus(provider = 'mipos'): Promise<PosIn
   const [cfgRes, mapRes, evtRes, lastRes] = await Promise.all([
     supabase
       .from('pos_configs')
-      .select('is_active, store_id, merchant_code')
+      .select('id, is_active, store_id, merchant_code, secret_scheme, secret_version, verified_at' as never)
       .eq('organization_id', session.organizationId)
       .eq('provider', provider)
       .maybeSingle(),
@@ -247,10 +248,15 @@ export async function getPosIntegrationStatus(provider = 'mipos'): Promise<PosIn
   const adapterRegistered = getPosAdapter(provider) !== null;
   // TODO(polling): quando MiPOS esporrà un'API pull documentata, aggiungere qui
   // il ping outbound reale con le credenziali di pos_configs.
-  const webhookSecretConfigured =
-    provider === 'mipos' ? Boolean((process.env.MIPOS_WEBHOOK_SECRET ?? '').trim()) : false;
-  const configActive = Boolean(cfgRes.data?.is_active);
-  const storeConfigured = Boolean(cfgRes.data?.store_id || cfgRes.data?.merchant_code);
+  // 062: la chiave dipende dalla config (segreto derivato per config, o legacy
+  // globale per le config pre-062). Senza config: basta il master per partire.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cfg = cfgRes.data as any;
+  const webhookSecretConfigured = cfg
+    ? webhookKeyFor(toBinding(cfg, session.organizationId, provider)) !== null
+    : masterSecret() !== null;
+  const configActive = Boolean(cfg?.is_active);
+  const storeConfigured = Boolean(cfg?.store_id || cfg?.merchant_code);
   const processedEventsCount = evtRes.count ?? 0;
 
   return {
@@ -290,6 +296,71 @@ export async function getPosConfig(provider = 'mipos'): Promise<PosConfigView | 
   return { storeId: data.store_id, merchantCode: data.merchant_code, isActive: data.is_active };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toBinding(cfg: any, organizationId: string, provider: string): PosConfigBinding {
+  return {
+    configId: cfg.id,
+    organizationId,
+    provider,
+    secretScheme: cfg.secret_scheme === 'legacy_global' ? 'legacy_global' : 'derived',
+    secretVersion: Number(cfg.secret_version ?? 1),
+    verifiedAt: cfg.verified_at ?? null,
+  };
+}
+
+export interface PosWebhookSecretView {
+  configId: string;
+  scheme: 'derived' | 'legacy_global';
+  version: number;
+  verifiedAt: string | null;
+  /** Segreto da incollare nel pannello della cassa. null se il server non è configurato
+   *  o se la config usa ancora il segreto globale (che non si mostra mai ai tenant). */
+  secret: string | null;
+}
+
+/**
+ * Segreto HMAC della cassa di QUESTA org (062), per il wizard. Solo owner/baker.
+ * Per le config legacy_global non si mostra nulla: il segreto globale è condiviso
+ * e va sostituito ruotando (rotatePosWebhookSecret).
+ */
+export async function getPosWebhookSecret(provider = 'mipos'): Promise<PosWebhookSecretView | null> {
+  const session = await requirePosWriter();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('pos_configs')
+    .select('id, secret_scheme, secret_version, verified_at' as never)
+    .eq('organization_id', session.organizationId)
+    .eq('provider', provider)
+    .maybeSingle();
+  if (error) throw mapSupabaseError(error);
+  if (!data) return null;
+  const binding = toBinding(data, session.organizationId, provider);
+  return {
+    configId: binding.configId,
+    scheme: binding.secretScheme,
+    version: binding.secretVersion,
+    verifiedAt: binding.verifiedAt,
+    secret: binding.secretScheme === 'derived' ? webhookKeyFor(binding) : null,
+  };
+}
+
+/** Ruota il segreto della cassa (version+1, verifica azzerata, schema derived). RPC 062. */
+export async function rotatePosWebhookSecret(provider = 'mipos'): Promise<number> {
+  const session = await requirePosWriter();
+  const supabase = await createClient();
+  const { data: cfg, error: selErr } = await supabase
+    .from('pos_configs')
+    .select('id')
+    .eq('organization_id', session.organizationId)
+    .eq('provider', provider)
+    .maybeSingle();
+  if (selErr) throw mapSupabaseError(selErr);
+  if (!cfg) throw new AuthError('Configura prima il negozio (passo 3).');
+  const { data, error } = await supabase.rpc('rotate_pos_webhook_secret' as never, { p_config_id: cfg.id } as never);
+  if (error) throw mapSupabaseError(error);
+  return Number(data);
+}
+
 /**
  * Crea/aggiorna la config POS dell'org (RLS pos_configs_write). Lo store/merchant
  * è ciò che il webhook usa per risolvere l'organizzazione: senza, gli scontrini
@@ -320,8 +391,8 @@ export async function savePosConfig(raw: unknown): Promise<void> {
   const friendly = (code: string | undefined) => {
     if (code === '23505') {
       throw new AuthError(
-        'Questo Store ID (o Merchant code) risulta già collegato a un\'altra organizzazione. ' +
-        'Controlla di aver copiato il codice giusto dal pannello della TUA cassa.',
+        'Questo Store ID (o Merchant code) non è disponibile. Controlla di aver copiato il codice ' +
+        'giusto dal pannello della TUA cassa; se è corretto, contatta l\'assistenza.',
       );
     }
   };
@@ -451,8 +522,9 @@ export async function replayPosEvent(eventId: string): Promise<PosReplayResult> 
   const incoming = event.raw_payload as unknown as IncomingSale;
   const source = posSource(event.provider);
 
-  // FAILED → riesegui l'intera pipeline (idempotente: ON CONFLICT sul sales).
-  if (event.status === 'failed') {
+  // NON TERMINALE (failed, o received rimasto a metà) → riesegui l'intera
+  // pipeline (idempotente: ON CONFLICT sul sales). 062.
+  if (event.status === 'failed' || event.status === 'received') {
     if (incoming.is_reversal) {
       const saleId = await salesRepo.findSaleIdByExternal(
         session.organizationId, source, incoming.external_receipt_id,
