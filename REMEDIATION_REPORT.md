@@ -48,7 +48,21 @@ Questi punti vanno nelle **nuove** migration di W2 (≥ 059). Il contenuto della
 
 ## 3. Stato per lavoro
 
-_(aggiornato a ogni commit: vedi sezioni seguenti)_
+| Lavoro | Stato | Commit | Migration | Evidenza principale |
+|---|---|---|---|---|
+| baseline | ✅ | `ad54f02` | 058 | report audit + guard di colonna |
+| W0 credenziali | ✅ repo · ⏳ H1–H4 | `6f69b15` | — | 0 vecchi valori nel working tree; E2E fail-fast verificato |
+| W1 DB riproducibile | ✅ | `92d96b6` | — | glob vecchio rotto alla 018 (riprodotto); catena da zero + test eseguiti |
+| W2 tenant/ledger | ✅ | `513acca` | 059 | controllo negativo: ordine di A → `partial` da B; ora `P0045` |
+| W3 lotti FEFO | ✅ | `056f5ba` | 060 | controllo negativo: lotti intatti con la 050; ora FEFO e righe dichiarate |
+| W4 ricevimenti parziali | ✅ | `72d9e78` | 061 | 2 sessioni Postgres reali: +4/+5 → 9; +6/+6 su 10 → una rifiutata |
+| W5 POS | ✅ codice · ⏳ H5–H6 | `aa4f51e` | 062 | firma di un'altra config → 401; retry dopo transitorio → una vendita |
+| W6 uso quotidiano | ✅ | `434b1f8` | 063 | 2ª rapida nello stesso giorno OK; doppio submit → una spedizione; tutti i prodotti con avanzo |
+| W7 piattaforma | ⏭ non avviato | — | — | per prompt: **dopo staging, separato** (Node 22 + Next supportato, font self-hosted, ESLint, e2e) |
+
+Esecuzione finale (catena 001…063 da zero su `supabase/postgres:15.20.0.005`):
+`✓ CHAIN coerente: 62 migration, 1 escluse` · `✓ test SQL verdi: 13 suite` (12 SQL + 1 concorrenza) ·
+riconciliazione OK · typecheck pulito · **385/385** unit · `next build` OK.
 
 ### W0 — Bonifica credenziali · ✅ fatto (lato repo) · azioni umane H1–H3 pendenti
 
@@ -281,3 +295,49 @@ Il ledger resta coerente con `qty_received`. Fix suggerito: incremento atomico i
 
 **Esecuzione:** 62 migration da zero, `✓ test SQL verdi: 13 suite`; typecheck pulito; **385/385** unit; build OK.
 **Non coperto da test automatici:** il flusso `changeOrderStatus → email` del service non ha un unit test con mock. Il contratto anti-doppio-invio è verificato a livello RPC (W6-C) e dal typecheck.
+
+
+---
+
+## 4. Stato dei rilievi di `SECURITY_REPORT.md`
+
+| Finding | Esito | Dove / motivazione |
+|---|---|---|
+| F-01 Next 14 (RCE optimizer) | **parziale** | mitigato (optimizer spento, baseline); l'upgrade è W7, dopo staging |
+| F-02 riattivazione/ripuntamento connessioni | **fatto** | 058 (trigger, test `security_column_guards`) |
+| F-03 manomissione ordini marketplace | **fatto** | 058 |
+| F-04 secret POS globale | **fatto (codice)** | 062; chiusura effettiva con H5/H6 |
+| F-05 webhook bloccato dal middleware | **fatto** | baseline + formalizzato in W5 (`lib/server-routes.ts`, test sul matcher) |
+| F-06 squatting store_id | **fatto** | 062: segreto per config + prova di possesso; messaggio generico |
+| F-07 ledger scrivibili / viewer | **fatto** per ledger e proiezioni (059) e per le nuove RPC (viewer escluso) · **parziale** per il ruolo viewer sulle altre tabelle, dove la RLS non distingue i ruoli |
+| F-08 prezzi forgiati nelle righe marketplace | **aperto** | non incluso in W0–W6; fix proposto: unico write-path `place_marketplace_order` o trigger che rifà lo snapshot dal catalogo |
+| F-09 costi import AI | **aperto** | non incluso; serve una quota per org |
+| F-10 open redirect `/\` | **aperto** | non incluso; fix da una riga in `safeNext` |
+| F-11 header di sicurezza | **aperto** | non incluso (CSP da progettare con gli script inline esistenti) |
+| F-12 FK cross-tenant | **parziale** | ricevimenti (059), righe di ricevimento (059/061), produzione (righe di altra org dichiarate, 060/063), prenotazioni e piani (063); restano `recipe_ingredients` e `order_line_items` |
+| F-13 upload dal portale | **aperto** (basso) | mitigato dalla whitelist MIME del bucket |
+| F-14 token portale 1 anno | **fatto** | W6: 30 giorni configurabili, rotazione via RPC |
+| F-15 entropia chiavi PSOS | **aperto** (basso) | correggere il commento e aggiungere un rate limit |
+| F-16 rollback nella catena | **fatto** | W1 (`CHAIN` con `!exclude`) |
+| F-17 dipendenze | **aperto** | W7 |
+
+## 5. ADR prodotti
+
+- [ADR 002 — Eccedenze in ricezione e avanzamento per riga d'ordine](docs/adr/002-over-receipt-policy.md) (W4)
+- [ADR 003 — Binding cassa ↔ tenant e semantica del webhook POS](docs/adr/003-pos-webhook-binding.md) (W5)
+
+## 6. Cosa NON è stato fatto / verificato (onestamente)
+
+- **Verifica di giornata in staging (§5 del prompt)**: non eseguita. Le regole vietano Railway e prod
+  e non c'è accesso a uno staging. È il prossimo passo umano, dopo aver applicato 058–063 in staging
+  (in ordine di `CHAIN`) e configurato `POS_WEBHOOK_MASTER_SECRET`.
+- **Job `sql` su GitHub Actions**: non osservato (`gh` non autenticato). Esegue lo stesso
+  `scripts/db/local.sh all` verificato qui.
+- **E2E Playwright**: non eseguiti (servono ambiente e credenziali nuove, H3/H4). Le suite `80`/`90`
+  restano escluse dal config: è W7.
+- **`lib/database.types.ts`** non rigenerato: le nuove RPC sono chiamate con il cast `as never`;
+  `DispatchOutcome` è esteso localmente con `'pending'`.
+- **Rischio residuo noto** (ADR 002): incremento non atomico di `qty_received` da scanner.
+- **Rollout delle migration in prod**: le 059 e 061 possono emettere un WARNING (invece di fallire) se
+  trovano dati storici incoerenti. Prima del deploy eseguire `supabase/diagnostics/tenant_coherence.sql`
+  e `receipts_open_duplicates.sql` sullo staging/prod in sola lettura.
