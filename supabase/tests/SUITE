@@ -10,3 +10,4 @@ receipts_double_count.test.sql
 ordering_production_rpc.test.sql
 security_column_guards.test.sql
 tenant_ledger_guards.test.sql
+production_fefo_lots.test.sql

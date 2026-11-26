@@ -5,6 +5,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { mapSupabaseError, NotFoundError } from '@/lib/errors';
+import { toCompletionReport } from './completion-report';
 import type { ProductionPlan, ProductionPlanListItem, ProductionPlanItem, PlanStatus, WeekTemplateItem } from './types';
 import type { CreatePlanInput, UpdatePlanInput, PlanItemInput, SaveWeekTemplateInput } from './schemas';
 
@@ -158,6 +159,7 @@ function toPlan(row: any): ProductionPlan {
     status:         row.status,
     notes:          row.notes,
     completedAt:    row.completed_at,
+    completionReport: toCompletionReport(row.completion_report),
     createdAt:      row.created_at,
     updatedAt:      row.updated_at,
     items: (row.production_plan_items ?? []).map(

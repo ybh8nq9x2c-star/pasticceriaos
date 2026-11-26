@@ -18,6 +18,26 @@ export interface ProductionPlanItem {
   sortOrder: number;
 }
 
+/** Esito dichiarato del completamento (RPC complete_production_plan v5, 060). */
+export interface PlanCompletionReport {
+  consumed: {
+    ingredientName: string;
+    quantity: number;
+    unit: string;
+    lots: { lotNumber: string | null; expiryDate: string; quantity: number; unit: string }[];
+    untrackedQuantity: number;
+  }[];
+  skipped: {
+    recipeName: string;
+    ingredientName: string;
+    quantity: number;
+    recipeUnit: string;
+    stockUnit: string;
+    reason: 'unit_incompatible' | 'ingredient_other_org';
+  }[];
+  output: { recipeName: string; quantity: number; ingredientsComplete: boolean }[];
+}
+
 export interface ProductionPlan {
   id: string;
   organizationId: string;
@@ -25,6 +45,8 @@ export interface ProductionPlan {
   status: PlanStatus;
   notes: string | null;
   completedAt: string | null;
+  /** null per piani completati prima della 060 o non ancora completati. */
+  completionReport: PlanCompletionReport | null;
   createdAt: string;
   updatedAt: string;
   items: ProductionPlanItem[];

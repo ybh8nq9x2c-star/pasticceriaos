@@ -159,3 +159,35 @@ Test esistenti allineati alla 059 (cambiava il write-path, non la regola):
 pulito, 356/356 unit, build OK.
 **Non fatto:** `lib/database.types.ts` non è stato rigenerato (CLI Supabase assente). Le due nuove RPC
 sono chiamate con il cast `as never`, come altri punti del codice.
+
+### W3 — Consumo dei lotti in produzione · ✅ fatto (eseguito)
+
+**Bug confermato a runtime (controllo negativo con il corpo della 050, stesso scenario del test):**
+```
+ EARLY | 300.0000     LATE | 1000.0000     ZUC | 10.0000      ← nessun lotto decrementato
+ movimenti_zucchero = 0                                         ← riga saltata in silenzio
+ nota_finito_biscotto = (nessuna nota)                          ← finito accreditato senza dichiararlo
+```
+
+**Migration `060_production_fefo_lots.sql`**: ridefinisce `complete_production_plan` (v5) senza
+toccare la 050. Il ritorno passa da `void` a `jsonb`, quindi DROP + CREATE con i grant identici.
+| Punto | Implementazione |
+|---|---|
+| Lotti nella stessa transazione | per ogni ingrediente: lock della giacenza, **un** movimento `production_usage` (con `qty_before/after`), poi allocazione sui lotti attivi `order by expiry_date, received_at` **for update**; `quantity_remaining` decrementato |
+| Collegamento lotto ↔ movimento | nuova colonna `production_batch_ingredients.inventory_movement_id` |
+| Stock senza lotto | la quota non coperta da lotti è dichiarata (`untracked_quantity`), non inventata |
+| Unità incompatibili | riga **saltata e dichiarata** (`skipped`, motivo `unit_incompatible`): nessun movimento, lotti intatti. Il finito viene accreditato, con `ingredients_complete=false` nell'esito e una nota "consumo ingredienti INCOMPLETO" sul movimento |
+| Ingrediente di altra org (F-12) | stessa gestione, motivo `ingredient_other_org`: mai scaricare stock altrui né filtrarlo in silenzio |
+| Esito | jsonb restituito **e** salvato in `production_plans.completion_report` (nuova colonna) |
+| Garanzie v4 | atomica; ricompletamento → `P0040` |
+| UI | `components/production/CompletionReportCard.tsx` nel dettaglio piano: avviso per le righe saltate, lotti FEFO consumati, quota senza lotto. Mapping puro in `modules/production/completion-report.ts` |
+
+**Regressioni eseguite:**
+- `supabase/tests/production_fefo_lots.test.sql` (nuova): EARLY 300→0 e LATE 1000→900 (ordine per scadenza, non per inserimento); 2 consumi collegati al movimento (−400 g); zucchero saltato e dichiarato con lotto a 10 e 0 movimenti; Biscotto `ingredients_complete=false`; `completion_report` uguale all'esito; secondo completamento → `P0040` senza nuovi movimenti né consumi.
+- `modules/production/__tests__/completion-report.test.ts` (3 test).
+- Test esistenti invariati e verdi: `ordering_production_rpc` (complete atomico e idempotente).
+
+**Esecuzione:** 59 migration da zero, `✓ test SQL verdi: 9 suite`; typecheck pulito; 359/359 unit; build OK.
+**Nota di comportamento:** i movimenti `production_usage` diventano **uno per ingrediente**: prima
+erano uno per riga ricetta, con più righe per lo stesso ingrediente se più ricette lo usavano. Il totale
+scaricato è identico.

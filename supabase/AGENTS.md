@@ -32,7 +32,7 @@ con check `current_organization_id()` esplicito. Inventario delle RPC che muovon
 | RPC | File | Effetto |
 |-----|------|---------|
 | `receive_purchase_order` | 019 | ⚠️ DEPRECATA (execute revocato): ricezione solo via engine 035 |
-| `complete_production_plan` | 019 | Scarico stock da produzione |
+| `complete_production_plan` | 019→**060 (v5)** | −materie prime (1 movimento/ingrediente) + **consumo FEFO dei lotti** collegato al movimento + finiti; righe non scaricabili **dichiarate** in `production_plans.completion_report`; ritorna l'esito jsonb |
 | `receive_marketplace_order` | 023 | Ordine marketplace consegnato → PO specchio + movimenti (idempotente) |
 | `complete_purchase_receipt` | 035 | **Goods Receipt Engine**: movimenti incrementali idempotenti + lotti |
 | `create_organization` | 011 | Onboarding org + membership |

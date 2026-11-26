@@ -18,6 +18,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { SubmitButton } from '@/components/ui/SubmitButton';
 import { StickyActionBar } from '@/components/ui/StickyActionBar';
 import { UNIT_LABELS } from '@/lib/utils';
+import { CompletionReportCard } from '@/components/production/CompletionReportCard';
 
 export const metadata: Metadata = { title: 'Piano di produzione' };
 
@@ -369,9 +370,15 @@ export default async function ProductionDetailPage({ params }: { params: { id: s
                 })}
               </p>
               <p className="text-xs text-ink-muted mt-2">
-                Stock magazzino aggiornato.
+                {plan.completionReport && plan.completionReport.skipped.length > 0
+                  ? 'Stock magazzino aggiornato, con righe saltate (vedi sotto).'
+                  : 'Stock magazzino aggiornato.'}
               </p>
             </div>
+          )}
+
+          {plan.status === 'completed' && plan.completionReport && (
+            <CompletionReportCard report={plan.completionReport} />
           )}
 
           {canComplete && (
